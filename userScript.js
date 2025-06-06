@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.4.16
+// @version      0.4.19
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 37.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -162,6 +162,16 @@
 			action: showHelp,
 			aliases: ["help", "man", "show help"],
 			description: "Displays help information for available commands",
+		},
+		universalCopy: {
+			action: universalCopyCommandPalette,
+			aliases: ["universal copy", "copy universal", "rocket copy"],
+			description: "Copy actions between control rooms.",
+		},
+		universalPaste: {
+			action: universalPasteCommandPalette,
+			aliases: ["universal paste", "paste universal", "rocket paste"],
+			description: "Paste actions between control rooms.",
 		},
 	};
 
@@ -757,6 +767,49 @@
 	}
 
 	/**
+	 * Recursively clears sensitive fields in an object.
+	 * @param {object} obj
+	 */
+	function clearSensitiveFields(obj) {
+		if (!obj || typeof obj !== "object") return;
+		for (const key in obj) {
+			if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+			if (key === "blob" || key === "thumbnailMetadataPath" || key === "screenshotMetadataPath") {
+				obj[key] = "";
+			} else if (typeof obj[key] === "object" && obj[key] !== null) {
+				clearSensitiveFields(obj[key]);
+			}
+		}
+	}
+
+	/**
+	 * Cleans Automation Anywhere node JSON by removing sensitive metadata paths and blobs.
+	 * @param {string} jsonString - The input JSON string.
+	 * @returns {string} - The cleaned, minified JSON string.
+	 */
+	function cleanAutomationAnywhereJson(jsonString) {
+		let data;
+		try {
+			data = JSON.parse(jsonString);
+		} catch (e) {
+			console.error("Invalid JSON input", e);
+			return jsonString;
+		}
+
+		if (!Array.isArray(data.nodes)) return JSON.stringify(data);
+
+		for (const node of data.nodes) {
+			if (!Array.isArray(node.attributes)) continue;
+			for (const attr of node.attributes) {
+				if (attr.value && typeof attr.value === "object") {
+					clearSensitiveFields(attr.value);
+				}
+			}
+		}
+		return JSON.stringify(data);
+	}
+
+	/**
 	 * Copies data to the specified clipboard slot.
 	 * @param {number} slot
 	 */
@@ -787,13 +840,35 @@
 		}
 		let emojiUid = generateEmojiString();
 		let modifiedData = clipboardData.replace(/🔥🔥🔥/g, emojiUid);
-		localStorage.setItem('globalClipboard', modifiedData);
+
+		// Clean the JSON before pasting
+		let cleanedData = cleanAutomationAnywhereJson(modifiedData);
+
+		localStorage.setItem('globalClipboard', cleanedData);
 		localStorage.setItem('globalClipboardUid', `"${emojiUid}"`);
 		const pasteButton = safeQuery(".aa-icon-action-clipboard-paste--shared", "pasteFromSlot");
 		if (pasteButton) {
 			setTimeout(() => {
 				pasteButton.click();
 			}, 500);
+		}
+	}
+
+	function universalCopyCommandPalette() {
+		const btn = document.querySelector(".universalCopy");
+		if (btn) {
+			btn.click();
+		} else {
+			universalCopy(); // fallback
+		}
+	}
+
+	function universalPasteCommandPalette() {
+		const btn = document.querySelector(".universalPaste");
+		if (btn) {
+			btn.click();
+		} else {
+			universalPaste(); // fallback
 		}
 	}
 
@@ -859,7 +934,11 @@
 			let emojiUid = generateEmojiString();
 			universalClipboard = universalClipboard.replace(/'/g, '"');
 			universalClipboard = universalClipboard.replace(/🔥🔥🔥/g, emojiUid);
-			localStorage.setItem("globalClipboard", universalClipboard);
+
+			// Clean the JSON before pasting
+			let cleanedData = cleanAutomationAnywhereJson(universalClipboard);
+
+			localStorage.setItem("globalClipboard", cleanedData);
 			localStorage.setItem("globalClipboardUid", `"${emojiUid}"`);
 		}
 		setTimeout(() => {
@@ -1074,5 +1153,4 @@
 	} else {
 		callInitializeRepeatedly();
 	}
-
 })();
