@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.4.19
+// @version      0.5.0
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 37.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -113,15 +113,15 @@
 			aliases: ["duv", "delete unused", "remove unused variables"],
 			description: "Shows dialog to select and delete unused variables",
 		},
-		redirectToPublicRepository: {
-			action: redirectToPublicRepository,
-			aliases: ["pub", "public", "public bots"],
-			description: "Redirects to the public bots folder",
-		},
 		redirectToPrivateRepository: {
 			action: redirectToPrivateRepository,
 			aliases: ["p", "private", "private bots"],
 			description: "Redirects to the private bots folder",
+		},
+		redirectToPublicRepository: {
+			action: redirectToPublicRepository,
+			aliases: ["pub", "public", "public bots"],
+			description: "Redirects to the public bots folder",
 		},
 		redirectToActivityHistorical: {
 			action: redirectToActivityHistorical,
@@ -173,6 +173,16 @@
 			aliases: ["universal paste", "paste universal", "rocket paste"],
 			description: "Paste actions between control rooms.",
 		},
+		exportActionToClipboard: {
+			action: exportActionToClipboard,
+			aliases: ["export action", "copy action json", "export copied action", "share action"],
+			description: "Export the currently copied action as JSON to your clipboard.",
+		},
+		importActionFromJson: {
+			action: importActionFromJson,
+			aliases: ["import action", "paste action json", "import shared action", "load action json"],
+			description: "Import an action from JSON and paste it as if copied locally.",
+		},
 	};
 
 	// =========================
@@ -209,17 +219,22 @@
 	function togglePaletteVisibility() {
 		const commandPalette = getCommandPalette();
 		if (!commandPalette) return;
+		const input = getCommandInput();
 		if (commandPalette.classList.contains("command_palette--visible")) {
 			commandPalette.classList.remove("command_palette--visible");
 			commandPalette.classList.add("command_palette--hidden");
-			const input = getCommandInput();
-			if (input) input.value = "";
+			if (input) {
+				input.value = "";
+				input.blur();
+			}
 			clearPredictions();
+			activePredictionIndex = -1;
 		} else {
 			commandPalette.classList.remove("command_palette--hidden");
 			commandPalette.classList.add("command_palette--visible");
-			const input = getCommandInput();
-			if (input) input.focus();
+			if (input) {
+				input.focus();
+			}
 		}
 	}
 
@@ -237,7 +252,10 @@
 	 */
 	function updatePredictions(input) {
 		clearPredictions();
-		if (!input) return;
+		if (!input) {
+			activePredictionIndex = -1;
+			return;
+		}
 
 		// Check for ":<number>" syntax to scroll to a line
 		const jumpToLineMatch = input.match(/^:(\d+)$/);
@@ -274,6 +292,16 @@
 				}
 			}
 		);
+
+		// Always select the first prediction if any
+		const predictionsContainer = getCommandPredictions();
+		const items = predictionsContainer ? predictionsContainer.getElementsByClassName("command_prediction-item") : [];
+		if (items.length > 0) {
+			activePredictionIndex = 0;
+			updateActivePrediction(items);
+		} else {
+			activePredictionIndex = -1;
+		}
 	}
 
 	/**
@@ -835,7 +863,6 @@
 	function pasteFromSlot(slot) {
 		const clipboardData = GM_getValue(`universalClipboardSlot${slot}`);
 		if (!clipboardData) {
-			alert(`No data in Slot ${slot}`);
 			return;
 		}
 		let emojiUid = generateEmojiString();
@@ -1056,6 +1083,128 @@
 				console.error("Failed to insert command palette after 5 retries.");
 			}
 		}
+	}
+
+	/**
+	 * Exports the currently copied action as JSON to the user's clipboard,
+	 * with uid set to 🔥🔥🔥 (for universal sharing).
+	 */
+	async function exportActionToClipboard() {
+		try {
+			// Use universalCopy to set GM storage with 🔥🔥🔥 as uid
+			universalCopy();
+			// Wait a short moment to ensure GM_setValue is complete
+			await sleep(200);
+			const universalClipboard = GM_getValue('universalClipboard');
+			if (!universalClipboard) {
+				return;
+			}
+			await navigator.clipboard.writeText(universalClipboard);
+		} catch (e) {
+			console.warn("Failed to export action to clipboard:", e);
+		}
+	}
+
+	function importActionFromJson() {
+		// Modal setup
+		const overlay = document.createElement('div');
+		overlay.style.position = 'fixed';
+		overlay.style.top = '0';
+		overlay.style.left = '0';
+		overlay.style.width = '100vw';
+		overlay.style.height = '100vh';
+		overlay.style.background = 'rgba(0,0,0,0.5)';
+		overlay.style.zIndex = '100000';
+		overlay.style.display = 'flex';
+		overlay.style.justifyContent = 'center';
+		overlay.style.alignItems = 'center';
+
+		const modal = document.createElement('div');
+		modal.style.background = 'white';
+		modal.style.padding = '24px';
+		modal.style.borderRadius = '8px';
+		modal.style.maxWidth = '600px';
+		modal.style.width = '90%';
+		modal.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+		modal.style.display = 'flex';
+		modal.style.flexDirection = 'column';
+		modal.style.alignItems = 'stretch';
+
+		const label = document.createElement('label');
+		label.textContent = "Paste Automation Anywhere Action JSON:";
+		label.style.marginBottom = '8px';
+
+		const textarea = document.createElement('textarea');
+		textarea.style.width = '100%';
+		textarea.style.height = '180px';
+		textarea.style.marginBottom = '12px';
+		textarea.style.fontFamily = 'monospace';
+		textarea.style.fontSize = '1rem';
+
+		const buttonRow = document.createElement('div');
+		buttonRow.style.display = 'flex';
+		buttonRow.style.justifyContent = 'flex-end';
+		buttonRow.style.gap = '8px';
+
+		const importBtn = document.createElement('button');
+		importBtn.textContent = "Import & Paste";
+		importBtn.style.padding = '8px 16px';
+		importBtn.style.background = 'var(--color_background_interactive, #3c5e83)';
+		importBtn.style.color = 'white';
+		importBtn.style.border = 'none';
+		importBtn.style.borderRadius = '4px';
+		importBtn.style.cursor = 'pointer';
+
+		const cancelBtn = document.createElement('button');
+		cancelBtn.textContent = "Cancel";
+		cancelBtn.style.padding = '8px 16px';
+		cancelBtn.style.background = '#ccc';
+		cancelBtn.style.color = '#222';
+		cancelBtn.style.border = 'none';
+		cancelBtn.style.borderRadius = '4px';
+		cancelBtn.style.cursor = 'pointer';
+
+		buttonRow.appendChild(cancelBtn);
+		buttonRow.appendChild(importBtn);
+
+		modal.appendChild(label);
+		modal.appendChild(textarea);
+		modal.appendChild(buttonRow);
+		overlay.appendChild(modal);
+		document.body.appendChild(overlay);
+		textarea.focus();
+
+		function closeModal() {
+			document.body.removeChild(overlay);
+		}
+
+		cancelBtn.onclick = closeModal;
+		overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+		document.addEventListener('keydown', function escListener(e) {
+			if (e.key === 'Escape') {
+				closeModal();
+				document.removeEventListener('keydown', escListener);
+			}
+		});
+
+		importBtn.onclick = async function () {
+			let input = textarea.value.trim();
+			if (!input) {
+				return;
+			}
+			try {
+				// Validate JSON
+				JSON.parse(input);
+			} catch (e) {
+				return;
+			}
+			// Set GM storage for universal paste
+			GM_setValue('universalClipboard', input);
+			closeModal();
+			// Wait a short moment to ensure GM_setValue is complete
+			await sleep(200);
+			universalPaste();
+		};
 	}
 
 	// =========================
