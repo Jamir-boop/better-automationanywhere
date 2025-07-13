@@ -1,0 +1,14 @@
+@import './utils.styl'
+
+button[aria-label="Run"][name="run"]
+	transition: transform 0.3s ease !important
+	top: -1px // to compensate the folder below
+	border: var(--color_background_interactive) 1px solid !important
+	cursor: pointer !important
+	animation: pulse 3s ease-in-out infinite !important
+	cursiveCascadiaFont()
+	&:hover
+			animation: shakeSideToSide 1s ease-in-out infinite !important
+			transform: scale(1.15)
+	.clipped-text
+		font-weight: bold

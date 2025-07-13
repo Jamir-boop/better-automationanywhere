@@ -1,0 +1,17 @@
+@import './utils.styl'
+
+// Grab cursor style
+.editor-palette-item__child--is_draggable
+	cursor: pointer !important
+.editor-palette-item__child--is_draggable:active
+	cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAQAAABKfvVzAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAACYktHRAD/h4/MvwAAAAlwSFlzAAAAyAAAAMgAY/rnrQAAAAd0SU1FB+gEEBIlOqIHvFsAAAABb3JOVAHPoneaAAABbklEQVQ4y2NgGAXkAcY3Pd9+/vzzIvWe+mMZBka8aj8mfP7y/c+73yL/df/f+vXw66ef9zMYWHFqCmX79NXoP9v/2f8ZgHA9EGv9//grIzhCCqum67xnVT7+AikNAGuIAJN3/j34+epzTQKDCAMTirvPSv34+fnnu78gRTxgpVxg0hiIA/9/+MWQxCCGrIH1Vs/cn3z/34EVoUO2/9/+MpQwSCNrYH/91vg/Xg2laBq+/2H7z/6/FSgt+l8YCCWAWPC/NJDkwaqBDaQBYp4LUKPzfw8g6fDf5z/HfwusGli//xEAKgFB3v/uQFP5gCQ30A63/5z/+bFpeHI/7L8kDqj5/+NvdA1Ml5uO/bYERhQ2WPf//GuGAgYplHiIkj+x/+OfZ7/A8Pfz3y+A8OXvV2D47HvEIgZ/BgHUiGZiEDeLNe0zmK47DQS1pmpN1Z6iDoKTeVsYIoHmM6OnDSYGdgYeBl4skIeBAzVhDCoAAKkBAU33aVt8AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI0LTA0LTE2VDE4OjM3OjU4KzAwOjAwql9V1wAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNC0wNC0xNlQxODozNzo1NyswMDowMC1KnYIAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjQtMDQtMTZUMTg6Mzc6NTgrMDA6MDCMF8y0AAAAAElFTkSuQmCC') 10 10, grab !important
+
+// Close button change the white bg to the same of run button
+button[name="close"]
+.command-button
+	background: transparent !important
+	&:hover
+		background: var(--color_background_interactive_whisper_hover) !important
+
+.loadable__overlay
+	customGradientBackground()

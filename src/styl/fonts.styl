@@ -1,0 +1,23 @@
+@import './utils.styl'
+
+.editor-page__body *:not(span):not(button):not(.field-label__help):not(.help-content .taskbot-node-details__description):not(.taskbot-canvas-list-node__number)
+	font-size: inputFontSize px !important
+	font-size: .94rem !important
+
+.folder-list__content .rio-link__label,
+.folder-list__content .clipped-text__string--for_presentation,
+	.message__main *:not(span):not(button):not(.field-label__help):not(.checkbox-input__content):not(.message__content)
+		font-size: 1rem !important
+
+	.code-input *
+		font-size: 1.10rem !important
+		line-height: normal !important
+.code-input
+	all: unset !important
+	font-weight: 500 !important
+
+code,
+.taskbot-canvas-list-node__title--disabled .taskbotnodelabel,
+.code-input,
+.editor-page-header__title-text
+	cursiveCascadiaFont()

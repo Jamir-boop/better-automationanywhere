@@ -1,0 +1,15 @@
+@import './utils.styl'
+
+// bigger loading image space
+.devicechannelmodal-icon.g-override
+	width: 120px !important
+	height: 120px !important
+
+// Loading animation replace
+.devicechannelmodal .icon-image-container,
+.rio-spinner--variant_LOADING,
+.rio-spinner--variant_WORKING
+	*:not(img)
+		display: none !important
+
+	customLoadingGifBase64()

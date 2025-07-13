@@ -1,0 +1,96 @@
+@import 'modern-normalize/modern-normalize.css'
+
+:root
+	font-family: Cascadia Code NF, sans-serif
+	line-height: 1.5
+	font-weight: 400
+
+	color: rgba(255, 255, 255, 0.87)
+	background-color: #242424
+
+	font-synthesis: none
+	text-rendering: optimizeLegibility
+	-webkit-font-smoothing: antialiased
+	-moz-osx-font-smoothing: grayscale
+	-webkit-text-size-adjust: 100%
+
+#topbar
+	display: flex
+	align-items: center
+	justify-content: flex-start
+	gap: 0.5rem
+	background: #17171c
+	padding: 0.5rem 1rem
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1)
+	position: relative
+	overflow: visible
+	margin-bottom: 1.25rem
+	min-width: 0
+
+	// max-width: 300px
+	button
+		position: relative
+		background: none
+		border: none
+		outline: none
+		color: #bfc7d5
+		font-size: 1rem
+		padding: 0.6rem 1.25rem
+		border-radius: 0.9rem
+		cursor: pointer
+		transition: color 0.2s
+		z-index: 1
+		font-weight: 500
+		letter-spacing: 0.04em
+
+		&:not(:last-child)
+			margin-right: 0.15rem
+
+		&:hover
+			color: #fff
+
+		&.active
+			color: #fff
+			z-index: 2
+
+	// Info button style (last button)
+	button:last-child
+		margin-left: auto
+		min-width: 2.3rem
+		display: flex
+		align-items: center
+		justify-content: center
+		font-size: 1.3rem
+		padding: 0.5rem 0.6rem
+		border-radius: 50%
+		background: none
+		color: #88b5fa
+		transition: background 0.18s, color 0.18s
+
+		&:hover
+			background: #23233a
+			color: #fff
+
+	// The animated sliding background
+	.tab-bg
+		position: absolute
+		top: 4px
+		left: 0
+		height: calc(100% - 8px)
+		width: 0
+		border-radius: 1rem
+		background: linear-gradient(90deg, #4a90e2, #3577d6)
+		box-shadow: 0 2px 12px #3577d640
+		z-index: 0
+		transition: all 0.28s cubic-bezier(0.4, 1.2, 0.7, 1)
+
+	// For visually separating info button
+	button:last-child::before
+		content: ''
+		display: block
+		width: 1px
+		height: 1.7rem
+		background: #23233a
+		margin-right: 0.8rem
+		margin-left: -0.8rem
+		border-radius: 2px

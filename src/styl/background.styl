@@ -1,0 +1,24 @@
+@import './utils.styl'
+
+// Editor background
+.tabs-labels,
+.editor-layout__toolbar,
+.editor-details,
+.taskbot-canvas-list,
+.editor-layout__right,
+.editor-layout__details,
+.editor-details__header::after,
+.page
+	background: transparent !important
+
+.editor-page,
+.main-layout__content // folder background
+	customGradientBackground()
+
+.editor-details__header
+	background: rgb(255,255,255);
+	background: linear-gradient(90deg, rgba(255,255,255,1) 1%, rgba(255,255,255,0) 100%);
+
+// login background
+.main-layout__authentication__wrapper
+	customGradientBackground()

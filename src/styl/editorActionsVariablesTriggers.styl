@@ -1,0 +1,67 @@
+// Actions and variables sidebar
+// hide the contents of the non active toolbars
+.editor-palette__accordion:not(.editor-palette__accordion--is_active)
+	.editor-palette-section__scroller
+			display: none
+	// make the header text smaller
+	span.editor-palette-section__header-title
+		font-size: 10px
+		font-weight: normal
+		:hover
+			font-weight: bold
+
+	.editor-palette-section__action-search,
+	.editor-palette-section__header-button
+		padding-inline: 0px
+
+.editor-palette
+	span.editor-palette-section__header-title
+		font-size: 1rem
+
+	flex-direction: row
+	&-section__scroller
+		display: block
+	&__accordion
+		//all: unset
+		//flex: 0 0 3px important
+
+		&--is_active
+			background: red !important
+			display: block
+
+	&-section__header-show
+		display: none
+
+	//hide the scrollbars
+	&-section__scroller
+		overflow-y: auto
+		scrollbar-width: none // For Firefox
+		&::-webkit-scrollbar
+			display: none // For Chrome, Safari, and Opera
+	&-section__header-actions
+		z-index: 999
+		margin-top: 45px
+
+	// mueve boton de limpiar busqueda a la derecha
+	&-search__cancel
+		right: 100%
+
+// Hides the non active palettes
+.editor-palette__accordion--is_active
+	flex: 1 0 1px !important
+
+.editor-palette__accordion
+	flex-basis: 0px !important
+	transition none
+.editor-palette span.editor-palette-section__header-title
+	color white
+
+.editor-palette-section__header
+	height 0px !important
+.editor-palette-section__header-inner
+	height 12px !important
+
+.editor-palette-section__scroller--variant_search
+	margin-top -30px !important
+.editor-palette-section__scroller-top
+	background transparent !important
