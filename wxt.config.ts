@@ -20,12 +20,18 @@ export default defineConfig({
 		},
 		action: {},
 		commands: {
-		"open-sidebar": {
-			suggested_key: {
-				default: "Ctrl+Shift+L"
+			"open-sidebar": {
+				suggested_key: {
+					default: "Ctrl+Shift+L"
+				},
+				description: "Open extension sidebar"
 			},
-			description: "Open extension sidebar"
+			"toggle-styles": {
+				suggested_key: {
+					default: "Ctrl+Shift+S"
+				},
+				description: "Toggle all custom styles"
+			}
 		}
-	    }
 	}
 });
