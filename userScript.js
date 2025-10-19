@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.0
-// @description  Enhanced Automation Anywhere developer experience. Working at CR Version 37.0.0
+// @version      0.5.1
+// @description  Enhanced Automation Anywhere developer experience. Working at CR Version 38.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
 // @icon         https://cmpc-1dev.my.automationanywhere.digital/favicon.ico
@@ -476,34 +476,41 @@
 	 * Shows the Variables section in the palette.
 	 */
 	async function showVariables() {
-		if (getPaletteState() === "closed") {
-			toggleToolbar();
-			await sleep(1000);
+	  if (getPaletteState() === "closed") {
+		toggleToolbar();
+		await sleep(1000);
+	  }
+
+	  const selector =
+		'button[data-path="EditorPalette.section.button"][aria-label="Variables"]';
+
+	  for (let i = 0; i < 10; i++) {
+		const el = document.querySelector(selector);
+		if (el) {
+		  el.click();
+		  return;
 		}
-		for (let i = 0; i < 10; i++) {
-			const el = document.querySelector(
-				'span.clipped-text.clipped-text--no_wrap.editor-palette-section__header-title[title="Variables"]'
-			);
-			if (el) {
-				el.click();
-				return;
-			}
-			await sleep(300);
-		}
+		await sleep(300);
+	  }
+
+	  throw new Error(`Variables button not found: ${selector}`);
 	}
+
 
 	/**
 	 * Shows the Triggers section in the palette.
 	 */
 	function showTriggers() {
-		if (getPaletteState() === "closed") {
-			toggleToolbar();
-		}
-		safeQuery(
-			'span.clipped-text.clipped-text--no_wrap.editor-palette-section__header-title[title="Triggers"]',
-			"showTriggers"
-		)?.click();
+	  if (getPaletteState() === "closed") {
+		toggleToolbar();
+	  }
+	  safeQuery(
+		'button.editor-palette-section__header-button[data-path="EditorPalette.section.button"][aria-label="Triggers"]',
+		"showTriggers"
+	  )?.click();
 	}
+
+
 
 	/**
 	 * Adds a new variable via the UI.
