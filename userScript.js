@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.1
+// @version      0.5.2
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 38.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -1056,7 +1056,7 @@
 			style.id = "commandPalette-style";
 			style.type = "text/css";
 			style.appendChild(document.createTextNode(`
-				#commandPalette * { font-size: 1.15rem; font-family: Museo Sans,sans-serif; }
+				#commandPalette * { font-size: 1.15rem; font-family: Museo Sans,sans-serif; color: black;}
 				#commandPalette { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 					background-color: white; border-radius: 10px 10px 0 0; display: flex; flex-direction: column;
 					align-items: center; min-width: 30vw; max-width: 80vw; width: 600px; z-index: 99999;
@@ -1069,7 +1069,7 @@
 					box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 10px 10px; max-height: 200px; overflow-y: auto; z-index: 100000; }
 				.command_prediction-item.active { background-color: #f0f0f0; }
 				.command_prediction-item strong { font-weight: bold; }
-				.command_prediction-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; }
+				.command_prediction-item { padding: 8px; cursor: pointer;}
 				.command_prediction-item:hover, .command_prediction-item.active { background-color: #f0f0f0; }
 				@keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
 					to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
