@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.2
+// @version      0.5.4
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 38.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -599,6 +599,7 @@
 		modalOverlay.style.fontSize = '16px';
 
 		modal.style.backgroundColor = 'white';
+		modal.style.color = 'black';
 		modal.style.padding = '20px';
 		modal.style.borderRadius = '8px';
 		modal.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
@@ -634,6 +635,14 @@
 				<li>You can also use the rocket icons in the top action bar to quickly copy/paste</li>
 			</ul>
 		`;
+
+		const style = document.createElement('style');
+			style.innerHTML = `
+				h1, h2, h3, h4, h5 {
+					color: black !important;
+				}
+			`;
+		document.head.appendChild(style);
 
 		modalContent.innerHTML = helpContent;
 
