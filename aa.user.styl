@@ -1,7 +1,7 @@
 /* ==UserStyle==
 @name           AutomationAnywhere - UI adjustments
 @namespace      Jamir-boop
-@version        0.1.25
+@version        0.1.26
 @description    Font size customization for automationanywhere CR 38.0.0
 @author         jamir-boop
 @preprocessor   stylus
@@ -88,18 +88,11 @@ generalFontSize = 1rem
 normalFontSize = .75rem
 
 @-moz-document regexp(".*automationanywhere\\.digital.*")
-		// Grab cursor style
+	// Grab cursor style
 	.editor-palette-item__child--is_draggable
 		cursor: pointer !important
 	.editor-palette-item__child--is_draggable:active
 		cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAQAAABKfvVzAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAACYktHRAD/h4/MvwAAAAlwSFlzAAAAyAAAAMgAY/rnrQAAAAd0SU1FB+gEEBIlOqIHvFsAAAABb3JOVAHPoneaAAABbklEQVQ4y2NgGAXkAcY3Pd9+/vzzIvWe+mMZBka8aj8mfP7y/c+73yL/df/f+vXw66ef9zMYWHFqCmX79NXoP9v/2f8ZgHA9EGv9//grIzhCCqum67xnVT7+AikNAGuIAJN3/j34+epzTQKDCAMTirvPSv34+fnnu78gRTxgpVxg0hiIA/9/+MWQxCCGrIH1Vs/cn3z/34EVoUO2/9/+MpQwSCNrYH/91vg/Xg2laBq+/2H7z/6/FSgt+l8YCCWAWPC/NJDkwaqBDaQBYp4LUKPzfw8g6fDf5z/HfwusGli//xEAKgFB3v/uQFP5gCQ30A63/5z/+bFpeHI/7L8kDqj5/+NvdA1Ml5uO/bYERhQ2WPf//GuGAgYplHiIkj+x/+OfZ7/A8Pfz3y+A8OXvV2D47HvEIgZ/BgHUiGZiEDeLNe0zmK47DQS1pmpN1Z6iDoKTeVsYIoHmM6OnDSYGdgYeBl4skIeBAzVhDCoAAKkBAU33aVt8AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI0LTA0LTE2VDE4OjM3OjU4KzAwOjAwql9V1wAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNC0wNC0xNlQxODozNzo1NyswMDowMC1KnYIAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjQtMDQtMTZUMTg6Mzc6NTgrMDA6MDCMF8y0AAAAAElFTkSuQmCC') 10 10, grab !important
-
-	// Close button change the white bg to the same of run button
-	button[name="close"]
-	.command-button
-			background: transparent !important
-			&:hover
-					background: var(--color_background_interactive_whisper_hover) !important
 
 	.loadable__overlay
 		customGradientBackground()
@@ -148,6 +141,51 @@ normalFontSize = .75rem
 					background: rgb(255,255,255);
 					background: linear-gradient(90deg, rgba(255,255,255,1) 1%, rgba(255,255,255,0) 100%);
 
+	if loadingCat
+		// bigger loading image space
+		.devicechannelmodal-icon.g-override
+			width: 120px !important
+			height: 120px !important
+
+		// Loading animation replace
+		.devicechannelmodal .icon-image-container,
+		.rio-spinner--variant_LOADING,
+		.rio-spinner--variant_WORKING
+			*:not(img)
+				display: none !important
+
+			customLoadingGifBase64()
+
+	if pathFinder
+		.pathfinder, .main-layout__navigation
+			display:none
+		.main-layout__content
+			padding-left: 0 !important
+
+	// width based on hover
+	.pathfinder--is_collapsed,
+	.main-layout__navigation
+		width: 10px
+		transition: width 0.1s ease
+
+	.pathfinder--is_collapsed:hover,
+	.main-layout__navigation:hover
+		width: 48px
+		transition: width 0.1s ease
+
+	// login background
+	.main-layout__authentication__wrapper
+		customGradientBackground()
+
+@-moz-document regexp(".*automationanywhere\\.digital.*private\\/files\\/task\\/.*")
+
+	// Close button change the white bg to the same of run button
+	button[name="close"]
+	.command-button
+			background: transparent !important
+			&:hover
+					background: var(--color_background_interactive_whisper_hover) !important
+
 	if editorTabsButtons
 			.taskbot-editor__toolbar__tabs > .editortabs[role="tablist"][data-path="EditorTabs"]
 				display: none
@@ -167,46 +205,32 @@ normalFontSize = .75rem
 						font-weight: bold
 
 	if dialogStyle
-			// Style of dialog boxes
-			.modal__content:not(.finder-prompt)
-					position: absolute
-					//top: 60vh
-					left: 0
-					bottom: 0
+		// Style of dialog boxes
+		.modal__content:not(.finder-prompt)
+				position: absolute
+				//top: 60vh
+				left: 0
+				bottom: 0
 
-			.message__content p
-					font-size: normalFontSize !important
-					line-height: normalFontSize
+		.message__content p
+				font-size: normalFontSize !important
+				line-height: normalFontSize
 
 		.modal__backdrop, .modal-form
 				darkGradientBackground()
 				opacity: 1
 				// filter: brightness(0.0)
 
+
 		// Text inputs to text area
 		.textinput-cell-input-content
-						width: 100% !important
-						max-height: 400px !important
-						overflow: auto !important
-						background-color: white !important
-						box-sizing: border-box !important
-						white-space: pre-wrap !important /* Preserves whitespace and line breaks */
-						word-wrap: break-word !important /* Ensures long words do not overflow */
-
-	if loadingCat
-		// bigger loading image space
-		.devicechannelmodal-icon.g-override
-			width: 120px !important
-			height: 120px !important
-
-		// Loading animation replace
-		.devicechannelmodal .icon-image-container,
-		.rio-spinner--variant_LOADING,
-		.rio-spinner--variant_WORKING
-			*:not(img)
-				display: none !important
-
-			customLoadingGifBase64()
+			width: 100% !important
+			max-height: 400px !important
+			overflow: auto !important
+			background-color: white !important
+			box-sizing: border-box !important
+			white-space: pre-wrap !important /* Preserves whitespace and line breaks */
+			word-wrap: break-word !important /* Ensures long words do not overflow */
 
 	// feat lines in number row
 	.taskbot-canvas-list-node > .taskbot-canvas-list-node__number.taskbot-canvas-list-node__number--clickable
@@ -333,26 +357,6 @@ normalFontSize = .75rem
 		.editor-palette-section__scroller-top
 			background transparent !important
 
-	if pathFinder
-		.pathfinder, .main-layout__navigation
-			display:none
-		.main-layout__content
-			padding-left: 0 !important
-
-	// width based on hover
-	.pathfinder--is_collapsed,
-	.main-layout__navigation
-		width: 10px
-		transition: width 0.1s ease
-
-	.pathfinder--is_collapsed:hover,
-	.main-layout__navigation:hover
-		width: 48px
-		transition: width 0.1s ease
-
-	// login background
-	.main-layout__authentication__wrapper
-		customGradientBackground()
 
 @-moz-document regexp(".*automationanywhere\\.digital.*?folders.*$")
 
