@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.5
-// @description  Enhanced Automation Anywhere developer experience. Working at CR Version 38.0.0
+// @version      0.5.6
+// @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
 // @icon         https://cmpc-1dev.my.automationanywhere.digital/favicon.ico
@@ -10,6 +10,8 @@
 // @grant        GM_getValue
 // @grant        GM_registerMenuCommand
 // @license      MIT
+// @downloadURL https://update.greasyfork.org/scripts/477891/Better%20AutomationAnywhere.user.js
+// @updateURL https://update.greasyfork.org/scripts/477891/Better%20AutomationAnywhere.meta.js
 // ==/UserScript==
 
 (function () {
