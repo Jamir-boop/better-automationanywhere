@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AutomationAnywhere sounds
 // @namespace    http://tampermonkey.net/
-// @version      0.0.6
-// @description  Adds Half-Life sounds to the "RUN" button and plays a sounds when an error appears. Working at CR Version 34.0.0
+// @version      0.0.8
+// @description  Adds Half-Life sounds to the "RUN" button and plays a sounds when an error appears. Working at CR Version 34.0.0 to 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
 // @icon         https://cdn2.steamgriddb.com/icon/e16e74a63567ecb44ade5c87002bb1d9/32/32x32.png
@@ -13,7 +13,16 @@
 
 (function () {
 	"use strict";
-	//Define sound lists
+
+    const URL_RE = /^https?:\/\/.*automationanywhere\.digital.*private\/files\/task\/.*$/i;
+
+    function shouldRun(url = location.href) {
+        return URL_RE.test(url);
+    }
+
+    if (!shouldRun()) return;
+
+    //Define sound lists
 	const buttonsBase64 = {
 		"buttons": [
 			{
@@ -128,7 +137,7 @@
 	}
 
 	function checkForDoneBadge() {
-		const doneModal = document.querySelector('.modal--theme_info');
+		const doneModal = document.querySelector('.taskbot-success');
 
 		if (doneModal) {
 			const spans = document.querySelectorAll('span.rio-icon.rio-icon--icon_checkmark');
