@@ -101,9 +101,9 @@ You can install both files together, or use `betterAutomationAnywhere.user.js` b
 
 | File | Type | Install |
 |---|---|---|
-| `BetterAutomationAnywhere.user.js` | Userscript | [![badge](https://img.shields.io/badge/Install-Userscript-blue?style=for-the-badge)](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/main/betterAutomationAnywhere.user.js) |
-| `aa.user.styl` | Stylus theme | [![badge](https://img.shields.io/badge/Install-Userstyle-green?style=for-the-badge)](https://raw.githubusercontent.com/Jamir-boop/automationanywhere-improvements/main/aa.user.styl) |
-| `buttons.user.js` | Optional custom sounds userscript | [![badge](https://img.shields.io/badge/Install-Userscript-blue?style=for-the-badge)](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/main/buttons.user.js) |
+| `BetterAutomationAnywhere.user.js` | Userscript | [![badge](https://img.shields.io/badge/install-blue?logo=tampermonkey)](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/main/betterAutomationAnywhere.user.js) |
+| `aa.user.styl` | Stylus theme | [![badge](https://img.shields.io/badge/install-green?logo=stylus)](https://raw.githubusercontent.com/Jamir-boop/automationanywhere-improvements/main/aa.user.styl) |
+| `buttons.user.js` | Optional custom sounds userscript | [![badge](https://img.shields.io/badge/install-blue?logo=tampermonkey)](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/main/buttons.user.js) |
 
   </details>
 
