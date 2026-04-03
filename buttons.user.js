@@ -6,6 +6,8 @@
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
 // @icon         https://cdn2.steamgriddb.com/icon/e16e74a63567ecb44ade5c87002bb1d9/32/32x32.png
+// @downloadURL  https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/refs/heads/main/buttons.user.js
+// @updateURL    https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/refs/heads/main/buttons.user.js
 // @grant        none
 // @license      MIT
 // @run-at       document-idle
