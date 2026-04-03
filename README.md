@@ -49,24 +49,24 @@ This script extends Automation Anywhere with a command palette (`Alt + P`) for f
 
 ### Command Palette Commands
 
-- `adv`, `addvar`, `add variable` Open a dialog to create a new variable.
-- `v`, `showvars`, `list variables`, `variables`  Show variables in the sidebar.
-- `duv`, `delete unused`, `remove unused variables`  Open a dialog to select and delete unused variables.
-- `p`, `private`, `private bots`  Go to the **Private Bots** folder.
-- `pub`, `public`, `public bots`  Go to the **Public Bots** folder.
-- `historical`, `history`, `activity historical`  Go to the **Activities Historical** tab.
-- `inprogress`, `progress`, `in progress`  Go to the **In-Progress Activities** tab.
-- `audit`, `audit log` Go to the **Activities Historical** tab.
-- `users`, `admin users`, `manage users` Go to the **Admin Users** page.
-- `roles`, `admin roles`, `manage roles` Go to the **Admin Roles** page.
-- `devices`, `admin devices`, `manage devices`  Go to the **Admin Devices** page.
-- `home`, `dashboard`, `overview` Go to the dashboard overview.
-- `help`, `man`, `show help` Display the list of available commands.
-- `universal copy`, `copy universal`, `rocket copy` Copy actions between Control Rooms.
-- `universal paste`, `paste universal`, `rocket paste`  Paste actions between Control Rooms.
-- `export action`, `copy action json`, `export copied action`, `share action`  Export the currently copied action as JSON to the clipboard.
-- `import action`, `paste action json`, `import shared action`, `load action json` Import an action from JSON and paste it as if it were copied locally.
-- `:line` Jump to a specific line number, for example `:25`.
+- `adv`, `addvar`, `add variable` — Open a dialog to create a new variable.
+- `v`, `showvars`, `list variables`, `variables` — Show variables in the sidebar.
+- `duv`, `delete unused`, `remove unused variables` — Open a dialog to select and delete unused variables.
+- `p`, `private`, `private bots` — Go to the **Private Bots** folder.
+- `pub`, `public`, `public bots` — Go to the **Public Bots** folder.
+- `historical`, `history`, `activity historical` — Go to the **Activities Historical** tab.
+- `inprogress`, `progress`, `in progress` — Go to the **In-Progress Activities** tab.
+- `audit`, `audit log` — Go to the **Activities Historical** tab.
+- `users`, `admin users`, `manage users` — Go to the **Admin Users** page.
+- `roles`, `admin roles`, `manage roles` — Go to the **Admin Roles** page.
+- `devices`, `admin devices`, `manage devices` — Go to the **Admin Devices** page.
+- `home`, `dashboard`, `overview` — Go to the dashboard overview.
+- `help`, `man`, `show help` — Display the list of available commands.
+- `universal copy`, `copy universal`, `rocket copy` — Copy actions between Control Rooms.
+- `universal paste`, `paste universal`, `rocket paste` — Paste actions between Control Rooms.
+- `export action`, `copy action json`, `export copied action`, `share action` — Export the currently copied action as JSON to the clipboard.
+- `import action`, `paste action json`, `import shared action`, `load action json` — Import an action from JSON and paste it as if it were copied locally.
+- `:line` — Jump to a specific line number, for example `:25`.
 
 ### Keyboard Shortcuts
 
