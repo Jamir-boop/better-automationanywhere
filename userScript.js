@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.12
+// @version      0.5.13
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -284,7 +284,7 @@
 		return host.querySelector(".toasttray");
 	}
 
-	function showNotification(title, message = "", duration = 5000) {
+	function showNotification(title, message = "", duration = 3000) {
 		ensureNotificationStyles();
 		const tray = getNotificationTray();
 
