@@ -1,135 +1,180 @@
-# Better AutomationAnywhere
+# Better Automation Anywhere
 
 <div align="center">
-<img src="https://i.ibb.co/pK7C9N2/aa-preview.png" alt="aa-preview" border="0">
+  <img src="https://raw.githubusercontent.com/Jamir-boop/markdown-images/master/2026-04-02_19-49-08-image-20260402194907547.png" alt="Better Automation Anywhere preview">
 </div>
 
-Improvements for the Automation Anywhere development platform with an upgraded user interface and a suite of features accessible via a command palette, along with fixes for several annoyances.
+Opinionated improvements for the Automation Anywhere Control Room, focused on UI fixes and developer-oriented features exposed through a command palette.
 
-> ✅ **Tested and working on AutomationAnywhere Control Room 31.0.0 to 38.0.0**
-
----
-
-<details>
-<summary>✨ <strong>Features</strong></summary>
-
-### `aa.user.styl`
-<img src="https://i.ibb.co/W2bxLKX/image.png" alt="image" border="0" width="50%">
-<br>
-
-- Universal copy/paste allows you to copy and paste actions between control rooms.
-
-<img src="https://i.ibb.co/fdmcjvF/image.png" alt="image" border="0" width="50%">
-
-- Converts input fields that have a horizontal scroll into text areas that break words, allowing you to view all contents at a glance.
-
-<img src="https://i.ibb.co/fx0RDqk/input-to-areatext.png" alt="input-to-areatext" border="0" width="60%">
-
-- Redesigned the annoying buttons for selecting actions, variables, and triggers.
-
-<img src="https://i.ibb.co/tHhMdWs/services.png" alt="services" border="0" width="60%">
-
-- Increases the font size and assigns Cascadia Code and Cursive Cascadia Code to key parts of the UI.
-- Adds a colorful background.
-- And much more...
+> Tested on Automation Anywhere Control Room **39.0.0**
 
 ---
 
-### `userScript.js`
+## Features
+
+- **Universal copy/paste** lets you copy and paste actions between different Control Rooms in the same browser.*
+
+![image-20260403103849668](https://raw.githubusercontent.com/Jamir-boop/markdown-images/master/2026-04-03_10-38-51-image-20260403103849668.png)
+
+You can also use the Tampermonkey context menu to copy and paste bot actions between sessions and across Control Rooms in the same browser:
+
+![Tampermonkey context menu](https://raw.githubusercontent.com/Jamir-boop/markdown-images/master/2026-04-02_20-28-41-image-20260402202840239.png)
+
+> \* This feature is limited by the browser `localStorage` size limit. For reliability, copy smaller code sections at a time.  
+> Uploaded Control Room dependencies are **not** transferred. For example, Capture steps that reference screenshots will not include those images when pasted.
+
+- Converts horizontally scrollable input fields into text areas with wrapped text, so the full content is visible at a glance.
+
+https://github.com/user-attachments/assets/c7a60ccb-d023-4dcb-b865-4d9fcc569933
+
+- Redesigns the action, variable, and trigger picker buttons.
+
+https://github.com/user-attachments/assets/271a4a95-26d5-491f-ad3c-bc281b00d0f4
+
+- Adds an option to change the TaskBot Builder background color.
+- Makes the sidebar scrollable for Public Folders.
+
+https://github.com/user-attachments/assets/24dd3f72-c5ca-46e6-8316-0d000381f408
+
+- Applies **Cascadia Code** to selected areas of the UI.
+- Includes several smaller UI refinements.
+
+---
+
+## `userScript.js`
 
 https://github.com/Jamir-boop/automationanywhere-improvements/assets/73477811/f7c6eec2-409f-495d-88e3-028e5b6d4593
 
-This script enhances Automation Anywhere by adding a command palette (`Alt + P`) that lets you execute helpful developer commands instantly.
+This script extends Automation Anywhere with a command palette (`Alt + P`) for fast access to developer-focused commands.
 
-#### ✅ Command Palette Commands
+### Command Palette Commands
 
-Use the command palette to run any of the following:
+- `adv`, `addvar`, `add variable`  
+  Open a dialog to create a new variable.
 
-- `a`, `addaction`, `add action`: Open the "Actions" section in the palette.
-- `adv`, `addvar`, `add variable`: Add a new variable.
-- `v`, `showvars`, `list variables`, `variables`: Show the variables panel.
-- `duv`, `delete unused`: Remove unused variables.
-- `p`, `private`, `private bots`: Go to your Private Bots folder.
-- `historical`, `activity historical`: Open Activity History.
-- `audit`, `audit log`: Open the Audit Log.
-- `:25`: Scroll to line number 25 (or any number).
-- `help`, `show help`: Show this command reference.
+- `v`, `showvars`, `list variables`, `variables`  
+  Show variables in the sidebar.
 
-#### ⌨️ Keyboard Shortcuts
+- `duv`, `delete unused`, `remove unused variables`  
+  Open a dialog to select and delete unused variables.
 
-- `Alt + P`: Toggle the command palette.
-- `Alt + V`: Show variables.
-- `Alt + A`: Show actions.
-- `Ctrl + D`: Toggle the right-side toolbar.
+- `p`, `private`, `private bots`  
+  Go to the **Private Bots** folder.
 
-#### 📋 Clipboard Slots (Universal Copy/Paste)
+- `pub`, `public`, `public bots`  
+  Go to the **Public Bots** folder.
 
-Using the Tampermonkey menu, you can copy/paste bot actions between sessions and even across control rooms:
+- `historical`, `history`, `activity historical`  
+  Go to the **Activities Historical** tab.
 
-- `Copy to Slot 1/2/3`
-- `Paste from Slot 1/2/3`
+- `inprogress`, `progress`, `in progress`  
+  Go to the **In-Progress Activities** tab.
 
-Rocket icon buttons will also appear in the top toolbar for faster access.
+- `audit`, `audit log`  
+  Go to the **Activities Historical** tab.
 
-</details>
+- `users`, `admin users`, `manage users`  
+  Go to the **Admin Users** page.
+
+- `roles`, `admin roles`, `manage roles`  
+  Go to the **Admin Roles** page.
+
+- `devices`, `admin devices`, `manage devices`  
+  Go to the **Admin Devices** page.
+
+- `home`, `dashboard`, `overview`  
+  Go to the dashboard overview.
+
+- `help`, `man`, `show help`  
+  Display the list of available commands.
+
+- `universal copy`, `copy universal`, `rocket copy`  
+  Copy actions between Control Rooms.
+
+- `universal paste`, `paste universal`, `rocket paste`  
+  Paste actions between Control Rooms.
+
+- `export action`, `copy action json`, `export copied action`, `share action`  
+  Export the currently copied action as JSON to the clipboard.
+
+- `import action`, `paste action json`, `import shared action`, `load action json`  
+  Import an action from JSON and paste it as if it were copied locally.
+
+- `:line`  
+  Jump to a specific line number, for example `:25`.
+
+### Keyboard Shortcuts
+
+- `Alt + P` — Open the command palette
+- `Alt + V` — Show variables
+- `Alt + A` — Show actions
 
 ---
 
 <details>
-<summary>⚙️ <strong>Installation</strong></summary>
+<summary><strong>Installation</strong></summary>
 
-These are a **userScript** (`userScript.js`) and a **userStyle** (`aa.user.styl`) that can work together or independently.
+### Requirements
 
-- `userScript.js`: Use with [Tampermonkey](https://www.tampermonkey.net)
-- `aa.user.styl`: Use with [Stylus](https://add0n.com/stylus.html)
+Before installing, make sure:
+
+> Your Control Room language is set to **English** for selector compatibility.
+
+You will need the following browser extensions:
+
+- **Tampermonkey** for `userScript.js`
+- **Stylus** for `aa.user.styl`
+
+You can install both files together, or use `userScript.js` by itself.
 
 ### 1. Install the Browser Extensions
 
-- Install **[Tampermonkey](https://www.tampermonkey.net)**.
-- Install **[Stylus](https://add0n.com/stylus.html)**.
+- [Install Tampermonkey](https://www.tampermonkey.net)
+- [Install Stylus](https://add0n.com/stylus.html)
 
-### 2. Add the Scripts
+### 2. Install the Files
 
-- **[Install the userScript.js](https://update.greasyfork.org/scripts/477891/Better%20AutomationAnywhere.user.js)** via GreasyFork
-- **[Install the Stylus Theme](https://github.com/Jamir-boop/automationanywhere-improvements/raw/main/aa.user.styl)** via Stylus
-
-> ✅ Make sure your Control Room language is set to **English** for selector compatibility.
+- [Install `userScript.js`](https://update.greasyfork.org/scripts/477891/Better%20AutomationAnywhere.user.js) via GreasyFork
+- [Install `aa.user.styl`](https://github.com/Jamir-boop/automationanywhere-improvements/raw/main/aa.user.styl) via Stylus
 
 </details>
 
 ---
 
 <details>
-<summary>🚀 <strong>Usage</strong></summary>
+<summary><strong>Usage</strong></summary>
 
 1. Open Automation Anywhere.
-2. Press `Alt + P` to open the palette.
-3. Start typing a command or `help` to see options.
-4. Hit `Enter` to execute.
-5. Optionally, right-click Tampermonkey → choose a clipboard slot to copy or paste.
+2. Press `Alt + P` to open the command palette.
+3. Type a command, or type `help` to list available commands.
+4. Press `Enter` to run the selected command.
+5. Optionally, right-click the Tampermonkey icon and use a clipboard slot to copy or paste actions.
 
 </details>
 
 ---
 
 <details>
-<summary>🧠 <strong>Why are there two files?</strong></summary>
+<summary><strong>Why are there two files?</strong></summary>
 
-This project is split into:
-- A **userScript** that runs JavaScript features via Tampermonkey.
-- A **userStyle** that changes CSS and UI styles via Stylus.
+They are split on purpose.
 
-Keeping them separate makes installation modular and leverages the best tool for each job without bloating a single script.
+- `aa.user.styl` handles UI styling cleanly through Stylus.
+- `userScript.js` handles behavior and command logic through Tampermonkey.
+
+Keeping style and script separate makes development, testing, and maintenance faster.
 
 </details>
 
 ---
 
-<strong>License</strong>
+## License
 
-MIT License
+MIT
 
 ---
 
-<strong>Created by **jamir-boop**</strong>
+## Author
+
+**jamir-boop**  
 GitHub: [@Jamir-boop](https://github.com/Jamir-boop)
