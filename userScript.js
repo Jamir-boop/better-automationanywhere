@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.6
+// @version      0.5.9
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -29,6 +29,76 @@
 
 	let initialized = false;
 	let updateActiveButtonIntervalId = null;
+
+	const COMMAND_PALETTE_SHORTCUT_KEY = "commandPaletteShortcut";
+	const COMMAND_PALETTE_SHORTCUTS = {
+		ALT_P: "alt+p",
+		SLASH: "slash",
+	};
+
+	function getCommandPaletteShortcut() {
+		return GM_getValue(
+			COMMAND_PALETTE_SHORTCUT_KEY,
+			COMMAND_PALETTE_SHORTCUTS.ALT_P
+		);
+	}
+
+	function setCommandPaletteShortcut(shortcut) {
+		const validShortcut = Object.values(COMMAND_PALETTE_SHORTCUTS).includes(shortcut)
+			? shortcut
+			: COMMAND_PALETTE_SHORTCUTS.ALT_P;
+
+		GM_setValue(COMMAND_PALETTE_SHORTCUT_KEY, validShortcut);
+	}
+
+	function getCommandPaletteShortcutLabel() {
+		return getCommandPaletteShortcut() === COMMAND_PALETTE_SHORTCUTS.SLASH
+			? "/"
+			: "Alt + P";
+	}
+
+	function isTypingTarget(target) {
+		if (!target) return false;
+
+		const tagName = target.tagName;
+		return (
+			target.isContentEditable ||
+			tagName === "INPUT" ||
+			tagName === "TEXTAREA" ||
+			tagName === "SELECT" ||
+			!!target.closest?.('[contenteditable="true"]')
+		);
+	}
+
+	function isCommandPaletteShortcutPressed(e) {
+		const shortcut = getCommandPaletteShortcut();
+
+		if (shortcut === COMMAND_PALETTE_SHORTCUTS.SLASH) {
+			return (
+				e.key === "/" &&
+				!e.altKey &&
+				!e.ctrlKey &&
+				!e.metaKey &&
+				!isTypingTarget(e.target)
+			);
+		}
+
+		return (
+			e.key.toLowerCase() === "p" &&
+			e.altKey &&
+			!e.ctrlKey &&
+			!e.metaKey &&
+			!e.shiftKey
+		);
+	}
+
+	function setCommandPaletteShortcutToAltP() {
+		setCommandPaletteShortcut(COMMAND_PALETTE_SHORTCUTS.ALT_P);
+	}
+
+	function setCommandPaletteShortcutToSlash() {
+		setCommandPaletteShortcut(COMMAND_PALETTE_SHORTCUTS.SLASH);
+	}
 
 	// =========================
 	// Section: Utility Functions
@@ -391,7 +461,7 @@
 	 */
 	function registerKeyboardShortcuts() {
 		document.addEventListener("keydown", function (e) {
-			if (e.altKey && e.key === "p") {
+			if (isCommandPaletteShortcutPressed(e)) {
 				e.preventDefault();
 				insertCustomEditorPaletteButtons();
 				togglePaletteVisibility();
@@ -621,7 +691,7 @@
 		helpContent += `
 			<h4>Keyboard Shortcuts:</h4>
 			<ul>
-				<li><b>Alt + P</b>: Open the command palette</li>
+				<li><b>${getCommandPaletteShortcutLabel()}</b>: Open the command palette</li>
 				<li><b>Alt + V</b>: Show variables</li>
 				<li><b>Alt + A</b>: Show actions</li>
 			</ul>
@@ -947,7 +1017,7 @@
 			} else if (attempt < 3) {
 				insertUniversalCopyPasteButtons(attempt + 1);
 			}
-		}, 1000 * attempt);
+		}, 5000 * attempt);
 	}
 
 	/**
@@ -1147,6 +1217,7 @@
 		modal.style.display = 'flex';
 		modal.style.flexDirection = 'column';
 		modal.style.alignItems = 'stretch';
+		modal.style.color = 'black';
 
 		const label = document.createElement('label');
 		label.textContent = "Paste Automation Anywhere Action JSON:";
@@ -1158,6 +1229,7 @@
 		textarea.style.marginBottom = '12px';
 		textarea.style.fontFamily = 'monospace';
 		textarea.style.fontSize = '1rem';
+		textarea.style.color = 'black';
 
 		const buttonRow = document.createElement('div');
 		buttonRow.style.display = 'flex';
@@ -1239,8 +1311,8 @@
 		if (!document.getElementById("customActionVariableButtons")) {
 			insertCustomEditorPaletteButtons();
 		}
-		insertUniversalCopyPasteButtons();
 		removeInlineWidth();
+		insertUniversalCopyPasteButtons();
 
 		// Only set up listeners and intervals once
 		if (!initialized) {
@@ -1293,6 +1365,8 @@
 	// =========================
 
 	// Register menu commands for selecting copy/paste slots
+	GM_registerMenuCommand("Use Alt+P for Command Palette", setCommandPaletteShortcutToAltP);
+	GM_registerMenuCommand("Use / for Command Palette", setCommandPaletteShortcutToSlash);
 	GM_registerMenuCommand("Copy to Slot 1", () => copyToSlot(1));
 	GM_registerMenuCommand("Copy to Slot 2", () => copyToSlot(2));
 	GM_registerMenuCommand("Copy to Slot 3", () => copyToSlot(3));
