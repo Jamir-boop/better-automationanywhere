@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.9
+// @version      0.5.12
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -164,6 +164,196 @@
 		if (el) el.addEventListener("click", handler);
 	}
 
+	function escapeHtml(value) {
+		return String(value).replace(/[&<>"']/g, (char) => {
+			const map = {
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				'"': "&quot;",
+				"'": "&#39;",
+			};
+			return map[char];
+		});
+	}
+
+	function ensureNotificationStyles() {
+		if (document.getElementById("better-aa-toast-style")) return;
+
+		const style = document.createElement("style");
+		style.id = "better-aa-toast-style";
+		style.textContent = `
+			#better-aa-toast-host {
+				position: fixed;
+				top: 16px;
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 2147483647;
+				pointer-events: none;
+				max-width: calc(100vw - 24px);
+			}
+
+			#better-aa-toast-host .main-layout__toast-tray,
+			#better-aa-toast-host .mainlayouttoasttray,
+			#better-aa-toast-host .toasttray {
+				position: static !important;
+				text-align: center;
+			}
+
+			#better-aa-toast-host .toasttray-toast {
+				position: static !important;
+				display: block !important;
+				inline-size: auto !important;
+				margin-bottom: 8px;
+				animation: none !important;
+				transform: none !important;
+				transition: opacity 0.2s ease, transform 0.2s ease;
+			}
+
+			#better-aa-toast-host .toasttray-toast.toast--closing {
+				opacity: 0;
+				transform: translateY(-6px);
+			}
+
+			#better-aa-toast-host .toast {
+				position: relative;
+				display: flex;
+				gap: 8px;
+				align-items: flex-start;
+				inline-size: min(460px, calc(100vw - 24px)) !important;
+				max-inline-size: min(460px, calc(100vw - 24px)) !important;
+				padding: 10px 12px;
+				border-radius: 10px;
+				background: #000 !important;
+				color: #fff !important;
+				box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+				pointer-events: auto;
+			}
+
+			#better-aa-toast-host .toast-content {
+				flex: 1 1 auto;
+				min-inline-size: 0;
+				font-size: 12px;
+				line-height: 1.35;
+			}
+
+			#better-aa-toast-host .toast-title {
+				font-weight: 700;
+				color: #fff !important;
+			}
+
+			#better-aa-toast-host .toast-message {
+				margin-top: 2px;
+				color: #fff !important;
+				word-break: break-word;
+			}
+
+			#better-aa-toast-host .toast-close {
+				flex: 0 0 auto;
+				color: #fff !important;
+			}
+
+			#better-aa-toast-host .toast-close .rio-close__icon {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 16px;
+				height: 16px;
+				font-size: 16px;
+				line-height: 1;
+				color: #fff !important;
+			}
+		`;
+		document.head.appendChild(style);
+	}
+
+	function getNotificationTray() {
+		let host = document.getElementById("better-aa-toast-host");
+		if (!host) {
+			host = document.createElement("div");
+			host.id = "better-aa-toast-host";
+			host.innerHTML = `
+				<div class="main-layout__toast-tray">
+					<div class="mainlayouttoasttray">
+						<div class="toasttray" data-path="ToastTray"></div>
+					</div>
+				</div>
+			`;
+			document.body.appendChild(host);
+		}
+		return host.querySelector(".toasttray");
+	}
+
+	function showNotification(title, message = "", duration = 5000) {
+		ensureNotificationStyles();
+		const tray = getNotificationTray();
+
+		const toastWrapper = document.createElement("div");
+		toastWrapper.className = "toasttray-toast";
+
+		toastWrapper.innerHTML = `
+			<div data-path="Toast" class="toast g-reset-element g-box-sizing_border-box toast--closable">
+				<div class="toast-content">
+					${title ? `
+						<span data-path="ClippedText" class="clipped-text clipped-text--no_wrap toast-title">
+							<span class="clipped-text__string clipped-text__string--for_presentation">${escapeHtml(title)}</span>
+						</span>
+					` : ""}
+					${message ? `
+						<div class="toast-message">
+							<span data-path="ClippedText" class="clipped-text">
+								<span class="clipped-text__string clipped-text__string--for_presentation">${escapeHtml(message)}</span>
+							</span>
+						</div>
+					` : ""}
+				</div>
+				<button
+					data-path="RioClose"
+					data-input-status="INTERACTIVE"
+					type="button"
+					tabindex="0"
+					aria-label="Close notification"
+					class="rio-focus rio-focus--inset_0 rio-focus--border-radius_pill rio-focus--has_element-focus-visible rio-bare-button g-reset-element rio-bare-button--is_interactive rio-bare-button--rio_neutral-inverse rio-bare-button--is_parent rio-bare-button--is_clickable rio-bare-button--is_pill rio-bare-button--size_14px rio-bare-button--is_square rio-bare-button--square_26x26 g-reset-element rio-close rio-close--size_14 toast-close"
+				>
+					<span class="rio-close__icon">×</span>
+				</button>
+			</div>
+		`;
+
+		const close = () => {
+			if (!toastWrapper.isConnected) return;
+			toastWrapper.classList.add("toast--closing");
+			setTimeout(() => {
+				toastWrapper.remove();
+			}, 200);
+		};
+
+		toastWrapper.querySelector(".toast-close")?.addEventListener("click", close);
+		tray.prepend(toastWrapper);
+		setTimeout(close, duration);
+	}
+
+	async function waitForClipboardJson(timeout = 1500, interval = 50) {
+		const start = Date.now();
+
+		while (Date.now() - start < timeout) {
+			const value = localStorage.getItem("globalClipboard");
+
+			if (value) {
+				try {
+					JSON.parse(value);
+					return value;
+				} catch (e) {
+					// keep waiting until the clipboard payload becomes valid JSON
+				}
+			}
+
+			await sleep(interval);
+		}
+
+		return null;
+	}
+
 	// =========================
 	// Section: Command Definitions
 	// =========================
@@ -291,22 +481,35 @@
 	function togglePaletteVisibility() {
 		const commandPalette = getCommandPalette();
 		if (!commandPalette) return;
+
 		const input = getCommandInput();
-		if (commandPalette.classList.contains("command_palette--visible")) {
+		const isVisible =
+			!commandPalette.hidden &&
+			commandPalette.classList.contains("command_palette--visible");
+
+		if (isVisible) {
 			commandPalette.classList.remove("command_palette--visible");
 			commandPalette.classList.add("command_palette--hidden");
+			commandPalette.hidden = true;
+			commandPalette.setAttribute("aria-hidden", "true");
+
 			if (input) {
 				input.value = "";
 				input.blur();
 			}
+
 			clearPredictions();
 			activePredictionIndex = -1;
-		} else {
-			commandPalette.classList.remove("command_palette--hidden");
-			commandPalette.classList.add("command_palette--visible");
-			if (input) {
-				input.focus();
-			}
+			return;
+		}
+
+		commandPalette.hidden = false;
+		commandPalette.setAttribute("aria-hidden", "false");
+		commandPalette.classList.remove("command_palette--hidden");
+		commandPalette.classList.add("command_palette--visible");
+
+		if (input) {
+			input.focus();
 		}
 	}
 
@@ -395,12 +598,24 @@
 	 * @param {Function} action
 	 */
 	function executeCommand(action) {
-		if (action) {
-			action();
-		} else {
-			showHelp();
+		const runAction = () => {
+			if (action) {
+				action();
+			} else {
+				showHelp();
+			}
+		};
+
+		const commandPalette = getCommandPalette();
+		if (commandPalette?.classList.contains("command_palette--visible")) {
+			togglePaletteVisibility();
+			requestAnimationFrame(() => {
+				requestAnimationFrame(runAction);
+			});
+			return;
 		}
-		togglePaletteVisibility();
+
+		runAction();
 	}
 
 	/**
@@ -929,18 +1144,29 @@
 	 * Copies data to the specified clipboard slot.
 	 * @param {number} slot
 	 */
-	function copyToSlot(slot) {
+	async function copyToSlot(slot) {
 		const copyButton = safeQuery(".aa-icon-action-clipboard-copy--shared", "copyToSlot");
-		if (copyButton) {
-			copyButton.click();
-			const globalClipboardJSON = localStorage.getItem('globalClipboard');
-			try {
-				const clipboardData = JSON.parse(globalClipboardJSON);
-				clipboardData.uid = "🔥🔥🔥";
-				GM_setValue(`universalClipboardSlot${slot}`, JSON.stringify(clipboardData));
-			} catch (error) {
-				console.error("Failed to copy data to slot:", error);
-			}
+		if (!copyButton) {
+			showNotification("Copy failed", "Shared copy button not found.");
+			return;
+		}
+
+		copyButton.click();
+
+		const globalClipboardJSON = await waitForClipboardJson();
+		if (!globalClipboardJSON) {
+			showNotification("Copy failed", `Clipboard JSON was not available in time for slot ${slot}.`);
+			return;
+		}
+
+		try {
+			const clipboardData = JSON.parse(globalClipboardJSON);
+			clipboardData.uid = "🔥🔥🔥";
+			GM_setValue(`universalClipboardSlot${slot}`, JSON.stringify(clipboardData));
+			showNotification("Copied", `Saved current selection to slot ${slot}.`);
+		} catch (error) {
+			console.error("Failed to copy data to slot:", error);
+			showNotification("Copy failed", `Could not save data to slot ${slot}.`);
 		}
 	}
 
@@ -951,22 +1177,27 @@
 	function pasteFromSlot(slot) {
 		const clipboardData = GM_getValue(`universalClipboardSlot${slot}`);
 		if (!clipboardData) {
+			showNotification("Nothing to paste", `Slot ${slot} is empty.`);
 			return;
 		}
+
 		let emojiUid = generateEmojiString();
 		let modifiedData = clipboardData.replace(/🔥🔥🔥/g, emojiUid);
-
-		// Clean the JSON before pasting
 		let cleanedData = cleanAutomationAnywhereJson(modifiedData);
 
-		localStorage.setItem('globalClipboard', cleanedData);
-		localStorage.setItem('globalClipboardUid', `"${emojiUid}"`);
+		localStorage.setItem("globalClipboard", cleanedData);
+		localStorage.setItem("globalClipboardUid", `"${emojiUid}"`);
+
 		const pasteButton = safeQuery(".aa-icon-action-clipboard-paste--shared", "pasteFromSlot");
-		if (pasteButton) {
-			setTimeout(() => {
-				pasteButton.click();
-			}, 500);
+		if (!pasteButton) {
+			showNotification("Paste failed", "Shared paste button not found.");
+			return;
 		}
+
+		setTimeout(() => {
+			pasteButton.click();
+			showNotification("Pasted", `Inserted content from slot ${slot}.`);
+		}, 500);
 	}
 
 	function universalCopyCommandPalette() {
@@ -1023,19 +1254,35 @@
 	/**
 	 * Universal copy action.
 	 */
-	function universalCopy() {
+	async function universalCopy() {
 		const copyBtn = safeQuery(".aa-icon-action-clipboard-copy--shared", "universalCopy");
-		if (copyBtn) copyBtn.click();
-		const globalClipboardJSON = localStorage.getItem('globalClipboard');
-		let globalClipboard = {};
+		if (!copyBtn) {
+			showNotification("Copy failed", "Shared copy button not found.");
+			return null;
+		}
+
+		copyBtn.click();
+
+		const globalClipboardJSON = await waitForClipboardJson();
+		if (!globalClipboardJSON) {
+			showNotification("Copy failed", "Clipboard JSON was not available in time.");
+			return null;
+		}
+
+		let globalClipboard;
 		try {
 			globalClipboard = JSON.parse(globalClipboardJSON);
 		} catch (e) {
 			console.error("Error parsing JSON:", e);
-			return;
+			showNotification("Copy failed", "Could not read current clipboard JSON.");
+			return null;
 		}
+
 		globalClipboard.uid = "🔥🔥🔥";
-		GM_setValue('universalClipboard', JSON.stringify(globalClipboard));
+		const serialized = JSON.stringify(globalClipboard);
+		GM_setValue("universalClipboard", serialized);
+		showNotification("Copied", "Saved current selection to the universal clipboard.");
+		return serialized;
 	}
 
 	/**
@@ -1044,21 +1291,28 @@
 	function universalPaste() {
 		const copyBtn = safeQuery(".aa-icon-action-clipboard-copy--shared", "universalPaste");
 		if (copyBtn) copyBtn.click();
-		let universalClipboard = GM_getValue('universalClipboard');
-		if (universalClipboard) {
-			let emojiUid = generateEmojiString();
-			universalClipboard = universalClipboard.replace(/'/g, '"');
-			universalClipboard = universalClipboard.replace(/🔥🔥🔥/g, emojiUid);
 
-			// Clean the JSON before pasting
-			let cleanedData = cleanAutomationAnywhereJson(universalClipboard);
-
-			localStorage.setItem("globalClipboard", cleanedData);
-			localStorage.setItem("globalClipboardUid", `"${emojiUid}"`);
+		let universalClipboard = GM_getValue("universalClipboard");
+		if (!universalClipboard) {
+			showNotification("Nothing to paste", "Universal clipboard is empty.");
+			return;
 		}
+
+		let emojiUid = generateEmojiString();
+		universalClipboard = universalClipboard.replace(/🔥🔥🔥/g, emojiUid);
+
+		let cleanedData = cleanAutomationAnywhereJson(universalClipboard);
+		localStorage.setItem("globalClipboard", cleanedData);
+		localStorage.setItem("globalClipboardUid", `"${emojiUid}"`);
+
 		setTimeout(() => {
 			const pasteBtn = safeQuery(".aa-icon-action-clipboard-paste--shared", "universalPaste");
-			if (pasteBtn) pasteBtn.click();
+			if (!pasteBtn) {
+				showNotification("Paste failed", "Shared paste button not found.");
+				return;
+			}
+			pasteBtn.click();
+			showNotification("Pasted", "Inserted content from the universal clipboard.");
 		}, 1000);
 	}
 
@@ -1123,44 +1377,130 @@
 		if (document.querySelector("#commandPalette")) {
 			return;
 		}
-		const containerDiv = document.createElement("div");
-		containerDiv.id = "commandPalette";
-		containerDiv.className = "command_palette--hidden";
-		containerDiv.innerHTML = `
-			<input type="text" id="commandInput" placeholder="Enter command...">
-			<div id="commandPredictions" class="command_predictions"></div>
-		`;
-		document.body.appendChild(containerDiv);
 
 		if (!document.getElementById("commandPalette-style")) {
 			const style = document.createElement("style");
 			style.id = "commandPalette-style";
 			style.type = "text/css";
 			style.appendChild(document.createTextNode(`
-				#commandPalette * { font-size: 1.15rem; font-family: Museo Sans,sans-serif; color: black;}
-				#commandPalette { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-					background-color: white; border-radius: 10px 10px 0 0; display: flex; flex-direction: column;
-					align-items: center; min-width: 30vw; max-width: 80vw; width: 600px; z-index: 99999;
-					box-shadow: 0px 0px 0px 5000px #00000054; }
-				#commandInput, #commandInput:focus-visible, #commandInput:active {
-					unset: all; padding: 10px; width: 93%; margin-bottom: 10px; border: 2px solid transparent; border-radius: 5px;
+				#commandPalette[hidden] {
+					display: none !important;
+					opacity: 0 !important;
+					visibility: hidden !important;
+					pointer-events: none !important;
+					animation: none !important;
 				}
-				#commandPalette:focus, #commandPalette:active { border-color: orange; }
-				#commandPredictions { position: absolute; top: 100%; left: 0; width: 100%; background-color: white;
-					box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 10px 10px; max-height: 200px; overflow-y: auto; z-index: 100000; }
-				.command_prediction-item.active { background-color: #f0f0f0; }
-				.command_prediction-item strong { font-weight: bold; }
-				.command_prediction-item { padding: 8px; cursor: pointer;}
-				.command_prediction-item:hover, .command_prediction-item.active { background-color: #f0f0f0; }
-				@keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
-					to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-				@keyframes fadeOut { from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-					to { opacity: 0; transform: translate(-50%, -50%) scale(0.95); } }
-				.command_palette--visible { display: block; animation: fadeIn 0.25s ease-out forwards; }
-				.command_palette--hidden { animation: fadeOut 0.25s ease-out forwards; display: none; pointer-events: none; opacity: 0; z-index: -1; }
+
+				#commandPalette * {
+					font-size: 1.15rem;
+					font-family: Museo Sans, sans-serif;
+					color: black;
+				}
+
+				#commandPalette {
+					position: fixed;
+					top: 50%;
+					left: 50%;
+					transform: translate(-50%, -50%);
+					background-color: white;
+					border-radius: 10px 10px 0 0;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					min-width: 30vw;
+					max-width: 80vw;
+					width: 600px;
+					z-index: 99999;
+					box-shadow: 0px 0px 0px 5000px #00000054;
+				}
+
+				#commandInput,
+				#commandInput:focus-visible,
+				#commandInput:active {
+					unset: all;
+					padding: 10px;
+					width: 93%;
+					margin-bottom: 10px;
+					border: 2px solid transparent;
+					border-radius: 5px;
+				}
+
+				#commandPalette:focus,
+				#commandPalette:active {
+					border-color: orange;
+				}
+
+				#commandPredictions {
+					position: absolute;
+					top: 100%;
+					left: 0;
+					width: 100%;
+					background-color: white;
+					box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+					border-radius: 0 0 10px 10px;
+					max-height: 200px;
+					overflow-y: auto;
+					z-index: 100000;
+				}
+
+				.command_prediction-item.active {
+					background-color: #f0f0f0;
+				}
+
+				.command_prediction-item strong {
+					font-weight: bold;
+				}
+
+				.command_prediction-item {
+					padding: 8px;
+					cursor: pointer;
+				}
+
+				.command_prediction-item:hover,
+				.command_prediction-item.active {
+					background-color: #f0f0f0;
+				}
+
+				@keyframes fadeIn {
+					from {
+						opacity: 0;
+						transform: translate(-50%, -50%) scale(0.85);
+					}
+					to {
+						opacity: 1;
+						transform: translate(-50%, -50%) scale(1);
+					}
+				}
+
+				.command_palette--visible {
+					display: block;
+					animation: fadeIn 0.25s ease-out forwards;
+				}
+
+				.command_palette--hidden {
+					display: none !important;
+					opacity: 0;
+					visibility: hidden;
+					pointer-events: none;
+					animation: none !important;
+					z-index: -1;
+				}
 			`));
 			document.head.appendChild(style);
 		}
+
+		const containerDiv = document.createElement("div");
+		containerDiv.id = "commandPalette";
+		containerDiv.className = "command_palette--hidden";
+		containerDiv.hidden = true;
+		containerDiv.setAttribute("aria-hidden", "true");
+		containerDiv.innerHTML = `
+			<input type="text" id="commandInput" placeholder="Enter command...">
+			<div id="commandPredictions" class="command_predictions"></div>
+		`;
+
+		document.body.appendChild(containerDiv);
+		showNotification("Insertion successful", `Command Palette inserted correctly on attempt ${retryCount + 1}.`);
 
 		setupCommandInputEventListeners();
 
@@ -1179,17 +1519,17 @@
 	 */
 	async function exportActionToClipboard() {
 		try {
-			// Use universalCopy to set GM storage with 🔥🔥🔥 as uid
-			universalCopy();
-			// Wait a short moment to ensure GM_setValue is complete
-			await sleep(200);
-			const universalClipboard = GM_getValue('universalClipboard');
+			const universalClipboard = await universalCopy();
 			if (!universalClipboard) {
+				showNotification("Export failed", "Universal clipboard is empty.");
 				return;
 			}
+
 			await navigator.clipboard.writeText(universalClipboard);
+			showNotification("Exported", "Action JSON copied to your clipboard.");
 		} catch (e) {
 			console.warn("Failed to export action to clipboard:", e);
+			showNotification("Export failed", "Could not write action JSON to the clipboard.");
 		}
 	}
 
@@ -1280,20 +1620,22 @@
 		importBtn.onclick = async function () {
 			let input = textarea.value.trim();
 			if (!input) {
+				showNotification("Import failed", "Paste the action JSON first.");
 				return;
 			}
+
 			try {
-				// Validate JSON
 				JSON.parse(input);
 			} catch (e) {
+				showNotification("Import failed", "Invalid JSON.");
 				return;
 			}
-			// Set GM storage for universal paste
-			GM_setValue('universalClipboard', input);
+
+			GM_setValue("universalClipboard", input);
 			closeModal();
-			// Wait a short moment to ensure GM_setValue is complete
 			await sleep(200);
 			universalPaste();
+			showNotification("Import queued", "JSON accepted. Pasting action now.");
 		};
 	}
 
