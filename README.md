@@ -101,7 +101,7 @@ You can install both files together, or use `userScript.js` by itself.
 
 - [Install `userScript.js`](https://update.greasyfork.org/scripts/477891/Better%20AutomationAnywhere.user.js) via GreasyFork
 - [Install `aa.user.styl`](https://github.com/Jamir-boop/automationanywhere-improvements/raw/main/aa.user.styl) via Stylus
-
+- (Optional) [Install `buttons.js`](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/refs/heads/main/buttons.js) by copying and pasting the file contents on a new script. To play start, stop and error sounds during bot development.
 </details>
 
 ---
