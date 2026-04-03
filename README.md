@@ -99,10 +99,13 @@ You can install both files together, or use `userScript.js` by itself.
 
 ### 2. Install the Files
 
-- [Install `userScript.js`](https://update.greasyfork.org/scripts/477891/Better%20AutomationAnywhere.user.js) via GreasyFork
-- [Install `aa.user.styl`](https://github.com/Jamir-boop/automationanywhere-improvements/raw/main/aa.user.styl) via Stylus
-- (Optional) [Install `buttons.js`](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/refs/heads/main/buttons.js) by copying and pasting the file contents on a new script. To play start, stop and error sounds during bot development.
-</details>
+| File | Type | Install |
+|---|---|---|
+| `BetterAutomationAnywhere.user.js` | Userscript | [![badge](https://img.shields.io/badge/Install-Userscript-blue?style=for-the-badge)](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/main/betterAutomationAnywhere.user.js) |
+| `aa.user.styl` | Stylus theme | [![badge](https://img.shields.io/badge/Install-Userstyle-green?style=for-the-badge)](https://raw.githubusercontent.com/Jamir-boop/automationanywhere-improvements/main/aa.user.styl) |
+| `buttons.user.js` | Optional custom sounds userscript | [![badge](https://img.shields.io/badge/Install-Userscript-blue?style=for-the-badge)](https://raw.githubusercontent.com/Jamir-boop/better-automationanywhere/main/buttons.user.js) |
+
+  </details>
 
 ---
 
