@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/24dd3f72-c5ca-46e6-8316-0d000381f408
 
 ---
 
-## `userScript.js`
+## `betterAutomationAnywhere.user.js`
 
 https://github.com/Jamir-boop/automationanywhere-improvements/assets/73477811/f7c6eec2-409f-495d-88e3-028e5b6d4593
 
@@ -87,10 +87,10 @@ Before installing, make sure:
 
 You will need the following browser extensions:
 
-- **Tampermonkey** for `userScript.js`
+- **Tampermonkey** for `betterAutomationAnywhere.user.js`
 - **Stylus** for `aa.user.styl`
 
-You can install both files together, or use `userScript.js` by itself.
+You can install both files together, or use `betterAutomationAnywhere.user.js` by itself.
 
 ### 1. Install the Browser Extensions
 
@@ -128,7 +128,7 @@ You can install both files together, or use `userScript.js` by itself.
 They are split on purpose.
 
 - `aa.user.styl` handles UI styling cleanly through Stylus.
-- `userScript.js` handles behavior and command logic through Tampermonkey.
+- `betterAutomationAnywhere.user.js` handles behavior and command logic through Tampermonkey.
 
 Keeping style and script separate makes development, testing, and maintenance faster.
 
