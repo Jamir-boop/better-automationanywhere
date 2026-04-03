@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/271a4a95-26d5-491f-ad3c-bc281b00d0f4
 
 https://github.com/user-attachments/assets/24dd3f72-c5ca-46e6-8316-0d000381f408
 
-- Applies **Cascadia Code** to selected areas of the UI.
+- Applies **[Cascadia Code](https://github.com/Microslop/cascadia-code/releases/)** to selected areas of the UI (optionally you can install it [here](https://github.com/Microslop/cascadia-code/releases/)).
 - Includes several smaller UI refinements.
 
 ---
