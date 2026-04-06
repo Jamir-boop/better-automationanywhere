@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.15
+// @version      0.5.16
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -702,7 +702,7 @@
 		document.addEventListener("keydown", function (e) {
 			if (isCommandPaletteShortcutPressed(e)) {
 				e.preventDefault();
-				insertCustomEditorPaletteButtons();
+				initialize();
 				togglePaletteVisibility();
 			}
 		});
