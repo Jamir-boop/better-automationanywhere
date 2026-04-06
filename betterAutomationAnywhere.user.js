@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.13
+// @version      0.5.14
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -183,9 +183,28 @@
 		const style = document.createElement("style");
 		style.id = "better-aa-toast-style";
 		style.textContent = `
+			@keyframes betterToastInOut {
+				0% {
+					opacity: 0;
+					transform: translateX(-20px);
+				}
+				15% {
+					opacity: 1;
+					transform: translateX(0);
+				}
+				85% {
+					opacity: 1;
+					transform: translateX(0);
+				}
+				100% {
+					opacity: 0;
+					transform: translateX(20px);
+				}
+			}
+
 			#better-aa-toast-host {
 				position: fixed;
-				top: 16px;
+				top: 50px;
 				left: 50%;
 				transform: translateX(-50%);
 				z-index: 2147483647;
@@ -205,9 +224,9 @@
 				display: block !important;
 				inline-size: auto !important;
 				margin-bottom: 8px;
-				animation: none !important;
-				transform: none !important;
-				transition: opacity 0.2s ease, transform 0.2s ease;
+				opacity: 0;
+				transform: translateX(-20px);
+				animation: betterToastInOut 3s ease forwards;
 			}
 
 			#better-aa-toast-host .toasttray-toast.toast--closing {
@@ -228,6 +247,7 @@
 				color: #fff !important;
 				box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
 				pointer-events: auto;
+				width: 300px !important;
 			}
 
 			#better-aa-toast-host .toast-content {
@@ -263,6 +283,10 @@
 				line-height: 1;
 				color: #fff !important;
 			}
+
+			#better-aa-toast-host .toast-close:hover .rio-close__icon {
+				color: #000 !important;
+			}
 		`;
 		document.head.appendChild(style);
 	}
@@ -284,7 +308,7 @@
 		return host.querySelector(".toasttray");
 	}
 
-	function showNotification(title, message = "", duration = 3000) {
+	function showNotification(title, message = "", duration = 5000) {
 		ensureNotificationStyles();
 		const tray = getNotificationTray();
 
