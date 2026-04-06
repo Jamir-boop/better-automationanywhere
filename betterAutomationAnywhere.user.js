@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.14
+// @version      0.5.15
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -866,6 +866,12 @@
 		await sleep(1000);
 		const duvButton = safeQuery(".dropdown-options.g-scroller button.rio-focus--inset_4px:nth-child(2)", "deleteUnusedVariables");
 		if (duvButton) duvButton.click();
+		await sleep(1000);
+		let inner_text = safeQuery(".modal__content .message__content").innerText;
+		if (inner_text == "All variables are currently being used.") {
+			const closeButton = safeQuery('.modal__content button span[data-text="Close"]', "deleteUnusedVariables");
+			if (closeButton) closeButton.click();
+		}
 	}
 
 	/**
