@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.16
+// @version      0.5.17
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -443,6 +443,11 @@
 			action: redirectToHome,
 			aliases: ["home", "dashboard", "overview"],
 			description: "Redirects to the dashboard home overview",
+		},
+		redirectToPackages: {
+			action: redirectToPackagesAdministration,
+			aliases: ["pack", "packages"],
+			description: "Redirects to the packages administration. List of published packages in the Control Room.",
 		},
 		showHelp: {
 			action: showHelp,
@@ -1393,6 +1398,9 @@
 	}
 	function redirectToHome() {
 		redirectToPath('/#/dashboard/home/overview');
+	}
+	function redirectToPackagesAdministration() {
+		redirectToPath('/#/bots/packages/versions');
 	}
 
 	// =========================
