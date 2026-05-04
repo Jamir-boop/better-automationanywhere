@@ -1,5 +1,7 @@
 # Better Automation Anywhere
 
+[Jump to installation.](#installation)
+
 <div align="center">
   <img src="https://raw.githubusercontent.com/Jamir-boop/markdown-images/master/2026-04-02_19-49-08-image-20260402194907547.png" alt="Better Automation Anywhere preview">
 </div>
@@ -76,6 +78,7 @@ This script extends Automation Anywhere with a command palette (`Alt + P`) for f
 
 ---
 
+<a id="installation"></a>
 <details>
 <summary><strong>Installation</strong></summary>
 
