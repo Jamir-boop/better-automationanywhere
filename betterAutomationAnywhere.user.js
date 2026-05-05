@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.18
+// @version      0.5.19
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
-// @icon         https://cmpc-1dev.my.automationanywhere.digital/favicon.ico
+// @icon         https://community.cloud.automationanywhere.digital/asset/favicon.7f6a15fb0fcbeb61e931.ico
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_registerMenuCommand
@@ -34,6 +34,20 @@
 	const COMMAND_PALETTE_SHORTCUTS = {
 		ALT_P: "alt+p",
 		SLASH: "slash",
+	};
+	const SIDEBAR_NAVIGATION_SELECTOR = 'nav[data-path="Pathfinder.primaryItems"]';
+	const SIDEBAR_NAVIGATION_ALIAS_SYNONYMS = {
+		home: ["dashboard", "overview"],
+		private: ["p", "private bots"],
+		public: ["pub", "public bots"],
+		historical: ["history", "activity historical"],
+		"in progress": ["inprogress", "progress"],
+		"audit log": ["audit"],
+		users: ["admin users", "manage users"],
+		roles: ["admin roles", "manage roles"],
+		devices: ["admin devices", "manage devices"],
+		packages: ["pack"],
+		"oauth connections": ["oauth"],
 	};
 
 	function getCommandPaletteShortcut() {
@@ -399,56 +413,6 @@
 			aliases: ["duv", "delete unused", "remove unused variables"],
 			description: "Shows dialog to select and delete unused variables",
 		},
-		redirectToPrivateRepository: {
-			action: redirectToPrivateRepository,
-			aliases: ["p", "private", "private bots"],
-			description: "Redirects to the private bots folder",
-		},
-		redirectToPublicRepository: {
-			action: redirectToPublicRepository,
-			aliases: ["pub", "public", "public bots"],
-			description: "Redirects to the public bots folder",
-		},
-		redirectToActivityHistorical: {
-			action: redirectToActivityHistorical,
-			aliases: ["historical", "history", "activity historical"],
-			description: "Redirects to the activities historical tab",
-		},
-		redirectToInProgress: {
-			action: redirectToInProgress,
-			aliases: ["inprogress", "progress", "in progress"],
-			description: "Redirects to the in-progress activities tab",
-		},
-		redirectToAuditLog: {
-			action: redirectToAuditLog,
-			aliases: ["audit", "audit log"],
-			description: "Redirects to the activities historical tab",
-		},
-		redirectToAdminUsers: {
-			action: redirectToAdminUsers,
-			aliases: ["users", "admin users", "manage users"],
-			description: "Redirects to the admin users page",
-		},
-		redirectToAdminRoles: {
-			action: redirectToAdminRoles,
-			aliases: ["roles", "admin roles", "manage roles"],
-			description: "Redirects to the admin roles page",
-		},
-		redirectToAdminDevices: {
-			action: redirectToAdminDevices,
-			aliases: ["devices", "admin devices", "manage devices"],
-			description: "Redirects to the admin devices page",
-		},
-		redirectToHome: {
-			action: redirectToHome,
-			aliases: ["home", "dashboard", "overview"],
-			description: "Redirects to the dashboard home overview",
-		},
-		redirectToPackages: {
-			action: redirectToPackagesAdministration,
-			aliases: ["pack", "packages"],
-			description: "Redirects to the packages administration. List of published packages in the Control Room.",
-		},
 		showHelp: {
 			action: showHelp,
 			aliases: ["help", "man", "show help"],
@@ -475,6 +439,137 @@
 			description: "Import an action from JSON and paste it as if copied locally.",
 		},
 	};
+
+	function normalizeCommandText(value) {
+		return String(value || "")
+			.replace(/[-_]+/g, " ")
+			.replace(/\s+/g, " ")
+			.trim()
+			.toLowerCase();
+	}
+
+	function addAlias(aliases, value) {
+		const alias = normalizeCommandText(value);
+		if (alias && !aliases.includes(alias)) aliases.push(alias);
+	}
+
+	function getCommandAliasSet(commands) {
+		const aliases = new Set();
+		Object.values(commands).forEach((command) => {
+			command.aliases.forEach((alias) => aliases.add(alias));
+		});
+		return aliases;
+	}
+
+	function getSidebarNavigationGroupLabel(link) {
+		const secondaryList = link.closest(".pathfinder-items--variant_secondary");
+		if (!secondaryList) return "";
+
+		const primaryItem = secondaryList.parentElement?.closest(".pathfinder-items__item--variant_primary");
+		return primaryItem
+			?.querySelector('[data-path="Pathfinder.button"] .pathfinder-items__item-label')
+			?.textContent || "";
+	}
+
+	function getSidebarNavigationLabel(link) {
+		return (
+			link.querySelector(".pathfinder-items__item-label")?.textContent ||
+			link.getAttribute("aria-label") ||
+			link.getAttribute("title") ||
+			link.getAttribute("name") ||
+			""
+		);
+	}
+
+	function getSidebarNavigationAliases(link) {
+		const aliases = [];
+		const label = getSidebarNavigationLabel(link);
+		const normalizedLabel = normalizeCommandText(label);
+		const title = link.getAttribute("title");
+		const ariaLabel = link.getAttribute("aria-label");
+		const name = link.getAttribute("name");
+		const groupLabel = getSidebarNavigationGroupLabel(link);
+
+		addAlias(aliases, label);
+		addAlias(aliases, title);
+		addAlias(aliases, ariaLabel);
+		addAlias(aliases, name);
+
+		if (groupLabel && label) {
+			addAlias(aliases, `${groupLabel} ${label}`);
+		}
+
+		(SIDEBAR_NAVIGATION_ALIAS_SYNONYMS[normalizedLabel] || []).forEach((alias) => {
+			addAlias(aliases, alias);
+		});
+
+		return aliases;
+	}
+
+	function toInternalNavigationPath(href) {
+		if (!href || !href.startsWith("#/")) return "";
+		return `/${href}`;
+	}
+
+	function createNavigationCommand(key, path, aliases, label) {
+		return {
+			key,
+			path,
+			action: () => redirectToPath(path),
+			aliases,
+			description: `Go to ${label}.`,
+		};
+	}
+
+	function getSidebarNavigationCommandDefinitions() {
+		const commands = [];
+		const navigationLinks = document.querySelectorAll(`${SIDEBAR_NAVIGATION_SELECTOR} a[href^="#/"]`);
+
+		navigationLinks.forEach((link, index) => {
+			const href = link.getAttribute("href");
+			const path = toInternalNavigationPath(href);
+			if (!path) return;
+
+			const label = normalizeCommandText(getSidebarNavigationLabel(link));
+			const aliases = getSidebarNavigationAliases(link);
+
+			commands.push(createNavigationCommand(
+				`sidebarNavigation${index}`,
+				path,
+				aliases,
+				label || path
+			));
+		});
+
+		return commands;
+	}
+
+	function getSidebarNavigationCommands(staticAliases = getCommandAliasSet(commandsWithAliases)) {
+		const usedAliases = new Set(staticAliases);
+		return getSidebarNavigationCommandDefinitions().reduce((filteredCommands, command) => {
+			const aliases = command.aliases.filter((alias) => !usedAliases.has(alias));
+			if (!aliases.length) return filteredCommands;
+
+			aliases.forEach((alias) => usedAliases.add(alias));
+			filteredCommands.push({ ...command, aliases });
+			return filteredCommands;
+		}, []);
+	}
+
+	function getCommandsWithNavigation() {
+		const mergedCommands = { ...commandsWithAliases };
+		const staticAliases = getCommandAliasSet(commandsWithAliases);
+
+		getSidebarNavigationCommands(staticAliases).forEach((command) => {
+			mergedCommands[command.key] = {
+				action: command.action,
+				aliases: command.aliases,
+				description: command.description,
+			};
+		});
+
+		return mergedCommands;
+	}
 
 	// =========================
 	// Section: Command Palette
@@ -561,6 +656,8 @@
 			return;
 		}
 
+		const normalizedInput = normalizeCommandText(input);
+
 		// Check for ":<number>" syntax to scroll to a line
 		const jumpToLineMatch = input.match(/^:(\d+)$/);
 		if (jumpToLineMatch) {
@@ -577,15 +674,15 @@
 			return;
 		}
 
-		Object.entries(commandsWithAliases).forEach(
+		Object.entries(getCommandsWithNavigation()).forEach(
 			([, { action, aliases, description }]) => {
 				const match = aliases.find((alias) =>
-					alias.startsWith(input.toLowerCase())
+					alias.startsWith(normalizedInput)
 				);
 				if (match) {
 					const predictionItem = document.createElement("div");
 					predictionItem.classList.add("command_prediction-item");
-					predictionItem.innerHTML = `<strong>${match}</strong> - ${description}`;
+					predictionItem.innerHTML = `<strong>${escapeHtml(match)}</strong> - ${escapeHtml(description)}`;
 					safeAddClick(predictionItem, () => {
 						const inputEl = getCommandInput();
 						if (inputEl) inputEl.value = match;
@@ -1054,10 +1151,19 @@
 
 		for (let command in commandsWithAliases) {
 			const { aliases, description } = commandsWithAliases[command];
-			helpContent += `<li><b>${aliases.join(', ')}</b>: ${description}</li>`;
+			helpContent += `<li><b>${escapeHtml(aliases.join(', '))}</b>: ${escapeHtml(description)}</li>`;
 		}
 		helpContent += `<li><b>:<i>line</i></b>: Scrolls to a specific line number (e.g. <code>:25</code>)</li>`;
 		helpContent += "</ul>";
+
+		const navigationCommands = getSidebarNavigationCommands();
+		if (navigationCommands.length) {
+			helpContent += "<h4>Navigation:</h4><ul>";
+			navigationCommands.forEach(({ aliases, description }) => {
+				helpContent += `<li><b>${escapeHtml(aliases.join(', '))}</b>: ${escapeHtml(description)}</li>`;
+			});
+			helpContent += "</ul>";
+		}
 
 		helpContent += `
 			<h4>Keyboard Shortcuts:</h4>
@@ -1477,37 +1583,6 @@
 		} else {
 			console.error("Pattern didn't match. The URL might not be in the expected format.");
 		}
-	}
-
-	function redirectToPublicRepository() {
-		redirectToPath('/#/bots/repository/public/');
-	}
-	function redirectToPrivateRepository() {
-		redirectToPath('/#/bots/repository/private/');
-	}
-	function redirectToActivityHistorical() {
-		redirectToPath('/#/activity/historical/');
-	}
-	function redirectToInProgress() {
-		redirectToPath('/#/activity/inprogress/');
-	}
-	function redirectToAuditLog() {
-		redirectToPath('/#/audit');
-	}
-	function redirectToAdminUsers() {
-		redirectToPath('/#/admin/users/');
-	}
-	function redirectToAdminRoles() {
-		redirectToPath('/#/admin/roles/');
-	}
-	function redirectToAdminDevices() {
-		redirectToPath('/#/devices/');
-	}
-	function redirectToHome() {
-		redirectToPath('/#/dashboard/home/overview');
-	}
-	function redirectToPackagesAdministration() {
-		redirectToPath('/#/bots/packages/versions');
 	}
 
 	// =========================
