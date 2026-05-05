@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.19
+// @version      0.5.20
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -371,13 +371,13 @@
 		setTimeout(close, duration);
 	}
 
-	async function waitForClipboardJson(timeout = 1500, interval = 50) {
+	async function waitForClipboardJson(timeout = 1500, interval = 50, previousValue = null) {
 		const start = Date.now();
 
 		while (Date.now() - start < timeout) {
 			const value = localStorage.getItem("globalClipboard");
 
-			if (value) {
+			if (value && value !== previousValue) {
 				try {
 					JSON.parse(value);
 					return value;
@@ -600,6 +600,43 @@
 	}
 
 	/**
+	 * Checks if the command palette is currently visible.
+	 * @returns {boolean}
+	 */
+	function isCommandPaletteVisible() {
+		const commandPalette = getCommandPalette();
+		return !!(
+			commandPalette &&
+			!commandPalette.hidden &&
+			commandPalette.classList.contains("command_palette--visible")
+		);
+	}
+
+	/**
+	 * Closes the command palette if it is visible.
+	 */
+	function closeCommandPalette() {
+		if (!isCommandPaletteVisible()) return;
+
+		const commandPalette = getCommandPalette();
+		const input = getCommandInput();
+		if (!commandPalette) return;
+
+		commandPalette.classList.remove("command_palette--visible");
+		commandPalette.classList.add("command_palette--hidden");
+		commandPalette.hidden = true;
+		commandPalette.setAttribute("aria-hidden", "true");
+
+		if (input) {
+			input.value = "";
+			input.blur();
+		}
+
+		clearPredictions();
+		activePredictionIndex = -1;
+	}
+
+	/**
 	 * Toggles the command palette visibility.
 	 */
 	function togglePaletteVisibility() {
@@ -607,23 +644,9 @@
 		if (!commandPalette) return;
 
 		const input = getCommandInput();
-		const isVisible =
-			!commandPalette.hidden &&
-			commandPalette.classList.contains("command_palette--visible");
 
-		if (isVisible) {
-			commandPalette.classList.remove("command_palette--visible");
-			commandPalette.classList.add("command_palette--hidden");
-			commandPalette.hidden = true;
-			commandPalette.setAttribute("aria-hidden", "true");
-
-			if (input) {
-				input.value = "";
-				input.blur();
-			}
-
-			clearPredictions();
-			activePredictionIndex = -1;
+		if (isCommandPaletteVisible()) {
+			closeCommandPalette();
 			return;
 		}
 
@@ -668,7 +691,7 @@
 			safeAddClick(predictionItem, () => {
 				scrollToLineNumber(lineNumber);
 				clearPredictions();
-				togglePaletteVisibility();
+				closeCommandPalette();
 			});
 			getCommandPredictions().appendChild(predictionItem);
 			return;
@@ -732,9 +755,8 @@
 			}
 		};
 
-		const commandPalette = getCommandPalette();
-		if (commandPalette?.classList.contains("command_palette--visible")) {
-			togglePaletteVisibility();
+		if (isCommandPaletteVisible()) {
+			closeCommandPalette();
 			requestAnimationFrame(() => {
 				requestAnimationFrame(runAction);
 			});
@@ -754,7 +776,7 @@
 		const items = commandPredictions.getElementsByClassName("command_prediction-item");
 		if (!items.length) {
 			if (e.key === "Escape") {
-				togglePaletteVisibility();
+				closeCommandPalette();
 				e.preventDefault();
 			}
 			return;
@@ -778,7 +800,7 @@
 				items[activePredictionIndex].click();
 			}
 		} else if (e.key === "Escape") {
-			togglePaletteVisibility();
+			closeCommandPalette();
 			e.preventDefault();
 		}
 	}
@@ -801,6 +823,30 @@
 	 * Registers all keyboard shortcuts.
 	 */
 	function registerKeyboardShortcuts() {
+		document.addEventListener("keydown", function (e) {
+			if (e.key === "Escape" && isCommandPaletteVisible()) {
+				closeCommandPalette();
+				e.preventDefault();
+			}
+		});
+
+		document.addEventListener("mousedown", function (e) {
+			if (!isCommandPaletteVisible()) return;
+
+			const commandPalette = getCommandPalette();
+			if (!commandPalette) return;
+
+			const eventPath = e.composedPath?.();
+			if (
+				eventPath?.includes(commandPalette) ||
+				commandPalette.contains(e.target)
+			) {
+				return;
+			}
+
+			closeCommandPalette();
+		});
+
 		document.addEventListener("keydown", function (e) {
 			if (isCommandPaletteShortcutPressed(e)) {
 				e.preventDefault();
@@ -969,7 +1015,9 @@
 		const duvButton = safeQuery(".dropdown-options.g-scroller button.rio-focus--inset_4px:nth-child(2)", "deleteUnusedVariables");
 		if (duvButton) duvButton.click();
 		await sleep(1000);
-		let inner_text = safeQuery(".modal__content .message__content").innerText;
+		const message = safeQuery(".modal__content .message__content", "deleteUnusedVariables");
+		if (!message) return;
+		let inner_text = message.innerText;
 		if (inner_text == "All variables are currently being used.") {
 			const closeButton = safeQuery('.modal__content button span[data-text="Close"]', "deleteUnusedVariables");
 			if (closeButton) closeButton.click();
@@ -1399,9 +1447,10 @@
 			return;
 		}
 
+		const previousClipboardJSON = localStorage.getItem("globalClipboard");
 		copyButton.click();
 
-		const globalClipboardJSON = await waitForClipboardJson();
+		const globalClipboardJSON = await waitForClipboardJson(1500, 50, previousClipboardJSON);
 		if (!globalClipboardJSON) {
 			showNotification("Copy failed", `Clipboard JSON was not available in time for slot ${slot}.`);
 			return;
@@ -1509,9 +1558,10 @@
 			return null;
 		}
 
+		const previousClipboardJSON = localStorage.getItem("globalClipboard");
 		copyBtn.click();
 
-		const globalClipboardJSON = await waitForClipboardJson();
+		const globalClipboardJSON = await waitForClipboardJson(1500, 50, previousClipboardJSON);
 		if (!globalClipboardJSON) {
 			showNotification("Copy failed", "Clipboard JSON was not available in time.");
 			return null;
@@ -1825,17 +1875,20 @@
 		textarea.focus();
 
 		function closeModal() {
+			if (!overlay.isConnected) return;
 			document.body.removeChild(overlay);
+			document.removeEventListener('keydown', escListener);
+		}
+
+		function escListener(e) {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
 		}
 
 		cancelBtn.onclick = closeModal;
 		overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
-		document.addEventListener('keydown', function escListener(e) {
-			if (e.key === 'Escape') {
-				closeModal();
-				document.removeEventListener('keydown', escListener);
-			}
-		});
+		document.addEventListener('keydown', escListener);
 
 		importBtn.onclick = async function () {
 			let input = textarea.value.trim();
