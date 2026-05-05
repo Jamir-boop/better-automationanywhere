@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.17
+// @version      0.5.18
 // @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
@@ -908,26 +908,147 @@
 		const closeButton = document.createElement('button');
 		const signature = document.createElement('div');
 
-		modalOverlay.style.position = 'fixed';
-		modalOverlay.style.top = '0';
-		modalOverlay.style.left = '0';
-		modalOverlay.style.width = '100vw';
-		modalOverlay.style.height = '100vh';
-		modalOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-		modalOverlay.style.display = 'flex';
-		modalOverlay.style.justifyContent = 'center';
-		modalOverlay.style.alignItems = 'center';
-		modalOverlay.style.zIndex = '1000';
-		modalOverlay.style.fontSize = '16px';
+		modalOverlay.className = 'better-aa-help-overlay';
+		modal.className = 'better-aa-help-modal';
+		modalContent.className = 'better-aa-help-content';
+		closeButton.className = 'better-aa-help-close';
+		signature.className = 'better-aa-help-signature';
 
-		modal.style.backgroundColor = 'white';
-		modal.style.color = 'black';
-		modal.style.padding = '20px';
-		modal.style.borderRadius = '8px';
-		modal.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
-		modal.style.maxWidth = '800px';
-		modal.style.width = '80%';
-		modal.style.position = 'relative';
+		if (!document.getElementById('better-aa-help-style')) {
+			const style = document.createElement('style');
+			style.id = 'better-aa-help-style';
+			style.textContent = `
+				.better-aa-help-overlay {
+					position: fixed;
+					inset: 0;
+					display: flex;
+					justify-content: center;
+					align-items: center;
+					width: 100vw;
+					height: 100vh;
+					height: 100dvh;
+					padding: 12px;
+					box-sizing: border-box;
+					background-color: rgba(0, 0, 0, 0.5);
+					z-index: 1000;
+					font-size: 16px;
+				}
+
+				.better-aa-help-overlay *,
+				.better-aa-help-overlay *::before,
+				.better-aa-help-overlay *::after {
+					box-sizing: border-box;
+				}
+
+				.better-aa-help-modal {
+					display: flex;
+					flex-direction: column;
+					width: min(800px, calc(100vw - 24px));
+					max-height: calc(100vh - 24px);
+					max-height: calc(100dvh - 24px);
+					padding: clamp(14px, 3vw, 20px);
+					border-radius: 8px;
+					background-color: white;
+					color: black;
+					box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+					overflow: hidden;
+				}
+
+				.better-aa-help-content {
+					min-height: 0;
+					overflow: auto;
+					overflow-wrap: anywhere;
+					line-height: 1.45;
+				}
+
+				.better-aa-help-content h1,
+				.better-aa-help-content h2,
+				.better-aa-help-content h3,
+				.better-aa-help-content h4,
+				.better-aa-help-content h5 {
+					color: black !important;
+				}
+
+				.better-aa-help-content h3,
+				.better-aa-help-content h4 {
+					margin: 0 0 10px;
+				}
+
+				.better-aa-help-content h4 {
+					margin-top: 16px;
+				}
+
+				.better-aa-help-content ul {
+					margin: 0 0 12px;
+					padding-left: 22px;
+				}
+
+				.better-aa-help-content li {
+					margin-bottom: 6px;
+				}
+
+				.better-aa-help-content b,
+				.better-aa-help-content code {
+					overflow-wrap: anywhere;
+					word-break: break-word;
+				}
+
+				.better-aa-help-close {
+					flex: 0 0 auto;
+					align-self: flex-start;
+					margin-top: 10px;
+					padding: 8px 16px;
+					border: none;
+					border-radius: 4px;
+					background-color: var(--color_background_interactive);
+					color: white;
+					cursor: pointer;
+				}
+
+				.better-aa-help-signature {
+					flex: 0 0 auto;
+					margin-top: 10px;
+					text-align: right;
+				}
+
+				.better-aa-help-signature a {
+					color: #888;
+					font-size: 12px;
+					text-decoration: none;
+				}
+
+				@media (max-width: 480px) {
+					.better-aa-help-overlay {
+						align-items: stretch;
+						padding: 8px;
+						font-size: 14px;
+					}
+
+					.better-aa-help-modal {
+						width: calc(100vw - 16px);
+						max-height: calc(100vh - 16px);
+						max-height: calc(100dvh - 16px);
+					}
+
+					.better-aa-help-content ul {
+						padding-left: 18px;
+					}
+
+					.better-aa-help-content li {
+						margin-bottom: 4px;
+					}
+
+					.better-aa-help-close {
+						width: 100%;
+					}
+
+					.better-aa-help-signature {
+						text-align: left;
+					}
+				}
+			`;
+			document.head.appendChild(style);
+		}
 
 		let helpContent = "<h3>List of Commands:</h3><ul>";
 
@@ -958,29 +1079,11 @@
 			</ul>
 		`;
 
-		const style = document.createElement('style');
-			style.innerHTML = `
-				h1, h2, h3, h4, h5 {
-					color: black !important;
-				}
-			`;
-		document.head.appendChild(style);
-
 		modalContent.innerHTML = helpContent;
 
 		closeButton.textContent = 'Close';
-		closeButton.style.marginTop = '10px';
-		closeButton.style.padding = '8px 16px';
-		closeButton.style.border = 'none';
-		closeButton.style.backgroundColor = 'var(--color_background_interactive)';
-		closeButton.style.color = 'white';
-		closeButton.style.cursor = 'pointer';
-		closeButton.style.borderRadius = '4px';
 
-		signature.innerHTML = `<a href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank" style="text-decoration: none; color: #888; font-size: 12px;">made by jamir-boop</a>`;
-		signature.style.position = 'absolute';
-		signature.style.bottom = '8px';
-		signature.style.right = '12px';
+		signature.innerHTML = `<a href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank">made by jamir-boop</a>`;
 
 		modal.appendChild(modalContent);
 		modal.appendChild(closeButton);
@@ -989,7 +1092,15 @@
 		document.body.appendChild(modalOverlay);
 
 		function closeModal() {
+			if (!modalOverlay.isConnected) return;
 			document.body.removeChild(modalOverlay);
+			document.removeEventListener('keydown', handleEscape);
+		}
+
+		function handleEscape(e) {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
 		}
 
 		modalOverlay.addEventListener('click', (e) => {
@@ -997,11 +1108,7 @@
 				closeModal();
 			}
 		});
-		document.addEventListener('keydown', (e) => {
-			if (e.key === 'Escape') {
-				closeModal();
-			}
-		});
+		document.addEventListener('keydown', handleEscape);
 		closeButton.addEventListener('click', closeModal);
 	}
 

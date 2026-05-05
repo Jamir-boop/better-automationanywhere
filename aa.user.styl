@@ -1,14 +1,14 @@
 /* ==UserStyle==
 @name           AutomationAnywhere - UI adjustments
 @namespace      Jamir-boop
-@version        0.1.31
+@version        0.1.32
 @description    Font size customization for automationanywhere CR 39.0.0
 @author         jamir-boop
 @preprocessor   stylus
 
 @var checkbox customPaletteButtons "Activate this if using userJS ⚙" 1
 @var checkbox runButton "Shaky RUN button" 0
-@var checkbox pathFinder "Hide sidebar" 0
+@var checkbox pathFinder "Keep sidebar slim" 0
 @var checkbox bgStyle "Custom background" 0
 @var checkbox fontStyle "Bigger font" 0
 @var checkbox loadingCat "Replace loading animation" 0
@@ -157,21 +157,16 @@ normalFontSize = .75rem
 			customLoadingGifBase64()
 
 	if pathFinder
-		.pathfinder, .main-layout__navigation
-			display:none
-		.main-layout__content
-			padding-left: 0 !important
+		// width based on hover
+		.pathfinder--is_collapsed,
+		.main-layout__navigation
+			width: 10px
+			transition: width 0.1s ease
 
-	// width based on hover
-	.pathfinder--is_collapsed,
-	.main-layout__navigation
-		width: 10px
-		transition: width 0.1s ease
-
-	.pathfinder--is_collapsed:hover,
-	.main-layout__navigation:hover
-		width: 48px
-		transition: width 0.1s ease
+		.pathfinder--is_collapsed:hover,
+		.main-layout__navigation:hover
+			width: 48px
+			transition: width 0.1s ease
 
 	// login background
 	.main-layout__authentication__wrapper
