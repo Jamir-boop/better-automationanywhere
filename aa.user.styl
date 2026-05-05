@@ -1,7 +1,7 @@
 /* ==UserStyle==
 @name           AutomationAnywhere - UI adjustments
 @namespace      Jamir-boop
-@version        0.1.32
+@version        0.1.33
 @description    Font size customization for automationanywhere CR 39.0.0
 @author         jamir-boop
 @preprocessor   stylus
@@ -10,7 +10,6 @@
 @var checkbox runButton "Shaky RUN button" 0
 @var checkbox pathFinder "Keep sidebar slim" 0
 @var checkbox bgStyle "Custom background" 0
-@var checkbox fontStyle "Bigger font" 0
 @var checkbox loadingCat "Replace loading animation" 0
 @var checkbox foldersStyle "Improved folder navigation" 0
 @var checkbox editorTabsButtons "Hide editor tabs button (Flow & List & Dual)" 0
@@ -97,29 +96,16 @@ normalFontSize = .75rem
 	.loadable__overlay
 		customGradientBackground()
 
+	// font styles
+	.code-input
+		all: unset !important
+		font-weight: 500 !important
 
-	if fontStyle
-				.editor-page__body *:not(span):not(button):not(.field-label__help):not(.help-content .taskbot-node-details__description):not(.taskbot-canvas-list-node__number)
-						font-size: inputFontSize px !important
-						font-size: .94rem !important
-
-				.folder-list__content .rio-link__label,
-		.folder-list__content .clipped-text__string--for_presentation,
-				.message__main *:not(span):not(button):not(.field-label__help):not(.checkbox-input__content):not(.message__content)
-						font-size: 1rem !important
-
-				.code-input *
-						font-size: 1.10rem !important
-						line-height: normal !important
-		.code-input
-			all: unset !important
-			font-weight: 500 !important
-
-		code,
-		.taskbot-canvas-list-node__title--disabled .taskbotnodelabel,
-		.code-input,
-		.editor-page-header__title-text
-			cursiveCascadiaFont()
+	code,
+	.taskbot-canvas-list-node__title--disabled .taskbotnodelabel,
+	.code-input,
+	.editor-page-header__title-text
+		cursiveCascadiaFont()
 
 	if bgStyle
 				// Editor background
