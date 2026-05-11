@@ -8,7 +8,7 @@
 
 Opinionated improvements for the Automation Anywhere Control Room, focused on UI fixes and developer-oriented features exposed through a command palette.
 
-> Tested on Automation Anywhere Control Room **39.0.0**
+> Tested on Automation Anywhere Control Room **40.0.0**
 
 ---
 
