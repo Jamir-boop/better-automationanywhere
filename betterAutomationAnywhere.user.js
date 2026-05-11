@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better AutomationAnywhere
 // @namespace    http://tampermonkey.net/
-// @version      0.5.20
-// @description  Enhanced Automation Anywhere developer experience. Working at CR Version 39.0.0
+// @version      0.5.21
+// @description  Enhanced Automation Anywhere developer experience. Working at CR Version 40.0.0
 // @author       jamir-boop
 // @match        *://*.automationanywhere.digital/*
 // @icon         https://community.cloud.automationanywhere.digital/asset/favicon.7f6a15fb0fcbeb61e931.ico
@@ -823,6 +823,15 @@
 	 * Registers all keyboard shortcuts.
 	 */
 	function registerKeyboardShortcuts() {
+		document.addEventListener("click", function (e) {
+			const nodeLink = e.target?.closest?.(".taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]");
+
+			if (!nodeLink || e.button === 1) return;
+
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		}, true);
+
 		document.addEventListener("keydown", function (e) {
 			if (e.key === "Escape" && isCommandPaletteVisible()) {
 				closeCommandPalette();
