@@ -1,67 +1,268 @@
+import '../src/styl/index.styl';
+import {
+	copyToSlot,
+	importActionJson,
+	pasteFromSlot,
+	startGlobalClipboardWatcher,
+	universalCopy,
+	universalPaste,
+} from '../src/ts/clipboard';
+import {
+	AUTOMATION_ANYWHERE_MATCHES,
+	isAutomationAnywhereUrl,
+} from '../src/ts/automation-anywhere';
+import {
+	exportActionToClipboard,
+	getHelpHtml,
+	importActionFromJson,
+} from '../src/ts/commands';
+import { debugError, debugInfo } from '../src/ts/debug';
 import { callInitializeRepeatedly } from '../src/ts/initialize';
+import type { ContentActionResponse, RuntimeMessage } from '../src/ts/messages';
+import {
+	getCommandPaletteShortcut,
+	getShowSuggestions,
+	getSoundsEnabled,
+	getStyleFeatureValues,
+	getStylesEnabled,
+	getStyleValues,
+	RUN_BUTTON_CLASS,
+	STYLE_FEATURES,
+	STYLE_VALUE_FIELDS,
+	STYLE_CLASS,
+	showSuggestions,
+	styleFeatureItems,
+	styleValueItems,
+	stylesEnabled,
+} from '../src/ts/settings';
+import { setSoundsEnabled } from '../src/ts/sounds';
+import { setSuggestionsEnabled } from '../src/ts/suggestions';
+import { setActiveCommandPaletteShortcut } from '../src/ts/utils';
 
-let activeStyleSheets: CSSStyleSheet[] = [];
+const DEFAULT_LOADING_IMAGE_CSS = `url("${browser.runtime.getURL(
+	'media/loading.gif' as any
+)}")`;
 
-async function applyStyles() {
-	// First, ensure any previous styles are removed before applying new ones.
-	removeStyles();
-
-	const { runButton = false } = await chrome.storage.sync.get({ runButton: false });
-
-	const styleImports = [
-		import('../src/styl/background.styl', { with: { type: 'css' } }),
-		import('../src/styl/customLoadingIcon.styl', { with: { type: 'css' } }),
-		import('../src/styl/editorActionsVariablesTriggers.styl', { with: { type: 'css' } }),
-		import('../src/styl/editorMain.styl', { with: { type: 'css' } }),
-		import('../src/styl/editorTabsButtons.styl', { with: { type: 'css' } }),
-		import('../src/styl/fonts.styl', { with: { type: 'css' } }),
-		import('../src/styl/rootSidebarAutoHide.styl', { with: { type: 'css' } }),
-		import('../src/styl/taskbot.styl', { with: { type: 'css' } }),
-	];
-
-	if (runButton) {
-		styleImports.push(import('../src/styl/editorRunButton.styl', { with: { type: 'css' } }));
-	}
-
-	const loadedModules = await Promise.all(styleImports);
-	activeStyleSheets = loadedModules.map(module => module.default);
-	document.adoptedStyleSheets = [...document.adoptedStyleSheets, ...activeStyleSheets];
+function applyBundledAssetVariables(): void {
+	document.documentElement.style.setProperty(
+		'--better-aa-loading-image-url',
+		DEFAULT_LOADING_IMAGE_CSS
+	);
 }
 
-function removeStyles() {
-	if (activeStyleSheets.length > 0) {
-		document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-			(s) => !activeStyleSheets.includes(s)
+async function applyStyleClasses(): Promise<void> {
+	const [stylesEnabled, styleFeatures] = await Promise.all([
+		getStylesEnabled(),
+		getStyleFeatureValues(),
+	]);
+	document.documentElement.classList.toggle(STYLE_CLASS, stylesEnabled);
+	for (const feature of STYLE_FEATURES) {
+		document.documentElement.classList.toggle(
+			feature.className,
+			styleFeatures[feature.key]
 		);
-		activeStyleSheets = [];
+	}
+}
+
+function setStyleValue(key: string, value: string): void {
+	const field = STYLE_VALUE_FIELDS.find((item) => item.key === key);
+	if (!field) return;
+	const normalizedValue = value.trim();
+	if (!normalizedValue && field.key === 'userBg') {
+		document.documentElement.style.removeProperty(field.cssVar);
+		return;
+	}
+	document.documentElement.style.setProperty(
+		field.cssVar,
+		normalizedValue || field.defaultValue
+	);
+}
+
+async function applyStyleValues(): Promise<void> {
+	const values = await getStyleValues();
+	for (const field of STYLE_VALUE_FIELDS) {
+		setStyleValue(field.key, values[field.key]);
+	}
+}
+
+async function applyInitialSettings(): Promise<void> {
+	try {
+		await applyStyleClasses();
+		await applyStyleValues();
+		setSoundsEnabled(await getSoundsEnabled());
+		setSuggestionsEnabled(await getShowSuggestions());
+		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
+	} catch (error) {
+		void debugError('content', 'Initial settings failed.', { error }, {
+			feedback: true,
+		});
+		document.documentElement.classList.add(STYLE_CLASS);
+	}
+}
+
+function runOnReady(callback: () => void): void {
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', callback, { once: true });
+		return;
+	}
+	callback();
+}
+
+function getAutomationAnywhereAuthToken(): string | null {
+	try {
+		const raw = localStorage.getItem('authToken');
+		if (!raw) return null;
+		try {
+			const parsed = JSON.parse(raw);
+			return typeof parsed === 'string' ? parsed : raw;
+		} catch {
+			return raw;
+		}
+	} catch {
+		return null;
+	}
+}
+
+function refreshAutomationAnywhereFolderList(): boolean {
+	const refreshButton = document.getElementsByName('table-refresh')[0];
+	if (!(refreshButton instanceof HTMLElement)) return false;
+	refreshButton.click();
+	return true;
+}
+
+async function handleRuntimeMessage(
+	message: RuntimeMessage
+): Promise<ContentActionResponse | void> {
+	try {
+		if (message.type === 'PING_AA_CONTENT') {
+			return { ok: true, message: 'Content script loaded.' };
+		}
+		if (message.type === 'GET_AA_AUTH_TOKEN') {
+			return { ok: true, authToken: getAutomationAnywhereAuthToken() };
+		}
+		if (message.type === 'REFRESH_AA_FOLDER_LIST') {
+			return refreshAutomationAnywhereFolderList()
+				? { ok: true, message: 'Folder refresh queued.' }
+				: { ok: false, error: 'Refresh button not found.' };
+		}
+		if (message.type === 'TOGGLE_STYLES') {
+			document.documentElement.classList.toggle(STYLE_CLASS, message.enabled ?? false);
+			return;
+		}
+		if (message.type === 'SET_RUN_BUTTON_STYLE') {
+			document.documentElement.classList.toggle(RUN_BUTTON_CLASS, message.enabled);
+			return;
+		}
+		if (message.type === 'SET_SOUNDS_ENABLED') {
+			setSoundsEnabled(message.enabled);
+			return;
+		}
+		if (message.type === 'SET_SHOW_SUGGESTIONS') {
+			setSuggestionsEnabled(message.enabled);
+			return;
+		}
+		if (message.type === 'SET_DEBUG_ENABLED') {
+			return;
+		}
+		if (message.type === 'SET_COMMAND_PALETTE_SHORTCUT') {
+			setActiveCommandPaletteShortcut(message.shortcut);
+			return;
+		}
+		if (message.type === 'SET_STYLE_FEATURE') {
+			const feature = STYLE_FEATURES.find((item) => item.key === message.key);
+			if (feature) {
+				document.documentElement.classList.toggle(feature.className, message.enabled);
+			}
+			return;
+		}
+		if (message.type === 'SET_STYLE_VALUE') {
+			setStyleValue(message.key, message.value);
+			return;
+		}
+		if (message.type === 'COPY_TO_SLOT') {
+			const json = await copyToSlot(message.slot);
+			return json
+				? { ok: true, message: `Copied slot ${message.slot}.`, json }
+				: { ok: false, error: `Could not copy slot ${message.slot}.` };
+		}
+		if (message.type === 'PASTE_FROM_SLOT') {
+			const json = await pasteFromSlot(message.slot);
+			return json
+				? { ok: true, message: `Pasted slot ${message.slot}.`, json }
+				: { ok: false, error: `Slot ${message.slot} is empty.` };
+		}
+		if (message.type === 'UNIVERSAL_COPY') {
+			const json = await universalCopy();
+			return json
+				? { ok: true, json }
+				: { ok: false, error: 'Copy failed.' };
+		}
+		if (message.type === 'UNIVERSAL_PASTE') {
+			const json = await universalPaste();
+			return json
+				? { ok: true, message: 'Paste queued.', json }
+				: { ok: false, error: 'Universal clipboard is empty.' };
+		}
+		if (message.type === 'EXPORT_ACTION') {
+			await exportActionToClipboard();
+			return { ok: true, message: 'Export queued.' };
+		}
+		if (message.type === 'IMPORT_ACTION') {
+			importActionFromJson();
+			return { ok: true, message: 'Sidebar import field opened.' };
+		}
+		if (message.type === 'GET_HELP_HTML') {
+			return { ok: true, html: getHelpHtml() };
+		}
+		if (message.type === 'IMPORT_ACTION_JSON') {
+			await importActionJson(message.json);
+			return { ok: true, message: 'Import queued.' };
+		}
+	} catch (error) {
+		return {
+			ok: false,
+			error: error instanceof Error ? error.message : 'Action failed.',
+		};
 	}
 }
 
 export default defineContentScript({
-	matches: ['*://*.automationanywhere.digital/*'],
+	matches: [...AUTOMATION_ANYWHERE_MATCHES],
+	allFrames: true,
+	runAt: 'document_idle',
 	async main() {
-		// On initial load, check storage and apply styles if enabled
-		const { stylesEnabled = true } = await chrome.storage.local.get('stylesEnabled');
-		if (stylesEnabled) {
-			await applyStyles();
-		}
+		if (!isAutomationAnywhereUrl(location.href)) return;
+		document.documentElement.dataset.betterAaContentScript = 'loaded';
+		void debugInfo('content', 'Content script loaded.', { url: location.href });
+		applyBundledAssetVariables();
+		await applyInitialSettings();
+		startGlobalClipboardWatcher();
 
-		// Listen for toggle commands from the background script
-		chrome.runtime.onMessage.addListener((message) => {
-			if (message.type === 'TOGGLE_STYLES') {
-				if (message.enabled) {
-					applyStyles();
-				} else {
-					removeStyles();
-				}
-			}
+		browser.runtime.onMessage.addListener((message: RuntimeMessage) => {
+			return handleRuntimeMessage(message);
 		});
 
-		// userscript loading
-		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", () => callInitializeRepeatedly());
-		} else {
-			callInitializeRepeatedly();
-		}
-	}
+		stylesEnabled.watch(() => {
+			void applyStyleClasses();
+		});
+		styleFeatureItems.runButton.watch(() => {
+			void applyStyleClasses();
+		});
+		showSuggestions.watch((value) => {
+			setSuggestionsEnabled(value ?? true);
+		});
+		STYLE_FEATURES.forEach((feature) => {
+			if (feature.key === 'runButton') return;
+			styleFeatureItems[feature.key].watch(() => {
+				void applyStyleClasses();
+			});
+		});
+		STYLE_VALUE_FIELDS.forEach((field) => {
+			styleValueItems[field.key].watch(() => {
+				void applyStyleValues();
+			});
+		});
+
+		runOnReady(() => callInitializeRepeatedly());
+	},
 });

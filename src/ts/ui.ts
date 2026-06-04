@@ -1,34 +1,34 @@
-import * as utils from './utils';
-import * as clipboard from './clipboard';
 import * as commands from './commands';
+import { debugWarn } from './debug';
+import { escapeHtml } from './utils';
 
-export function insertCustomEditorPaletteButtons() {
-	if (document.getElementById("customActionVariableButtons")) {
+export function insertCustomEditorPaletteButtons(): void {
+	if (document.getElementById('customActionVariableButtons')) {
 		return;
 	}
-	const containerDiv = document.createElement("div");
-	containerDiv.id = "customActionVariableButtons";
+	const containerDiv = document.createElement('div');
+	containerDiv.id = 'customActionVariableButtons';
 
-	const variableButton = document.createElement("button");
-	variableButton.className = "customActionVariableButton";
-	variableButton.textContent = "Variables";
-	variableButton.onclick = function() {
-		commands.showVariables();
+	const variableButton = document.createElement('button');
+	variableButton.className = 'customActionVariableButton';
+	variableButton.textContent = 'Variables';
+	variableButton.onclick = () => {
+		void commands.showVariables();
 		updateActiveButton();
 	};
 
-	const actionButton = document.createElement("button");
-	actionButton.className = "customActionVariableButton";
-	actionButton.textContent = "Actions";
-	actionButton.onclick = function() {
-		commands.showActions();
+	const actionButton = document.createElement('button');
+	actionButton.className = 'customActionVariableButton';
+	actionButton.textContent = 'Actions';
+	actionButton.onclick = () => {
+		void commands.showActions();
 		updateActiveButton();
 	};
 
-	const triggerButton = document.createElement("button");
-	triggerButton.className = "customActionVariableButton";
-	triggerButton.textContent = "Triggers";
-	triggerButton.onclick = function() {
+	const triggerButton = document.createElement('button');
+	triggerButton.className = 'customActionVariableButton';
+	triggerButton.textContent = 'Triggers';
+	triggerButton.onclick = () => {
 		commands.showTriggers();
 		updateActiveButton();
 	};
@@ -37,14 +37,14 @@ export function insertCustomEditorPaletteButtons() {
 	containerDiv.appendChild(actionButton);
 	containerDiv.appendChild(triggerButton);
 
-	const palette = utils.safeQuery(".editor-layout__palette", "insertCustomEditorPaletteButtons");
+	const palette = document.querySelector('.editor-layout__palette');
 	if (palette) {
 		palette.appendChild(containerDiv);
 	}
 
-	if (!document.getElementById("customActionVariableButtons-style")) {
-		const style = document.createElement("style");
-		style.id = "customActionVariableButtons-style";
+	if (!document.getElementById('customActionVariableButtons-style')) {
+		const style = document.createElement('style');
+		style.id = 'customActionVariableButtons-style';
 		style.textContent = `
 			#customActionVariableButtons {
 				display: flex;
@@ -71,7 +71,7 @@ export function insertCustomEditorPaletteButtons() {
 			}
 			.buttonToolbarActive {
 				border: 1px solid #3c5e83 !important;
-				text-shadow: 0.5px 0 0 #3c5e83 , -0.01px 0 0 #3c5e83 !important;
+				text-shadow: 0.5px 0 0 #3c5e83, -0.01px 0 0 #3c5e83 !important;
 			}
 			.editor-palette.g-box-sizing_border-box {
 				margin-top: 38px;
@@ -81,116 +81,149 @@ export function insertCustomEditorPaletteButtons() {
 	}
 }
 
-export function insertUniversalCopyPasteButtons(attempt = 1) {
-	setTimeout(() => {
-		const actionBar = document.querySelector('.action-bar--theme_info');
-		if (actionBar && !actionBar.querySelector('.universalCopy')) {
-			const separator = document.createElement('div');
-			separator.className = 'action-bar__separator';
-			actionBar.appendChild(separator);
-
-			// Universal Copy button
-			const copyButton = document.createElement('button');
-			copyButton.className = 'universalCopy rio-focus rio-focus--inset_0 rio-focus--border-radius_4px rio-focus--has_element-focus-visible rio-bare-button g-reset-element rio-bare-button--is_interactive rio-bare-button--rio_interactive-softest rio-bare-button--is_parent rio-bare-button--is_clickable rio-bare-button--size_14px rio-bare-button--is_square rio-bare-button--square_26x26 action-bar__item action-bar__item--is_action taskbot-editor__toolbar__action';
-			copyButton.innerHTML = `<span class="icon fa fa-rocket icon--block"></span>`;
-			copyButton.title = 'Universal Copy';
-			copyButton.onclick = clipboard.universalCopy;
-			actionBar.appendChild(copyButton);
-
-			// Universal Paste button
-			const pasteButton = document.createElement('button');
-			pasteButton.className = 'universalPaste rio-focus rio-focus--inset_0 rio-focus--border-radius_4px rio-focus--has_element-focus-visible rio-bare-button g-reset-element rio-bare-button--is_interactive rio-bare-button--rio_interactive-softest rio-bare-button--is_parent rio-bare-button--is_clickable rio-bare-button--size_14px rio-bare-button--is_square rio-bare-button--square_26x26 action-bar__item action-bar__item--is_action taskbot-editor__toolbar__action';
-			pasteButton.innerHTML = `<span class="icon fa fa-rocket icon--block" style="transform: rotate(180deg);"></span>`;
-			pasteButton.title = 'Universal Paste';
-			pasteButton.onclick = clipboard.universalPaste;
-			actionBar.appendChild(pasteButton);
-		} else if (attempt < 3) {
-			insertUniversalCopyPasteButtons(attempt + 1);
-		}
-	}, 1000 * attempt);
-}
-
-export function removeInlineWidth() {
-	const nav = document.querySelector('.main-layout__navigation');
+export function removeInlineWidth(): void {
+	const nav = document.querySelector<HTMLElement>('.main-layout__navigation');
 	const pathfinderCollapsed = document.querySelector('.pathfinder--is_collapsed');
 	if (pathfinderCollapsed) {
-		if (nav?.style?.width) {
-			nav.style.removeProperty('width');
-		}
+		nav?.style.removeProperty('width');
 		return;
 	}
-	const collapseButton = document.querySelector('button[aria-label="Collapse"]');
+	const collapseButton = document.querySelector<HTMLElement>('button[aria-label="Collapse"]');
 	if (collapseButton) {
 		collapseButton.click();
 		setTimeout(() => {
-			if (nav?.style?.width) {
-				nav.style.removeProperty('width');
-			}
+			nav?.style.removeProperty('width');
 		}, 500);
 	} else {
-		console.warn('Collapse button not found');
+		void debugWarn('selector', 'Collapse button not found.', {
+			selector: 'button[aria-label="Collapse"]',
+		}, { feedback: true });
 	}
 }
 
-export function updateActiveButton() {
-	const activeSection = document.querySelector(
-		".editor-palette-section__header--is_active .clipped-text__string--for_presentation"
+export function updateActiveButton(): void {
+	const activeSection = document.querySelector<HTMLElement>(
+		'.editor-palette-section__header--is_active .clipped-text__string--for_presentation'
 	)?.innerText;
-	const buttons = document.querySelectorAll(".customActionVariableButton");
+	const buttons = document.querySelectorAll('.customActionVariableButton');
 	buttons.forEach((button) => {
-		if (button.textContent === activeSection) {
-			button.classList.add("buttonToolbarActive");
-		} else {
-			button.classList.remove("buttonToolbarActive");
-		}
+		button.classList.toggle('buttonToolbarActive', button.textContent === activeSection);
 	});
 }
 
+export function ensureNotificationStyles(): void {
+	if (document.getElementById('better-aa-toast-style')) return;
 
-type ToastType = 'error' | 'warning' | 'alert';
+	const style = document.createElement('style');
+	style.id = 'better-aa-toast-style';
+	style.textContent = `
+		@keyframes betterToastInOut {
+			0% { opacity: 0; transform: translateX(-20px); }
+			15% { opacity: 1; transform: translateX(0); }
+			85% { opacity: 1; transform: translateX(0); }
+			100% { opacity: 0; transform: translateX(20px); }
+		}
+		#better-aa-toast-host {
+			position: fixed;
+			top: 50px;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 2147483647;
+			pointer-events: none;
+			max-width: calc(100vw - 24px);
+		}
+		#better-aa-toast-host .toasttray-toast {
+			position: static !important;
+			display: block !important;
+			margin-bottom: 8px;
+			opacity: 0;
+			transform: translateX(-20px);
+			animation: betterToastInOut 3s ease forwards;
+		}
+		#better-aa-toast-host .toast {
+			position: relative;
+			display: flex;
+			gap: 8px;
+			align-items: flex-start;
+			inline-size: min(460px, calc(100vw - 24px)) !important;
+			max-inline-size: min(460px, calc(100vw - 24px)) !important;
+			width: 300px !important;
+			padding: 10px 12px;
+			border-radius: 10px;
+			background: #000 !important;
+			color: #fff !important;
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+			pointer-events: auto;
+		}
+		#better-aa-toast-host .toast-content {
+			flex: 1 1 auto;
+			min-inline-size: 0;
+			font-size: 12px;
+			line-height: 1.35;
+		}
+		#better-aa-toast-host .toast-title {
+			font-weight: 700;
+			color: #fff !important;
+		}
+		#better-aa-toast-host .toast-message {
+			margin-top: 2px;
+			color: #fff !important;
+			word-break: break-word;
+		}
+		#better-aa-toast-host .toast-close {
+			flex: 0 0 auto;
+			color: #fff !important;
+		}
+	`;
+	document.head.appendChild(style);
+}
 
-export function showToast(message: string, type: ToastType = 'alert', duration = 5000): void {
-  // Remove any existing toast
-  const prev = document.getElementById('ba-toast');
-  if (prev) prev.remove();
+function getNotificationTray(): Element {
+	let host = document.getElementById('better-aa-toast-host');
+	if (!host) {
+		host = document.createElement('div');
+		host.id = 'better-aa-toast-host';
+		host.innerHTML = `
+			<div class="main-layout__toast-tray">
+				<div class="mainlayouttoasttray">
+					<div class="toasttray" data-path="ToastTray"></div>
+				</div>
+			</div>
+		`;
+		document.body.appendChild(host);
+	}
+	return host.querySelector('.toasttray') ?? host;
+}
 
-  const toast = document.createElement('div');
-  toast.id = 'ba-toast';
-  toast.textContent = message;
-  toast.style.position = 'fixed';
-  toast.style.bottom = '40px';
-  toast.style.left = '50%';
-  toast.style.transform = 'translateX(-50%)';
-  toast.style.zIndex = '100000';
-  toast.style.padding = '12px 24px';
-  toast.style.borderRadius = '8px';
-  toast.style.fontSize = '16px';
-  toast.style.color = 'white';
-  toast.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
-  toast.style.opacity = '0';
-  toast.style.transition = 'opacity 0.3s';
+export function showNotification(
+	title: string,
+	message = '',
+	duration = 5000
+): void {
+	ensureNotificationStyles();
+	const tray = getNotificationTray();
+	const toastWrapper = document.createElement('div');
+	toastWrapper.className = 'toasttray-toast';
+	toastWrapper.innerHTML = `
+		<div data-path="Toast" class="toast g-reset-element g-box-sizing_border-box toast--closable">
+			<div class="toast-content">
+				${title ? `<div class="toast-title">${escapeHtml(title)}</div>` : ''}
+				${message ? `<div class="toast-message">${escapeHtml(message)}</div>` : ''}
+			</div>
+			<button type="button" aria-label="Close notification" class="toast-close">x</button>
+		</div>
+	`;
 
-  // Set background color based on type
-  switch (type) {
-    case 'error':
-      toast.style.background = '#e53e3e'; // red
-      break;
-    case 'warning':
-      toast.style.background = '#ecc94b'; // yellow
-      toast.style.color = '#2d3748';
-      break;
-    case 'alert':
-    default:
-      toast.style.background = '#3182ce'; // blue
-      break;
-  }
+	const close = () => {
+		if (!toastWrapper.isConnected) return;
+		toastWrapper.remove();
+	};
 
-  document.body.appendChild(toast);
-  // animate in
-  setTimeout(() => { toast.style.opacity = '1'; }, 20);
-  // animate out and remove
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
+	toastWrapper.querySelector('.toast-close')?.addEventListener('click', close);
+	tray.prepend(toastWrapper);
+	setTimeout(close, duration);
+}
+
+export function showToast(message: string, _type = 'alert', duration = 5000): void {
+	showNotification('', message, duration);
 }
