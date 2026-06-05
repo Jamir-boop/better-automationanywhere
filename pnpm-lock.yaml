@@ -8,10 +8,16 @@ importers:
 
   .:
     dependencies:
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
       modern-normalize:
         specifier: ^3.0.1
         version: 3.0.1
     devDependencies:
+      fallow:
+        specifier: ^2.87.0
+        version: 2.87.0
       stylus:
         specifier: ^0.64.0
         version: 0.64.0
@@ -234,6 +240,46 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@fallow-cli/darwin-arm64@2.87.0':
+    resolution: {integrity: sha512-+5RD8P5C+kI9sINhkUdAeTPv8dl6f3+Wm3k060mqyz8NAIS8aXwZi9GACkW//AOteT2MLdcmAU2n1eQIrsA/TQ==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@fallow-cli/darwin-x64@2.87.0':
+    resolution: {integrity: sha512-U2+PX+00lhZvUr3tn7pHz3sO0AI0sLMOlcEHP8Cc7z9MosmnTCUSulLJpV8G2JXCV3vAZ+qKJhYcq9HKEQsPLw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@fallow-cli/linux-arm64-gnu@2.87.0':
+    resolution: {integrity: sha512-qWrkl6eZBR7B/vYgbzLIp7v7m82a81CYH57zNr68HDOXZPDfibkOFWHstFnkgTEJ8b112Xwx/7wugdxmfLH8Yw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@fallow-cli/linux-arm64-musl@2.87.0':
+    resolution: {integrity: sha512-ryxcJFd25EJ8d0jqsTYAYAYXqAv5hJVj5Ta/j+srrDIrKyMwvGt2UZlKNcqLsc03l/W4HM9HFMvpIOmzentfcw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@fallow-cli/linux-x64-gnu@2.87.0':
+    resolution: {integrity: sha512-gu8igbVkufB1SRSrPcrLJCyDhfFq+4Dkrvp8MtlKkTDnBf7EfSqjwqlmEZ8avux19agKUz5/vRFZZoOkB+umow==}
+    cpu: [x64]
+    os: [linux]
+
+  '@fallow-cli/linux-x64-musl@2.87.0':
+    resolution: {integrity: sha512-2HerE6UJF/GCByOvCrAPN4qC8vQ8VKWhMVxfAXhCTuF9zSl7iOxt3eEGl+xYS9lg0eHzsKnM4K6mJowbR07pdA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@fallow-cli/win32-arm64-msvc@2.87.0':
+    resolution: {integrity: sha512-fVw3Jp7+UEkC78uV/noAXPoGj79y9cQD6qXkFhAJW/RwEj44GlYJY12fhSr07qEkJhtESDtSgHTiWBZqIKgtJg==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@fallow-cli/win32-x64-msvc@2.87.0':
+    resolution: {integrity: sha512-TAGlaiREHU8GC5boUPSsTOuu6oWqmtdCHRgZjcu/XRdhPjUZ2aCnxDeQNBUKIkOcQIr0R+H0LD3Ay04k8u4G4Q==}
+    cpu: [x64]
+    os: [win32]
+
   '@isaacs/balanced-match@4.0.1':
     resolution: {integrity: sha512-yzMTt9lEb8Gv7zRioUilSglI0c0smZ9k5D65677DLWLtWJaXIS3CqcGyUFByYKlnUj6TkjLVs54fBl6+TiGQDQ==}
     engines: {node: 20 || >=22}
@@ -311,56 +357,67 @@ packages:
     resolution: {integrity: sha512-+xmiDGGaSfIIOXMzkhJ++Oa0Gwvl9oXUeIiwarsdRXSe27HUIvjbSIpPxvnNsRebsNdUo7uAiQVgBD1hVriwSQ==}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm-musleabihf@4.44.2':
     resolution: {integrity: sha512-bDHvhzOfORk3wt8yxIra8N4k/N0MnKInCW5OGZaeDYa/hMrdPaJzo7CSkjKZqX4JFUWjUGm88lI6QJLCM7lDrA==}
     cpu: [arm]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-arm64-gnu@4.44.2':
     resolution: {integrity: sha512-NMsDEsDiYghTbeZWEGnNi4F0hSbGnsuOG+VnNvxkKg0IGDvFh7UVpM/14mnMwxRxUf9AdAVJgHPvKXf6FpMB7A==}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm64-musl@4.44.2':
     resolution: {integrity: sha512-lb5bxXnxXglVq+7imxykIp5xMq+idehfl+wOgiiix0191av84OqbjUED+PRC5OA8eFJYj5xAGcpAZ0pF2MnW+A==}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-loongarch64-gnu@4.44.2':
     resolution: {integrity: sha512-Yl5Rdpf9pIc4GW1PmkUGHdMtbx0fBLE1//SxDmuf3X0dUC57+zMepow2LK0V21661cjXdTn8hO2tXDdAWAqE5g==}
     cpu: [loong64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-powerpc64le-gnu@4.44.2':
     resolution: {integrity: sha512-03vUDH+w55s680YYryyr78jsO1RWU9ocRMaeV2vMniJJW/6HhoTBwyyiiTPVHNWLnhsnwcQ0oH3S9JSBEKuyqw==}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-riscv64-gnu@4.44.2':
     resolution: {integrity: sha512-iYtAqBg5eEMG4dEfVlkqo05xMOk6y/JXIToRca2bAWuqjrJYJlx/I7+Z+4hSrsWU8GdJDFPL4ktV3dy4yBSrzg==}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-riscv64-musl@4.44.2':
     resolution: {integrity: sha512-e6vEbgaaqz2yEHqtkPXa28fFuBGmUJ0N2dOJK8YUfijejInt9gfCSA7YDdJ4nYlv67JfP3+PSWFX4IVw/xRIPg==}
     cpu: [riscv64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-s390x-gnu@4.44.2':
     resolution: {integrity: sha512-evFOtkmVdY3udE+0QKrV5wBx7bKI0iHz5yEVx5WqDJkxp9YQefy4Mpx3RajIVcM6o7jxTvVd/qpC1IXUhGc1Mw==}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-gnu@4.44.2':
     resolution: {integrity: sha512-/bXb0bEsWMyEkIsUL2Yt5nFB5naLAwyOWMEviQfQY1x3l5WsLKgvZf66TM7UTfED6erckUVUJQ/jJ1FSpm3pRQ==}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-musl@4.44.2':
     resolution: {integrity: sha512-3D3OB1vSSBXmkGEZR27uiMRNiwN08/RVAcBKwhUYPaiZ8bcvdeEwWPvbnXvvXHY+A/7xluzcN+kaiOFNiOZwWg==}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-win32-arm64-msvc@4.44.2':
     resolution: {integrity: sha512-VfU0fsMK+rwdK8mwODqYeM2hDrF2WiHaSmCBrS7gColkQft95/8tphyzv2EupVxn3iE0FI78wzffoULH1G+dkw==}
@@ -728,6 +785,10 @@ packages:
   destr@2.0.5:
     resolution: {integrity: sha512-ugFTXCtDZunbzasqBxrK93Ik/DRYsO6S/fedkWEMKqt04xZ4csmnmwGDBAb07QWNaGMAmnTIemsYZCksjATwsA==}
 
+  detect-libc@2.1.2:
+    resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
+    engines: {node: '>=8'}
+
   dom-serializer@2.0.0:
     resolution: {integrity: sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg==}
 
@@ -832,6 +893,11 @@ packages:
     engines: {node: '>= 10.17.0'}
     hasBin: true
 
+  fallow@2.87.0:
+    resolution: {integrity: sha512-Lw93VYQGlnenzg9ENCnyfB/7VlfVqQFF9t9UXiBJPbEyCsK3uRfxDd+LgalTiLLRXpLn7ilGFvZQHTTrWEOC1Q==}
+    engines: {node: '>=16'}
+    hasBin: true
+
   fast-glob@3.3.3:
     resolution: {integrity: sha512-7MptL8U0cqcFdzIzwOTHoilX9x5BrNqye7Z/LuC7kCMRio1EMSyqRK3BEAUD7sXRq4iT4AzTVuZdhgQ2TCvYLg==}
     engines: {node: '>=8.6.0'}
@@ -920,6 +986,7 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   global-directory@4.0.1:
@@ -1787,6 +1854,7 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   vite-node@3.2.4:
@@ -2075,6 +2143,30 @@ snapshots:
     optional: true
 
   '@esbuild/win32-x64@0.25.6':
+    optional: true
+
+  '@fallow-cli/darwin-arm64@2.87.0':
+    optional: true
+
+  '@fallow-cli/darwin-x64@2.87.0':
+    optional: true
+
+  '@fallow-cli/linux-arm64-gnu@2.87.0':
+    optional: true
+
+  '@fallow-cli/linux-arm64-musl@2.87.0':
+    optional: true
+
+  '@fallow-cli/linux-x64-gnu@2.87.0':
+    optional: true
+
+  '@fallow-cli/linux-x64-musl@2.87.0':
+    optional: true
+
+  '@fallow-cli/win32-arm64-msvc@2.87.0':
+    optional: true
+
+  '@fallow-cli/win32-x64-msvc@2.87.0':
     optional: true
 
   '@isaacs/balanced-match@4.0.1': {}
@@ -2521,6 +2613,8 @@ snapshots:
 
   destr@2.0.5: {}
 
+  detect-libc@2.1.2: {}
+
   dom-serializer@2.0.0:
     dependencies:
       domelementtype: 2.3.0
@@ -2653,6 +2747,19 @@ snapshots:
       '@types/yauzl': 2.10.3
     transitivePeerDependencies:
       - supports-color
+
+  fallow@2.87.0:
+    dependencies:
+      detect-libc: 2.1.2
+    optionalDependencies:
+      '@fallow-cli/darwin-arm64': 2.87.0
+      '@fallow-cli/darwin-x64': 2.87.0
+      '@fallow-cli/linux-arm64-gnu': 2.87.0
+      '@fallow-cli/linux-arm64-musl': 2.87.0
+      '@fallow-cli/linux-x64-gnu': 2.87.0
+      '@fallow-cli/linux-x64-musl': 2.87.0
+      '@fallow-cli/win32-arm64-msvc': 2.87.0
+      '@fallow-cli/win32-x64-msvc': 2.87.0
 
   fast-glob@3.3.3:
     dependencies:

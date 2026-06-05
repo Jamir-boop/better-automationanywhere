@@ -7,14 +7,14 @@ const webAccessibleResources = ['media/loading.gif', 'sounds/*'];
 export default defineConfig({
 	targetBrowsers: ['chrome', 'firefox'],
 	manifest: ({ browser }) => ({
-		name: 'Better AutomationAnywhere DX',
-		version: '0.2.4',
-		description: 'Enhanced Automation Anywhere developer experience.',
+		name: 'Better AA Developer Experience',
+		version: '1.0.0',
+		description: 'Better AA Developer Experience for Automation Anywhere.',
 		author: 'jamir-boop',
 		permissions: [
 			'storage',
 			'tabs',
-			...(browser === 'chrome' ? ['sidePanel'] : []),
+			...(browser === 'chrome' ? ['sidePanel', 'scripting', 'activeTab'] : []),
 		],
 		host_permissions: automationAnywhereMatches,
 		web_accessible_resources:
@@ -39,18 +39,28 @@ export default defineConfig({
 						},
 					},
 					sidebar_action: {
-						default_title: 'Better AutomationAnywhere DX',
+						default_title: 'Better AA Developer Experience',
 						default_panel: 'sidepanel/index.html',
 					},
 				}),
 		action: {},
 		commands: {
-			'open-sidebar': {
-				suggested_key: {
-					default: 'Ctrl+Shift+L',
-				},
-				description: 'Open extension sidebar',
-			},
+			...(browser === 'firefox'
+				? {
+						'_execute_sidebar_action': {
+							suggested_key: {
+								default: 'Ctrl+Shift+L',
+							},
+						},
+					}
+				: {
+						'open-sidebar': {
+							suggested_key: {
+								default: 'Ctrl+Shift+L',
+							},
+							description: 'Open extension sidebar',
+						},
+					}),
 			'toggle-styles': {
 				suggested_key: {
 					default: 'Ctrl+Shift+S',

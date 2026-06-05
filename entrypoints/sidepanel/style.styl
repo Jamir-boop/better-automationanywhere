@@ -32,6 +32,9 @@ body
 	color: var(--text)
 	background: var(--bg)
 
+[hidden]
+	display: none !important
+
 button,
 select,
 input,
@@ -61,9 +64,33 @@ textarea
 		color: var(--text-muted)
 		font-size: .76rem
 
+.header-controls
+	display: flex
+	align-items: center
+	gap: 10px
+	flex-wrap: wrap
+	justify-content: flex-end
+
+.version-chip
+	color: var(--accent)
+	font-size: .76rem
+	font-weight: 700
+
+.debug-toggle
+	display: flex
+	align-items: center
+	gap: 6px
+	color: var(--text-muted)
+	font-size: .72rem
+	white-space: nowrap
+
+	input
+		width: 34px
+		height: 18px
+
 .tab-list
 	display: grid
-	grid-template-columns: repeat(4, 1fr)
+	grid-template-columns: repeat(3, 1fr)
 	gap: 4px
 	padding: 3px
 	border: 1px solid var(--border)
@@ -257,8 +284,21 @@ textarea
 	font-size: .78rem
 	line-height: 1.35
 
+	&.is-invalid
+		border-color: #A33A3A
+
+		&:focus
+			outline-color: #A33A3A
+			border-color: #A33A3A
+
 .json-area
 	min-height: 180px
+
+.json-inline-error
+	margin: -4px 0 0
+	color: #FF8A8A
+	font-size: .72rem
+	line-height: 1.3
 
 .json-field
 	position: relative
@@ -404,16 +444,34 @@ button
 		display: none
 
 .feedback-section
-	#clearFeedback
+	.feedback-actions
+		display: inline-flex
+		align-items: center
+		gap: 6px
 		flex: 0 0 auto
-		font-size: .72rem
+
+		button
+			padding: 5px 8px
+			font-size: .72rem
+
+		.debug-log-toggle
+			width: 28px
+			height: 26px
+			padding: 0
+			font-size: .9rem
+			line-height: 1
 
 .feedback-list
+	--feedback-row-height: 32px
 	display: flex
 	flex-direction: column
-	gap: 6px
-	max-height: 220px
+	gap: 4px
+	max-height: calc(var(--feedback-row-height) * 5 + 16px)
 	overflow: auto
+
+.feedback-section.is-collapsed .feedback-list
+	max-height: calc(var(--feedback-row-height) + 2px)
+	overflow: hidden
 
 .feedback-empty
 	margin: 0
@@ -421,34 +479,31 @@ button
 	font-size: .74rem
 
 .feedback-line
-	display: flex
-	flex-direction: column
-	gap: 3px
-	padding: 7px 8px
+	display: grid
+	grid-template-columns: minmax(112px, .55fr) minmax(0, 1fr)
+	align-items: center
+	gap: 8px
+	min-height: var(--feedback-row-height)
+	padding: 4px 7px
 	border: 1px solid var(--border)
 	border-radius: 6px
 	background: var(--surface-0)
 
 	small
 		color: var(--text-muted)
-		font-size: .62rem
+		font-size: .58rem
 		text-transform: uppercase
+		overflow: hidden
+		text-overflow: ellipsis
+		white-space: nowrap
 
 	span
 		color: var(--text)
 		font-size: .72rem
-		line-height: 1.32
-
-	pre
-		margin: 2px 0 0
-		padding: 6px
-		color: var(--text-muted)
-		background: var(--surface-1)
-		border: 1px solid var(--border)
-		border-radius: 4px
-		font-size: .66rem
-		white-space: pre-wrap
-		overflow-wrap: anywhere
+		line-height: 1.25
+		overflow: hidden
+		text-overflow: ellipsis
+		white-space: nowrap
 
 .feedback-info
 	border-color: var(--border)
@@ -534,6 +589,32 @@ button
 	font-size: .76rem
 	line-height: 1.35
 	overflow-wrap: anywhere
+
+.tools-refresh-group
+	display: inline-flex
+	align-items: center
+	gap: 8px
+
+.tools-availability-dot
+	display: inline-block
+	width: 9px
+	height: 9px
+	border-radius: 999px
+	background: #A33A3A
+
+	&[data-available='true']
+		background: #3AA35C
+
+.icon-button
+	display: inline-flex
+	align-items: center
+	justify-content: center
+	width: 30px
+	height: 30px
+	padding: 0
+	border-radius: 999px
+	font-size: 1rem
+	line-height: 1
 
 .tool-action-grid
 	display: grid
@@ -624,6 +705,104 @@ button
 
 	button[hidden]
 		display: none
+
+.tools-progress
+	display: flex
+	flex-direction: column
+	gap: 6px
+	padding: 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+
+.tools-progress-meta
+	display: flex
+	align-items: center
+	justify-content: space-between
+	gap: 10px
+	color: var(--text-muted)
+	font-size: .72rem
+
+	span:first-child
+		min-width: 0
+		overflow: hidden
+		text-overflow: ellipsis
+		white-space: nowrap
+
+.tools-progress-track
+	height: 8px
+	overflow: hidden
+	border: 1px solid var(--border-strong)
+	border-radius: 999px
+	background: var(--surface-1)
+
+.tools-progress-fill
+	display: block
+	width: 0
+	height: 100%
+	background: var(--accent)
+	transition: width .16s ease
+
+.tools-modal-backdrop
+	position: fixed
+	inset: 0
+	z-index: 1000
+	display: flex
+	align-items: center
+	justify-content: center
+	padding: 14px
+	background: rgba(0, 0, 0, .72)
+
+.tools-modal
+	display: flex
+	width: min(100%, 420px)
+	max-height: min(82vh, 620px)
+	flex-direction: column
+	gap: 10px
+	padding: 14px
+	color: var(--text)
+	background: var(--surface-2)
+	border: 1px solid var(--border-strong)
+	border-radius: 8px
+	box-shadow: 0 16px 44px rgba(0, 0, 0, .55)
+
+	h2
+		margin: 0
+		color: var(--accent)
+		font-size: .88rem
+		text-transform: uppercase
+
+	p
+		margin: 0
+		color: var(--text)
+		font-size: .76rem
+		line-height: 1.35
+
+.tools-finish-log
+	display: flex
+	min-height: 70px
+	max-height: 300px
+	flex-direction: column
+	gap: 6px
+	overflow: auto
+
+.tools-finish-line,
+.tools-finish-empty
+	margin: 0
+	padding: 7px 8px
+	color: var(--text)
+	background: var(--surface-0)
+	border: 1px solid var(--border)
+	border-radius: 6px
+	font-size: .7rem
+	line-height: 1.32
+	overflow-wrap: anywhere
+
+.tools-finish-warn
+	border-color: var(--accent)
+
+.tools-finish-error
+	border-color: #A33A3A
 
 .tools-results
 	margin: 0

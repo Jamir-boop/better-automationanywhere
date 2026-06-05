@@ -42,6 +42,16 @@ import { setActiveCommandPaletteShortcut } from '../src/ts/utils';
 const DEFAULT_LOADING_IMAGE_CSS = `url("${browser.runtime.getURL(
 	'media/loading.gif' as any
 )}")`;
+const SHARED_CLIPBOARD_SELECTORS = [
+	'.aa-icon-action-clipboard-copy--shared',
+	'.aa-icon-action-clipboard-paste--shared',
+];
+const TASK_EDITOR_CAPABILITY_SELECTORS = [
+	'.taskbot-editor__toolbar__action',
+	'.taskbot-canvas-list-node',
+	'.editor-layout__canvas',
+];
+const OPEN_SIDEBAR_BUTTON_ID = 'better-aa-open-sidebar-button';
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -108,6 +118,55 @@ function runOnReady(callback: () => void): void {
 	callback();
 }
 
+function isTopFrame(): boolean {
+	try {
+		return window.top === window.self;
+	} catch {
+		return false;
+	}
+}
+
+function insertOpenSidebarButton(): void {
+	if (
+		import.meta.env.FIREFOX ||
+		!isTopFrame() ||
+		document.getElementById(OPEN_SIDEBAR_BUTTON_ID)
+	) {
+		return;
+	}
+	const button = document.createElement('button');
+	button.id = OPEN_SIDEBAR_BUTTON_ID;
+	button.type = 'button';
+	button.textContent = 'Better AA Developer Experience';
+	button.title = 'Open Better AA Developer Experience sidebar';
+	button.setAttribute('aria-label', 'Open Better AA Developer Experience sidebar');
+	button.addEventListener('click', () => {
+		button.style.transform = 'scale(0.95)';
+		setTimeout(() => {
+			button.style.transform = '';
+		}, 100);
+		void browser.runtime
+			.sendMessage({ type: 'OPEN_SIDEBAR', tab: 'tools' })
+			.then((response: ContentActionResponse | undefined) => {
+				if (response && !response.ok) throw new Error(response.error);
+				button.style.background = '#3AA35C';
+				button.style.borderColor = '#3AA35C';
+				setTimeout(() => {
+					button.style.background = '';
+					button.style.borderColor = '';
+				}, 300);
+			})
+			.catch((error) => {
+				button.style.background = '#A33A3A';
+				button.style.borderColor = '#A33A3A';
+				void debugError('content', 'Open sidebar button failed.', { error }, {
+					feedback: true,
+				});
+			});
+	});
+	document.body.appendChild(button);
+}
+
 function getAutomationAnywhereAuthToken(): string | null {
 	try {
 		const raw = localStorage.getItem('authToken');
@@ -130,6 +189,22 @@ function refreshAutomationAnywhereFolderList(): boolean {
 	return true;
 }
 
+function getToolCapabilities(): ContentActionResponse {
+	const universalClipboard =
+		SHARED_CLIPBOARD_SELECTORS.some((selector) =>
+			Boolean(document.querySelector(selector))
+		) ||
+		TASK_EDITOR_CAPABILITY_SELECTORS.some((selector) =>
+			Boolean(document.querySelector(selector))
+		);
+	return {
+		ok: true,
+		capabilities: {
+			universalClipboard,
+		},
+	};
+}
+
 async function handleRuntimeMessage(
 	message: RuntimeMessage
 ): Promise<ContentActionResponse | void> {
@@ -139,6 +214,9 @@ async function handleRuntimeMessage(
 		}
 		if (message.type === 'GET_AA_AUTH_TOKEN') {
 			return { ok: true, authToken: getAutomationAnywhereAuthToken() };
+		}
+		if (message.type === 'GET_TOOL_CAPABILITIES') {
+			return getToolCapabilities();
 		}
 		if (message.type === 'REFRESH_AA_FOLDER_LIST') {
 			return refreshAutomationAnywhereFolderList()
@@ -263,6 +341,9 @@ export default defineContentScript({
 			});
 		});
 
-		runOnReady(() => callInitializeRepeatedly());
+		runOnReady(() => {
+			insertOpenSidebarButton();
+			callInitializeRepeatedly();
+		});
 	},
 });

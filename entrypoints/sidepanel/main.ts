@@ -5,6 +5,7 @@ import type {
 	BackgroundMessage,
 	ContentActionMessage,
 	ContentActionResponse,
+	ExtensionShortcuts,
 } from '@/src/ts/messages';
 import {
 	isAutomationAnywhereJson,
@@ -14,6 +15,7 @@ import {
 import {
 	COMMAND_PALETTE_SHORTCUTS,
 	DEFAULT_DEBUG_ENABLED,
+	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
 	DEFAULT_STYLES_ENABLED,
 	EXTENSION_VERSION,
@@ -113,6 +115,66 @@ function renderClipboardSlotRow(slot: number): string {
 	`;
 }
 
+function renderToolsConfigSection(): string {
+	return `
+		<section class="panel-section">
+			<h2>Userscript Config</h2>
+			<label class="select-row">
+				<span>
+					<strong>Command palette</strong>
+					<small id="shortcutLabel"></small>
+				</span>
+				<select id="commandPaletteShortcut">
+					<option value="${COMMAND_PALETTE_SHORTCUTS.ALT_P}">Alt + P</option>
+					<option value="${COMMAND_PALETTE_SHORTCUTS.SLASH}">/</option>
+				</select>
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>Sounds</strong>
+					<small>Run, error, and done tones</small>
+				</span>
+				<input id="soundsEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>Show suggestions</strong>
+					<small>Short mouse-click tips for common shortcuts</small>
+				</span>
+				<input id="showSuggestions" type="checkbox">
+			</label>
+		</section>
+	`;
+}
+
+function renderUniversalClipboardSection(): string {
+	return `
+		<h2>Universal Clipboard</h2>
+		<div class="slots">
+			${UNIVERSAL_CLIPBOARD_SLOTS.map(renderClipboardSlotRow).join('')}
+		</div>
+
+		<h2>Action JSON</h2>
+		<div class="json-field">
+			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="Universal copy loads selected action JSON here. Paste JSON here to import."></textarea>
+			<button id="clearJson" class="clear-json-button" type="button" aria-label="Clear JSON" title="Clear JSON" hidden>
+				<svg aria-hidden="true" viewBox="0 0 24 24">
+					<path d="M3 6h18"></path>
+					<path d="M8 6V4h8v2"></path>
+					<path d="M6 6l1 15h10l1-15"></path>
+					<path d="M10 11v6"></path>
+					<path d="M14 11v6"></path>
+				</svg>
+			</button>
+		</div>
+		<pre id="actionSummary" class="action-summary" hidden></pre>
+		<div class="button-grid">
+			<button id="importJson" type="button">Import JSON</button>
+			<button id="copyJsonText" type="button">Copy text</button>
+		</div>
+	`;
+}
+
 function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): string {
 	return `
 		<label class="setting-row userstyle-dependent">
@@ -197,93 +259,41 @@ function renderStyleValueControls(): string {
 app.innerHTML = `
 	<header class="panel-header">
 		<div>
-			<h1>Better AA</h1>
-			<p>Automation Anywhere DX controls</p>
+			<h1>Better AA Developer Experience</h1>
+		</div>
+		<div class="header-controls">
+			<span class="version-chip">v${extensionVersion}</span>
+			<label class="debug-toggle">
+				<span>Debug Mode</span>
+				<input id="debugEnabled" type="checkbox">
+			</label>
 		</div>
 	</header>
 
+	<section id="debugLogSection" class="panel-section feedback-section is-collapsed">
+		<div class="section-heading-row">
+			<h2>Debug Log</h2>
+			<span class="feedback-actions">
+				<button id="toggleDebugLog" class="debug-log-toggle" type="button" aria-expanded="false" aria-label="Expand debug log" title="Expand debug log">▾</button>
+				<button id="copyFeedback" type="button">Copy details</button>
+				<button id="clearFeedback" type="button">Clear</button>
+			</span>
+		</div>
+		<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
+	</section>
+
+	<p id="status" role="status"></p>
+
 	<nav class="tab-list" role="tablist" aria-label="Sidebar sections">
 		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">Tools</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userscript">Userscript</button>
 		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">Userstyle</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="about">About</button>
+		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">Settings</button>
 	</nav>
 
 	<main>
-		${renderToolsPanel()}
-
-		<section class="tab-panel" role="tabpanel" data-panel="userscript" hidden>
-			<section class="panel-section">
-				<h2>Userscript Config</h2>
-				<label class="select-row">
-					<span>
-						<strong>Command palette</strong>
-						<small id="shortcutLabel"></small>
-					</span>
-					<select id="commandPaletteShortcut">
-						<option value="${COMMAND_PALETTE_SHORTCUTS.ALT_P}">Alt + P</option>
-						<option value="${COMMAND_PALETTE_SHORTCUTS.SLASH}">/</option>
-					</select>
-				</label>
-				<label class="setting-row">
-					<span>
-						<strong>Sounds</strong>
-						<small>Run, error, and done tones</small>
-					</span>
-					<input id="soundsEnabled" type="checkbox">
-				</label>
-				<label class="setting-row">
-					<span>
-						<strong>Show suggestions</strong>
-						<small>Short mouse-click tips for common shortcuts</small>
-					</span>
-					<input id="showSuggestions" type="checkbox">
-				</label>
-				<label class="setting-row">
-					<span>
-						<strong>Debug mode</strong>
-						<small>Show selector details and verbose console diagnostics</small>
-					</span>
-					<input id="debugEnabled" type="checkbox">
-				</label>
-			</section>
-
-			<section class="panel-section">
-				<h2>Universal Clipboard</h2>
-				<div class="slots">
-					${UNIVERSAL_CLIPBOARD_SLOTS.map(renderClipboardSlotRow).join('')}
-				</div>
-			</section>
-
-			<section class="panel-section">
-				<h2>Action JSON</h2>
-				<div class="json-field">
-					<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="Universal copy loads selected action JSON here. Paste JSON here to import."></textarea>
-					<button id="clearJson" class="clear-json-button" type="button" aria-label="Clear JSON" title="Clear JSON" hidden>
-						<svg aria-hidden="true" viewBox="0 0 24 24">
-							<path d="M3 6h18"></path>
-							<path d="M8 6V4h8v2"></path>
-							<path d="M6 6l1 15h10l1-15"></path>
-							<path d="M10 11v6"></path>
-							<path d="M14 11v6"></path>
-						</svg>
-					</button>
-				</div>
-				<pre id="actionSummary" class="action-summary" hidden></pre>
-				<div class="button-grid">
-					<button id="importJson" type="button">Import JSON</button>
-					<button id="copyJsonText" type="button">Copy text</button>
-				</div>
-			</section>
-
-			<section class="panel-section feedback-section">
-				<div class="section-heading-row">
-					<h2>Feedback</h2>
-					<button id="clearFeedback" type="button">Clear</button>
-				</div>
-				<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
-			</section>
-		</section>
+		${renderToolsPanel({
+			universalClipboardHtml: renderUniversalClipboardSection(),
+		})}
 
 		<section class="tab-panel" role="tabpanel" data-panel="userstyle" hidden>
 			<section class="panel-section">
@@ -310,7 +320,19 @@ app.innerHTML = `
 			</section>
 		</section>
 
-		<section class="tab-panel" role="tabpanel" data-panel="about" hidden>
+		<section class="tab-panel" role="tabpanel" data-panel="settings" hidden>
+			${renderToolsConfigSection()}
+			<section class="panel-section">
+				<h2>Configuration shortcuts</h2>
+				<div class="info-row">
+					<span>Sidebar shortcut</span>
+					<strong id="sidebarShortcutValue">Ctrl+Shift+L</strong>
+				</div>
+				<div class="info-row">
+					<span>Command palette shortcut</span>
+					<strong id="settingsCommandPaletteShortcut">Alt + P</strong>
+				</div>
+			</section>
 			<section class="panel-section info-panel">
 				<h2>About</h2>
 				<div class="info-row">
@@ -327,7 +349,6 @@ app.innerHTML = `
 		</section>
 	</main>
 
-	<p id="status" role="status"></p>
 `;
 
 const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
@@ -339,11 +360,20 @@ const shortcutSelect = document.querySelector<HTMLSelectElement>(
 	'#commandPaletteShortcut'
 )!;
 const shortcutLabel = document.querySelector<HTMLElement>('#shortcutLabel')!;
+const sidebarShortcutValue = document.querySelector<HTMLElement>('#sidebarShortcutValue')!;
+const settingsCommandPaletteShortcut = document.querySelector<HTMLElement>(
+	'#settingsCommandPaletteShortcut'
+)!;
 const status = document.querySelector<HTMLElement>('#status')!;
 const actionJson = document.querySelector<HTMLTextAreaElement>('#actionJson')!;
 const actionSummary = document.querySelector<HTMLElement>('#actionSummary')!;
 const clearJsonButton = document.querySelector<HTMLButtonElement>('#clearJson')!;
+const debugLogSection = document.querySelector<HTMLElement>('#debugLogSection')!;
 const feedbackList = document.querySelector<HTMLElement>('#feedbackList')!;
+const toggleDebugLogButton =
+	document.querySelector<HTMLButtonElement>('#toggleDebugLog')!;
+const copyFeedbackButton =
+	document.querySelector<HTMLButtonElement>('#copyFeedback')!;
 const clearFeedbackButton =
 	document.querySelector<HTMLButtonElement>('#clearFeedback')!;
 const restoreUserstyleDefaultsButton = document.querySelector<HTMLButtonElement>(
@@ -360,6 +390,11 @@ const backgroundPreview =
 	document.querySelector<HTMLElement>('#backgroundPreview')!;
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
+let debugLogCollapsed = true;
+let currentExtensionShortcuts: ExtensionShortcuts = {
+	openSidebar: 'Ctrl+Shift+L',
+	commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
+};
 let lastSidepanelRequestNonce: string | null = null;
 
 function setStatus(
@@ -376,22 +411,38 @@ function setStatus(
 	}, 3000);
 }
 
+function updateDebugLogState(): void {
+	debugLogSection.classList.toggle('is-collapsed', debugLogCollapsed);
+	feedbackList.dataset.collapsed = String(debugLogCollapsed);
+	toggleDebugLogButton.textContent = debugLogCollapsed ? '▾' : '▴';
+	toggleDebugLogButton.title = debugLogCollapsed ? 'Expand debug log' : 'Collapse debug log';
+	toggleDebugLogButton.setAttribute(
+		'aria-label',
+		debugLogCollapsed ? 'Expand debug log' : 'Collapse debug log'
+	);
+	toggleDebugLogButton.setAttribute('aria-expanded', String(!debugLogCollapsed));
+}
+
 function renderFeedbackHistory(events: DebugEvent[] = []): void {
+	updateDebugLogState();
 	feedbackList.textContent = '';
 	if (!events.length) {
 		const empty = document.createElement('p');
 		empty.className = 'feedback-empty';
-		empty.textContent = 'No feedback.';
+		empty.textContent = 'No debug log.';
 		feedbackList.appendChild(empty);
 		return;
 	}
 
-	for (const event of events) {
+	const visibleEvents = debugLogCollapsed ? events.slice(0, 1) : events;
+	for (const event of visibleEvents) {
 		const row = document.createElement('div');
 		row.className = `feedback-line feedback-${event.level}`;
 
 		const meta = document.createElement('small');
-		meta.textContent = `${new Date(event.timestamp).toLocaleTimeString()} · ${event.level.toUpperCase()} · ${event.source}`;
+		meta.textContent = `${new Date(event.timestamp).toLocaleTimeString()} - ${event.level.toUpperCase()} - ${event.source}${
+			event.details ? ' - DETAILS IN COPY' : ''
+		}`;
 
 		const message = document.createElement('span');
 		message.textContent = event.message;
@@ -399,18 +450,42 @@ function renderFeedbackHistory(events: DebugEvent[] = []): void {
 		row.appendChild(meta);
 		row.appendChild(message);
 
-		if (currentDebugEnabled && event.details) {
-			const details = document.createElement('pre');
-			details.textContent = JSON.stringify(event.details, null, 2);
-			row.appendChild(details);
-		}
-
 		feedbackList.appendChild(row);
 	}
 }
 
 async function refreshFeedbackHistory(): Promise<void> {
 	renderFeedbackHistory(await getFeedbackHistory());
+}
+
+function formatFeedbackForAi(events: DebugEvent[]): string {
+	if (!events.length) {
+		return '# Better AA Developer Experience Debug Log\n\nStored entries: 0\n\nNo debug log.';
+	}
+
+	return [
+		'# Better AA Developer Experience Debug Log',
+		'',
+		`Stored entries: ${events.length}`,
+		'',
+		...events.flatMap((event, index) => {
+			const lines = [
+				`## Entry ${index + 1}`,
+				`Timestamp: ${event.timestamp}`,
+				`Level: ${event.level}`,
+				`Source: ${event.source}`,
+				`Message: ${event.message}`,
+			];
+
+			if (event.details) {
+				lines.push('Details JSON:');
+				lines.push(JSON.stringify(event.details, null, 2));
+			}
+
+			lines.push('');
+			return lines;
+		}),
+	].join('\n').trimEnd();
 }
 
 function setActiveTab(tab: SidepanelTab): void {
@@ -448,13 +523,41 @@ async function sendActiveTabMessage(
 }
 
 function updateShortcutLabel(shortcut: CommandPaletteShortcut): void {
-	shortcutLabel.textContent = `Current: ${getCommandPaletteShortcutLabel(shortcut)}`;
+	const label = getCommandPaletteShortcutLabel(shortcut);
+	shortcutLabel.textContent = `Current: ${label}`;
+	currentExtensionShortcuts.commandPalette = label;
+	updateSettingsShortcutLabels();
+}
+
+function updateSettingsShortcutLabels(): void {
+	sidebarShortcutValue.textContent = currentExtensionShortcuts.openSidebar;
+	settingsCommandPaletteShortcut.textContent = currentExtensionShortcuts.commandPalette;
+}
+
+async function refreshExtensionShortcuts(): Promise<void> {
+	try {
+		const response = (await browser.runtime.sendMessage({
+			type: 'GET_EXTENSION_SHORTCUTS',
+		})) as ExtensionShortcuts | undefined;
+		currentExtensionShortcuts = {
+			openSidebar: response?.openSidebar || 'Ctrl+Shift+L',
+			commandPalette:
+				response?.commandPalette || getCommandPaletteShortcutLabel(currentShortcut),
+		};
+	} catch {
+		currentExtensionShortcuts = {
+			openSidebar: 'Ctrl+Shift+L',
+			commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
+		};
+	}
+	updateSettingsShortcutLabels();
 }
 
 function renderStaticAboutHelp(shortcut: CommandPaletteShortcut): void {
 	aboutHelp.innerHTML = renderHelpHtml({
 		commands: Object.values(COMMAND_HELP),
 		shortcutLabel: getCommandPaletteShortcutLabel(shortcut),
+		sidebarShortcutLabel: currentExtensionShortcuts.openSidebar,
 	});
 }
 
@@ -468,6 +571,7 @@ async function refreshAboutHelp(): Promise<void> {
 }
 
 function focusActionJsonTextarea(): void {
+	document.querySelector<HTMLButtonElement>('[data-tool-action="universal-clipboard"]')?.click();
 	requestAnimationFrame(() => {
 		actionJson.scrollIntoView({ block: 'center' });
 		actionJson.focus();
@@ -481,7 +585,7 @@ async function handleSidepanelRequest(
 	lastSidepanelRequestNonce = request.nonce;
 
 	setActiveTab(request.tab);
-	if (request.tab === 'about') void refreshAboutHelp();
+	if (request.tab === 'settings') void refreshAboutHelp();
 	if (request.focus === 'actionJson') focusActionJsonTextarea();
 
 	await sidepanelRequest.setValue(null);
@@ -567,11 +671,19 @@ function getSlotStateText(json: string | null | undefined): string {
 		if (isAutomationAnywhereJson(parsed)) {
 			const summary = summarizeAutomationAnywhereJson(parsed);
 			const noun = summary.actionCount === 1 ? 'action' : 'actions';
-			return `Populated - AA - ${summary.actionCount} ${noun}`;
+			const packageNames = [
+				...new Set(
+					summary.packages
+						.map((pkg) => pkg.name.trim())
+						.filter(Boolean)
+				),
+			].slice(0, 3);
+			const prefix = packageNames.length ? packageNames.join(', ') : 'AA';
+			return `${prefix} - ${summary.actionCount} ${noun}`;
 		}
-		return 'Populated - JSON';
+		return 'JSON';
 	} catch {
-		return 'Populated - invalid JSON';
+		return 'Invalid JSON';
 	}
 }
 
@@ -584,7 +696,7 @@ function updateSlotState(slot: number, json: string | null | undefined): void {
 	state.textContent = stateText;
 	row.classList.toggle('is-empty', stateText === 'Empty');
 	row.classList.toggle('is-populated', stateText !== 'Empty');
-	row.classList.toggle('is-invalid', stateText.includes('invalid'));
+	row.classList.toggle('is-invalid', stateText === 'Invalid JSON');
 }
 
 async function refreshSlotState(slot: number): Promise<void> {
@@ -843,6 +955,7 @@ async function loadState(): Promise<void> {
 	shortcutSelect.value = shortcut;
 	currentShortcut = shortcut;
 	updateShortcutLabel(shortcut);
+	await refreshExtensionShortcuts();
 	renderStaticAboutHelp(shortcut);
 
 	STYLE_FEATURES.forEach((feature) => {
@@ -866,7 +979,7 @@ async function loadState(): Promise<void> {
 document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 	button.addEventListener('click', () => {
 		setActiveTab(button.dataset.tab as SidepanelTab);
-		if (button.dataset.tab === 'about') void refreshAboutHelp();
+		if (button.dataset.tab === 'settings') void refreshAboutHelp();
 	});
 });
 
@@ -915,6 +1028,8 @@ shortcutSelect.addEventListener('change', () => {
 	void sendBackgroundMessage({
 		type: 'SET_COMMAND_PALETTE_SHORTCUT',
 		shortcut,
+	}).then(() => {
+		void refreshExtensionShortcuts();
 	});
 });
 
@@ -1130,12 +1245,28 @@ document.querySelectorAll<HTMLElement>('[data-slot-row]').forEach((row) => {
 
 clearFeedbackButton.addEventListener('click', () => {
 	void clearFeedback().then(() => {
-		status.textContent = 'Feedback cleared.';
+		status.textContent = 'Debug log cleared.';
 		status.dataset.severity = 'info';
 		setTimeout(() => {
-			if (status.textContent === 'Feedback cleared.') status.textContent = '';
+			if (status.textContent === 'Debug log cleared.') status.textContent = '';
 		}, 3000);
 	});
+});
+
+toggleDebugLogButton.addEventListener('click', () => {
+	debugLogCollapsed = !debugLogCollapsed;
+	void refreshFeedbackHistory();
+});
+
+copyFeedbackButton.addEventListener('click', () => {
+	void getFeedbackHistory()
+		.then((events) => navigator.clipboard.writeText(formatFeedbackForAi(events)))
+		.then(() => {
+			setStatus('Debug log copied for AI.', 'info', 'debug');
+		})
+		.catch(() => {
+			setStatus('Debug log copy failed.', 'error', 'debug');
+		});
 });
 
 document.querySelector<HTMLButtonElement>('#importJson')!.addEventListener('click', async () => {
@@ -1187,7 +1318,7 @@ stylesEnabled.watch((value) => {
 	updateUserstyleDependentState();
 });
 soundsEnabled.watch((value) => {
-	soundsInput.checked = value ?? true;
+	soundsInput.checked = value ?? DEFAULT_SOUNDS_ENABLED;
 });
 showSuggestions.watch((value) => {
 	showSuggestionsInput.checked = value ?? DEFAULT_SHOW_SUGGESTIONS;
@@ -1202,6 +1333,7 @@ commandPaletteShortcut.watch((value) => {
 	currentShortcut = value;
 	shortcutSelect.value = value;
 	updateShortcutLabel(value);
+	void refreshExtensionShortcuts();
 	renderStaticAboutHelp(value);
 });
 STYLE_FEATURES.forEach((feature) => {
@@ -1231,7 +1363,7 @@ sidepanelRequest.watch((value) => {
 	void handleSidepanelRequest(value);
 });
 
-initializeToolsPanel({ setStatus, prettyJson, sendActiveTabMessage });
+initializeToolsPanel({ setStatus, addFeedback, prettyJson });
 void loadState();
 updateActionJsonState();
 void sidepanelRequest.getValue().then(handleSidepanelRequest);

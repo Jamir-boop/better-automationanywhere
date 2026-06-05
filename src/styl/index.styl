@@ -1,8 +1,37 @@
 @import './utils.styl'
 
+#better-aa-open-sidebar-button
+	all: initial
+	box-sizing: border-box
+	position: fixed
+	right: 16px
+	bottom: 16px
+	z-index: 2147483647
+	display: inline-flex
+	align-items: center
+	justify-content: center
+	min-width: 92px
+	height: 34px
+	padding: 0 12px
+	color: #000000
+	background: #FFB900
+	border: 1px solid #FFB900
+	border-radius: 6px
+	box-shadow: 0 8px 22px rgba(0, 0, 0, .35)
+	font: 700 12px/1 Segoe UI, Arial, sans-serif
+	letter-spacing: 0
+	cursor: pointer
+
+	&:hover
+		background: #FFD45A
+		border-color: #FFD45A
+
+	&:focus
+		outline: 2px solid #000000
+		outline-offset: 2px
+
 html.better-aa-styles-enabled
 	@import './editorMain.styl'
-	@import './fonts.styl'
 	@import './taskbot.styl'
 
 html.better-aa-styles-enabled.better-aa-bg-style

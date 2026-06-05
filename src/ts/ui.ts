@@ -171,8 +171,38 @@ export function ensureNotificationStyles(): void {
 			word-break: break-word;
 		}
 		#better-aa-toast-host .toast-close {
+			all: unset;
+			box-sizing: border-box;
 			flex: 0 0 auto;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-width: 20px;
+			height: 20px;
+			padding: 0 6px;
+			border: 1px solid #fff !important;
+			border-radius: 6px;
+			background: #000 !important;
 			color: #fff !important;
+			font-size: 14px;
+			font-weight: 700;
+			line-height: 1;
+			cursor: pointer;
+			transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+		}
+		#better-aa-toast-host .toast-close:hover {
+			background: #fff !important;
+			color: #000 !important;
+			border-color: #000 !important;
+		}
+		#better-aa-toast-host .toast-close:focus-visible {
+			outline: 2px solid #fff;
+			outline-offset: 2px;
+		}
+		#better-aa-toast-host .toast-close svg,
+		#better-aa-toast-host .toast-close svg * {
+			fill: currentColor !important;
+			stroke: currentColor !important;
 		}
 	`;
 	document.head.appendChild(style);
@@ -201,6 +231,7 @@ export function showNotification(
 	duration = 5000
 ): void {
 	ensureNotificationStyles();
+
 	const tray = getNotificationTray();
 	const toastWrapper = document.createElement('div');
 	toastWrapper.className = 'toasttray-toast';
@@ -210,7 +241,7 @@ export function showNotification(
 				${title ? `<div class="toast-title">${escapeHtml(title)}</div>` : ''}
 				${message ? `<div class="toast-message">${escapeHtml(message)}</div>` : ''}
 			</div>
-			<button type="button" aria-label="Close notification" class="toast-close">x</button>
+			<button type="button" aria-label="Close notification" class="toast-close">×</button>
 		</div>
 	`;
 

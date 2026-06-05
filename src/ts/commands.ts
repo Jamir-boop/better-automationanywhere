@@ -168,7 +168,7 @@ export function redirectToHome(): void {
 }
 
 async function openSidebar(
-	tab: SidepanelTab = 'userscript',
+	tab: SidepanelTab = 'tools',
 	focus?: SidepanelFocusTarget
 ): Promise<void> {
 	try {
@@ -182,7 +182,7 @@ async function openSidebar(
 }
 
 export function openSidebarCommandPalette(): void {
-	void openSidebar('userscript');
+	void openSidebar('tools');
 }
 
 export function universalCopyCommandPalette(): void {
@@ -211,7 +211,7 @@ export async function exportActionToClipboard(): Promise<void> {
 }
 
 export function importActionFromJson(): void {
-	void openSidebar('userscript', 'actionJson');
+	void openSidebar('tools', 'actionJson');
 }
 
 export const commandsWithAliases: Record<string, Command> = {
@@ -399,6 +399,22 @@ export function getHelpHtml(): string {
 	});
 }
 
+async function getOpenSidebarShortcut(): Promise<string> {
+	try {
+		const response = (await browser.runtime.sendMessage({
+			type: 'GET_EXTENSION_SHORTCUTS',
+		})) as { openSidebar?: string } | undefined;
+		return response?.openSidebar || 'Ctrl+Shift+L';
+	} catch {
+		return 'Ctrl+Shift+L';
+	}
+}
+
 export function showHelp(): void {
-	void openSidebar('about');
+	void getOpenSidebarShortcut().then((shortcut) => {
+		ui.showNotification(
+			'Help',
+			`Open sidebar with ${shortcut}, then go to Settings/About for help.`
+		);
+	});
 }

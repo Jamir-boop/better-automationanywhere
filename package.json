@@ -1,8 +1,8 @@
 {
   "name": "better-automationanywhere-dx",
-  "description": "Automation Anywhere developer experience extension",
+  "description": "Better AA Developer Experience for Automation Anywhere",
   "private": true,
-  "version": "0.2.4",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -12,14 +12,19 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "agent:fallow": "node scripts/fallow-agent.mjs audit",
+    "agent:fallow:full": "node scripts/fallow-agent.mjs",
+    "agent:fallow:dead-code": "node scripts/fallow-agent.mjs dead-code",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "fallow": "^2.87.0",
     "stylus": "^0.64.0",
     "typescript": "^5.8.3",
     "wxt": "^0.20.6"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "modern-normalize": "^3.0.1"
   }
 }

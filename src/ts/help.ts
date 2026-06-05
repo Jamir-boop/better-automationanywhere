@@ -76,6 +76,7 @@ export function renderHelpHtml(options: {
 	commands?: readonly HelpCommandInfo[];
 	navigationCommands?: readonly HelpCommandInfo[];
 	shortcutLabel: string;
+	sidebarShortcutLabel?: string;
 }): string {
 	const commands = options.commands ?? Object.values(COMMAND_HELP);
 	const navigationCommands = options.navigationCommands ?? [];
@@ -94,7 +95,7 @@ export function renderHelpHtml(options: {
 		<h4>Keyboard Shortcuts:</h4>
 		<ul>
 			<li><b>${escapeHelpHtml(options.shortcutLabel)}</b>: Open command palette</li>
-			<li><b>Ctrl+Shift+L</b>: Open sidebar; configurable in browser extension shortcuts.</li>
+			<li><b>${escapeHelpHtml(options.sidebarShortcutLabel ?? 'Ctrl+Shift+L')}</b>: Open sidebar; configurable in browser extension shortcuts.</li>
 			<li><b>Alt + V</b>: Show variables</li>
 			<li><b>Alt + A</b>: Show actions</li>
 		</ul>

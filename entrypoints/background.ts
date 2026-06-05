@@ -2,6 +2,7 @@ import type {
 	AutomationAnywhereApiRequestMessage,
 	AutomationAnywhereApiResponse,
 	BackgroundMessage,
+	ContentActionResponse,
 	SettingsBackgroundMessage,
 } from '../src/ts/messages';
 import {
@@ -16,6 +17,8 @@ import {
 import {
 	commandPaletteShortcut,
 	debugEnabled,
+	getCommandPaletteShortcut,
+	getCommandPaletteShortcutLabel,
 	getStylesEnabled,
 	normalizeCommandPaletteShortcut,
 	runButton,
@@ -26,6 +29,8 @@ import {
 	stylesEnabled,
 } from '../src/ts/settings';
 import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
+
+const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Ctrl+Shift+L';
 
 async function broadcastToAutomationTabs(
 	message: SettingsBackgroundMessage
@@ -67,24 +72,108 @@ function createNonce(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function openSidebar(request?: {
+type SidebarOpenRequest = {
 	tab?: SidepanelTab;
 	focus?: SidepanelFocusTarget;
 	userAction?: boolean;
-}): Promise<void> {
-	const requestWrite = request
-		? sidepanelRequest.setValue({
-			tab: request.tab ?? 'tools',
-			focus: request.focus,
-			nonce: createNonce(),
-		})
-		: Promise.resolve();
+};
+
+async function writeSidepanelRequest(request?: SidebarOpenRequest): Promise<void> {
+	if (!request) return;
+	await sidepanelRequest.setValue({
+		tab: request.tab ?? 'tools',
+		focus: request.focus,
+		nonce: createNonce(),
+	});
+}
+
+function queueSidepanelRequest(request?: SidebarOpenRequest): void {
+	void writeSidepanelRequest(request).catch((error) => {
+		void debugWarn('background', 'Sidepanel request write failed.', {
+			error,
+		}, { feedback: true });
+	});
+}
+
+function reportSidebarOpenBlocked(error: unknown, messageType: string): void {
+	void debugWarn('background', 'Sidebar open was blocked by the browser.', {
+		error,
+		messageType,
+	}, { feedback: true });
+}
+
+function openChromeSidePanel(options: { windowId?: number; tabId?: number }): void {
+	const chromeApi = (globalThis as any).chrome;
+	try {
+		const result = chromeApi?.sidePanel?.open?.(options);
+		void Promise.resolve(result).catch((error) => {
+			reportSidebarOpenBlocked(error, 'open-sidebar');
+		});
+	} catch (error) {
+		reportSidebarOpenBlocked(error, 'open-sidebar');
+	}
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error || 'Action failed.');
+}
+
+function openChromeSidePanelFromSenderTab(
+	tabId: number,
+	request?: SidebarOpenRequest
+): ContentActionResponse | Promise<ContentActionResponse> {
+	const chromeApi = (globalThis as any).chrome;
+	if (!chromeApi?.sidePanel?.open) {
+		return { ok: false, error: 'Chrome side panel API unavailable.' };
+	}
+	queueSidepanelRequest(request);
+	try {
+		const result = chromeApi.sidePanel.open({ tabId });
+		return Promise.resolve(result)
+			.then(() => ({ ok: true, message: 'Sidebar opened.' }) as ContentActionResponse)
+			.catch((error) => {
+				reportSidebarOpenBlocked(error, 'OPEN_SIDEBAR');
+				return { ok: false, error: getErrorMessage(error) } as ContentActionResponse;
+			});
+	} catch (error) {
+		reportSidebarOpenBlocked(error, 'OPEN_SIDEBAR');
+		return { ok: false, error: getErrorMessage(error) };
+	}
+}
+
+function openChromeSidePanelFromUserAction(request?: SidebarOpenRequest): void {
+	const chromeApi = (globalThis as any).chrome;
+	if (!chromeApi?.tabs?.query) {
+		openChromeSidePanel({ windowId: chromeApi?.windows?.WINDOW_ID_CURRENT ?? -2 });
+		queueSidepanelRequest(request);
+		return;
+	}
+
+	chromeApi?.tabs?.query?.(
+		{ active: true, currentWindow: true },
+		(tabs: Array<{ windowId?: number }> = []) => {
+			const windowId = tabs[0]?.windowId;
+			openChromeSidePanel(
+				windowId === undefined
+					? { windowId: chromeApi?.windows?.WINDOW_ID_CURRENT ?? -2 }
+					: { windowId }
+			);
+			queueSidepanelRequest(request);
+		}
+	);
+}
+
+async function openSidebar(request?: SidebarOpenRequest): Promise<void> {
 
 	if (import.meta.env.CHROME) {
 		const activeTabs = await browser.tabs.query({ active: true, currentWindow: true });
 		const windowId = activeTabs[0]?.windowId;
-		await (globalThis as any).chrome?.sidePanel?.open?.({ windowId });
-		await requestWrite;
+		try {
+			await (globalThis as any).chrome?.sidePanel?.open?.({ windowId });
+		} catch (error) {
+			reportSidebarOpenBlocked(error, 'OPEN_SIDEBAR');
+		}
+		await writeSidepanelRequest(request);
 		return;
 	}
 
@@ -96,12 +185,9 @@ async function openSidebar(request?: {
 			await sidebarAction?.open?.();
 		}
 	} catch (error) {
-		void debugWarn('background', 'Sidebar open was blocked by the browser.', {
-			error,
-			messageType: request ? 'OPEN_SIDEBAR' : 'open-sidebar',
-		}, { feedback: true });
+		reportSidebarOpenBlocked(error, request ? 'OPEN_SIDEBAR' : 'open-sidebar');
 	}
-	await requestWrite;
+	await writeSidepanelRequest(request);
 }
 
 async function setPanelActionBehavior(): Promise<void> {
@@ -174,6 +260,21 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 		void debugInfo('userstyle', 'Style value saved.', { key: message.key });
 		await broadcastToAutomationTabs(message);
 	}
+}
+
+async function getExtensionShortcuts(): Promise<{
+	openSidebar: string;
+	commandPalette: string;
+}> {
+	const commands = await browser.commands.getAll().catch(() => []);
+	const openSidebarCommand = commands.find((command) =>
+		command.name === 'open-sidebar' || command.name === '_execute_sidebar_action'
+	);
+	const commandPalette = await getCommandPaletteShortcut();
+	return {
+		openSidebar: openSidebarCommand?.shortcut || FALLBACK_OPEN_SIDEBAR_SHORTCUT,
+		commandPalette: getCommandPaletteShortcutLabel(commandPalette),
+	};
 }
 
 function parseContentDispositionFileName(disposition: string | null): string | undefined {
@@ -298,16 +399,32 @@ async function handleApiRequest(
 export default defineBackground(() => {
 	browser.commands.onCommand.addListener((command) => {
 		if (command === 'open-sidebar') {
-			void openSidebar({ userAction: true });
+			if (import.meta.env.CHROME) {
+				openChromeSidePanelFromUserAction({ userAction: true });
+			} else {
+				void openSidebar({ userAction: true });
+			}
 		}
 		if (command === 'toggle-styles') {
 			void handleSettingsMessage({ type: 'TOGGLE_STYLES' });
 		}
 	});
 
-	browser.runtime.onMessage.addListener((message: BackgroundMessage) => {
+	browser.runtime.onMessage.addListener((message: BackgroundMessage, sender) => {
 		if (!message || typeof message.type !== 'string') return;
+		if (
+			message.type === 'OPEN_SIDEBAR' &&
+			import.meta.env.CHROME &&
+			sender.tab?.id !== undefined
+		) {
+			return openChromeSidePanelFromSenderTab(sender.tab.id, {
+				tab: message.tab,
+				focus: message.focus,
+				userAction: true,
+			});
+		}
 		if (message.type === 'AA_API_REQUEST') return handleApiRequest(message);
+		if (message.type === 'GET_EXTENSION_SHORTCUTS') return getExtensionShortcuts();
 		void handleSettingsMessage(message).catch((error) => {
 			void debugError('background', 'Settings message failed.', {
 				error,

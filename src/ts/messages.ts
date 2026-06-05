@@ -20,6 +20,15 @@ export interface AutomationAnywhereApiBlobResponse {
 	fileName?: string;
 }
 
+export interface ExtensionShortcuts {
+	openSidebar: string;
+	commandPalette: string;
+}
+
+export interface ToolCapabilities {
+	universalClipboard: boolean;
+}
+
 export type AutomationAnywhereApiResponse =
 	| { ok: true; data?: unknown }
 	| { ok: false; error: string; status?: number };
@@ -40,9 +49,14 @@ export type AutomationAnywhereApiRequestMessage = {
 	config: AutomationAnywhereApiRequestConfig;
 };
 
+export type ExtensionShortcutsMessage = {
+	type: 'GET_EXTENSION_SHORTCUTS';
+};
+
 export type BackgroundMessage =
 	| SettingsBackgroundMessage
-	| AutomationAnywhereApiRequestMessage;
+	| AutomationAnywhereApiRequestMessage
+	| ExtensionShortcutsMessage;
 
 export type ContentActionMessage =
 	| { type: 'COPY_TO_SLOT'; slot: number }
@@ -55,6 +69,7 @@ export type ContentActionMessage =
 	| { type: 'IMPORT_ACTION_JSON'; json: string }
 	| { type: 'PING_AA_CONTENT' }
 	| { type: 'GET_AA_AUTH_TOKEN' }
+	| { type: 'GET_TOOL_CAPABILITIES' }
 	| { type: 'REFRESH_AA_FOLDER_LIST' };
 
 export type ContentActionResponse =
@@ -64,6 +79,7 @@ export type ContentActionResponse =
 			message?: string;
 			html?: string;
 			authToken?: string | null;
+			capabilities?: ToolCapabilities;
 	  }
 	| { ok: false; error: string };
 

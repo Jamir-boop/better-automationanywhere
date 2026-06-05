@@ -11,21 +11,27 @@ import {
 	getAutomationAnywhereFileType,
 	isAutomationAnywhereFolder,
 	isAutomationAnywhereTaskbot,
+	refreshAutomationAnywhereFolderList,
 	type ActiveAutomationAnywhereContext,
 	type AutomationAnywhereFile,
-	type AutomationAnywherePackageInfo,
 	type AutomationAnywherePageContext,
 } from '@/src/ts/automation-anywhere-api';
 import type {
-	ContentActionMessage,
 	ContentActionResponse,
+	ToolCapabilities,
 } from '@/src/ts/messages';
-
+import JSZip from 'jszip';
 type FeedbackSeverity = 'info' | 'warn' | 'error';
-type ToolId = 'copy-files' | 'update-packages' | 'export-bots' | 'taskbot-json';
+type ToolId =
+	| 'universal-clipboard'
+	| 'copy-files'
+	| 'update-packages'
+	| 'export-bots'
+	| 'taskbot-json';
 
 interface ToolsRuntime extends ActiveAutomationAnywhereContext {
 	api: AutomationAnywhereApi;
+	capabilities: ToolCapabilities;
 }
 
 interface CopiedToolFile {
@@ -37,13 +43,79 @@ interface CopiedToolFile {
 
 interface InitializeToolsOptions {
 	setStatus(message: string, severity?: FeedbackSeverity, source?: string): void;
+	addFeedback(
+		severity: FeedbackSeverity,
+		source: string,
+		message: string,
+		details?: Record<string, unknown>
+	): void | Promise<void>;
 	prettyJson(json: string): string;
-	sendActiveTabMessage(message: ContentActionMessage): Promise<ContentActionResponse>;
+}
+
+interface RenderToolsPanelOptions {
+	universalClipboardHtml?: string;
+}
+
+interface ExportMetadataReference {
+	fileId: string;
+	botPath: string;
+	metadataPath: string;
+	fileName: string;
+}
+
+interface ExportManifestEntry {
+	path: string;
+	newPath: null;
+	contentType: string;
+	metadataForFile: string | null;
+	manualDependencies: string[] | null;
+	scannedDependencies: string[] | null;
+	manualDependenciesNewPaths: string[];
+	scannedDependenciesNewPaths: string[];
+	description: string;
+	author: string;
+	tags: string[];
+	excluded: boolean;
+}
+
+interface ExportManifest {
+	files: ExportManifestEntry[];
+	packages: [];
+	globalValues: [];
+}
+
+interface ToolRunState {
+	title: string;
+	total: number;
+	completed: number;
+	lines: Array<{ message: string; severity: FeedbackSeverity }>;
+	startedAt: number;
 }
 
 const PAGE_LENGTH = 200;
-const EXPORT_POLL_LIMIT = 60;
-const EXPORT_POLL_DELAY_MS = 2000;
+const EXPORT_BATCH_SIZE = 20;
+const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
+const EMPTY_TOOL_CAPABILITIES: ToolCapabilities = {
+	universalClipboard: false,
+};
+const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+	bmp: 'image/bmp',
+	csv: 'text/csv',
+	doc: 'application/msword',
+	docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+	gif: 'image/gif',
+	jpeg: 'image/jpeg',
+	jpg: 'image/jpeg',
+	json: 'application/json',
+	pdf: 'application/pdf',
+	png: 'image/png',
+	svg: 'image/svg+xml',
+	txt: 'text/plain',
+	xls: 'application/vnd.ms-excel',
+	xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+	xml: 'text/xml',
+	zip: 'application/zip',
+};
 
 let options: InitializeToolsOptions;
 let runtime: ToolsRuntime | null = null;
@@ -55,9 +127,12 @@ let loadedTotal = 0;
 let lastRawPageLength = 0;
 let copiedFiles: CopiedToolFile[] = [];
 let taskbotJsonFileId: string | null = null;
+let activeToolRun: ToolRunState | null = null;
 
 let contextText: HTMLElement;
+let availabilityDot: HTMLElement;
 let actionsContainer: HTMLElement;
+let universalClipboardSection: HTMLElement;
 let fileSection: HTMLElement;
 let listTitle: HTMLElement;
 let searchInput: HTMLInputElement;
@@ -67,22 +142,40 @@ let fileList: HTMLElement;
 let primaryActionButton: HTMLButtonElement;
 let pasteActionButton: HTMLButtonElement;
 let loadMoreButton: HTMLButtonElement;
-let resultsSection: HTMLElement;
-let resultsText: HTMLElement;
+let toolsProgress: HTMLElement;
+let toolsProgressLabel: HTMLElement;
+let toolsProgressPercent: HTMLElement;
+let toolsProgressBar: HTMLElement;
+let toolsProgressFill: HTMLElement;
+let toolsFinishModal: HTMLElement;
+let toolsFinishTitle: HTMLElement;
+let toolsFinishSummary: HTMLElement;
+let toolsFinishLog: HTMLElement;
+let toolsFinishClose: HTMLButtonElement;
 let taskbotSection: HTMLElement;
 let taskbotJson: HTMLTextAreaElement;
 let taskbotJsonMeta: HTMLElement;
+let taskbotJsonError: HTMLElement;
 
-export function renderToolsPanel(): string {
+export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): string {
 	return `
 		<section class="tab-panel is-active" role="tabpanel" data-panel="tools">
 			<section class="panel-section">
 				<div class="section-heading-row">
 					<h2>Tools</h2>
-					<button id="toolsRefresh" type="button">Refresh</button>
+					<span class="tools-refresh-group">
+						<span id="toolsAvailabilityDot" class="tools-availability-dot" data-available="false" aria-hidden="true"></span>
+						<button id="toolsRefresh" class="icon-button" type="button" aria-label="Refresh tools" title="Refresh tools">
+							<span aria-hidden="true">&#8635;</span>
+						</button>
+					</span>
 				</div>
 				<p id="toolsContext" class="tools-context">Open Automation Anywhere folder or taskbot.</p>
 				<div id="toolsActions" class="tool-action-grid"></div>
+			</section>
+
+			<section id="universalClipboardSection" class="panel-section" hidden>
+				${renderOptions.universalClipboardHtml ?? ''}
 			</section>
 
 			<section id="toolsFileSection" class="panel-section" hidden>
@@ -103,6 +196,23 @@ export function renderToolsPanel(): string {
 					<button id="toolsPrimaryAction" type="button" disabled>Run</button>
 					<button id="toolsPasteAction" type="button" hidden>Paste copied files</button>
 				</div>
+				<div id="toolsProgress" class="tools-progress" hidden aria-live="polite">
+					<div class="tools-progress-meta">
+						<span id="toolsProgressLabel">Idle</span>
+						<span id="toolsProgressPercent">0%</span>
+					</div>
+					<div id="toolsProgressBar" class="tools-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+						<span id="toolsProgressFill" class="tools-progress-fill"></span>
+					</div>
+				</div>
+				<div id="toolsFinishModal" class="tools-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="toolsFinishTitle" hidden>
+					<div class="tools-modal">
+						<h2 id="toolsFinishTitle">Tool finished</h2>
+						<p id="toolsFinishSummary"></p>
+						<div id="toolsFinishLog" class="tools-finish-log"></div>
+						<button id="toolsFinishClose" type="button">Close</button>
+					</div>
+				</div>
 			</section>
 
 			<section id="taskbotJsonSection" class="panel-section" hidden>
@@ -110,20 +220,16 @@ export function renderToolsPanel(): string {
 					<h2>Taskbot JSON</h2>
 					<span id="taskbotJsonMeta" class="tools-count"></span>
 				</div>
-				<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false"></textarea>
+				<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false" aria-describedby="taskbotJsonError"></textarea>
+				<p id="taskbotJsonError" class="json-inline-error" hidden></p>
 				<div class="button-grid">
-					<button id="taskbotLoadJson" type="button">Load</button>
-					<button id="taskbotCopyJson" type="button">Copy</button>
+					<button id="taskbotLoadJson" type="button">Load from Control Room</button>
+					<button id="taskbotCopyJson" type="button">Copy to clipboard</button>
 					<button id="taskbotFormatJson" type="button">Format</button>
-					<button id="taskbotValidateJson" type="button">Validate</button>
 				</div>
 				<button id="taskbotSaveJson" type="button">Save JSON</button>
 			</section>
 
-			<section id="toolsResultsSection" class="panel-section" hidden>
-				<h2>Result</h2>
-				<pre id="toolsResultsText" class="tools-results"></pre>
-			</section>
 		</section>
 	`;
 }
@@ -131,7 +237,9 @@ export function renderToolsPanel(): string {
 export function initializeToolsPanel(initOptions: InitializeToolsOptions): void {
 	options = initOptions;
 	contextText = getRequiredElement('#toolsContext');
+	availabilityDot = getRequiredElement('#toolsAvailabilityDot');
 	actionsContainer = getRequiredElement('#toolsActions');
+	universalClipboardSection = getRequiredElement('#universalClipboardSection');
 	fileSection = getRequiredElement('#toolsFileSection');
 	listTitle = getRequiredElement('#toolsListTitle');
 	searchInput = getRequiredElement<HTMLInputElement>('#toolsSearch');
@@ -141,11 +249,20 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	primaryActionButton = getRequiredElement<HTMLButtonElement>('#toolsPrimaryAction');
 	pasteActionButton = getRequiredElement<HTMLButtonElement>('#toolsPasteAction');
 	loadMoreButton = getRequiredElement<HTMLButtonElement>('#toolsLoadMore');
-	resultsSection = getRequiredElement('#toolsResultsSection');
-	resultsText = getRequiredElement('#toolsResultsText');
+	toolsProgress = getRequiredElement('#toolsProgress');
+	toolsProgressLabel = getRequiredElement('#toolsProgressLabel');
+	toolsProgressPercent = getRequiredElement('#toolsProgressPercent');
+	toolsProgressBar = getRequiredElement('#toolsProgressBar');
+	toolsProgressFill = getRequiredElement('#toolsProgressFill');
+	toolsFinishModal = getRequiredElement('#toolsFinishModal');
+	toolsFinishTitle = getRequiredElement('#toolsFinishTitle');
+	toolsFinishSummary = getRequiredElement('#toolsFinishSummary');
+	toolsFinishLog = getRequiredElement('#toolsFinishLog');
+	toolsFinishClose = getRequiredElement<HTMLButtonElement>('#toolsFinishClose');
 	taskbotSection = getRequiredElement('#taskbotJsonSection');
 	taskbotJson = getRequiredElement<HTMLTextAreaElement>('#taskbotJson');
 	taskbotJsonMeta = getRequiredElement('#taskbotJsonMeta');
+	taskbotJsonError = getRequiredElement('#taskbotJsonError');
 
 	getRequiredElement<HTMLButtonElement>('#toolsRefresh').addEventListener('click', () => {
 		void refreshToolsContext();
@@ -161,6 +278,10 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	loadMoreButton.addEventListener('click', () => {
 		void loadFolderPage(false);
 	});
+	toolsFinishClose.addEventListener('click', hideToolFinishModal);
+	toolsFinishModal.addEventListener('click', (event) => {
+		if (event.target === toolsFinishModal) hideToolFinishModal();
+	});
 	getRequiredElement<HTMLButtonElement>('#taskbotLoadJson').addEventListener('click', () => {
 		void loadTaskbotJson();
 	});
@@ -170,7 +291,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	getRequiredElement<HTMLButtonElement>('#taskbotFormatJson').addEventListener('click', () => {
 		formatTaskbotJson();
 	});
-	getRequiredElement<HTMLButtonElement>('#taskbotValidateJson').addEventListener('click', () => {
+	taskbotJson.addEventListener('input', () => {
 		validateTaskbotJson();
 	});
 	getRequiredElement<HTMLButtonElement>('#taskbotSaveJson').addEventListener('click', () => {
@@ -193,14 +314,95 @@ function setToolStatus(
 	options.setStatus(message, severity, 'tools');
 }
 
-function setResults(text: string): void {
-	resultsText.textContent = text;
-	resultsSection.hidden = !text;
+function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void {
+	activeToolRun?.lines.push({ message, severity });
 }
 
-function appendResult(line: string): void {
-	const current = resultsText.textContent?.trimEnd();
-	setResults(current ? `${current}\n${line}` : line);
+function appendToolLog(
+	message: string,
+	severity: FeedbackSeverity = 'info',
+	details?: Record<string, unknown>
+): void {
+	addRunLine(message, severity);
+	void options.addFeedback(severity, 'tools', message, details);
+}
+
+function getProgressPercent(completed: number, total: number): number {
+	if (total <= 0) return completed > 0 ? 100 : 0;
+	return Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+}
+
+function setToolProgress(completed: number, total: number, message: string): void {
+	const percent = getProgressPercent(completed, total);
+	toolsProgress.hidden = false;
+	toolsProgressLabel.textContent = message;
+	toolsProgressPercent.textContent = `${percent}%`;
+	toolsProgressBar.setAttribute('aria-valuenow', String(percent));
+	toolsProgressBar.setAttribute('aria-valuetext', message);
+	toolsProgressFill.style.width = `${percent}%`;
+	if (activeToolRun) {
+		activeToolRun.completed = completed;
+		activeToolRun.total = total;
+	}
+}
+
+function startToolRun(title: string, total: number, message: string): void {
+	activeToolRun = {
+		title,
+		total,
+		completed: 0,
+		lines: [],
+		startedAt: Date.now(),
+	};
+	setToolProgress(0, total, message);
+	appendToolLog(message);
+}
+
+function hideToolFinishModal(): void {
+	toolsFinishModal.hidden = true;
+}
+
+function showToolFinishModal(
+	run: ToolRunState,
+	summary: string,
+	severity: FeedbackSeverity
+): void {
+	toolsFinishTitle.textContent =
+		severity === 'error'
+			? `${run.title} failed`
+			: severity === 'warn'
+				? `${run.title} finished with warnings`
+				: `${run.title} finished`;
+	const seconds = Math.max(0, Math.round((Date.now() - run.startedAt) / 1000));
+	toolsFinishSummary.textContent = `${summary} Duration: ${seconds}s.`;
+	toolsFinishLog.textContent = '';
+	if (!run.lines.length) {
+		const empty = document.createElement('p');
+		empty.className = 'tools-finish-empty';
+		empty.textContent = 'No actions recorded.';
+		toolsFinishLog.appendChild(empty);
+	} else {
+		for (const line of run.lines) {
+			const row = document.createElement('div');
+			row.className = `tools-finish-line tools-finish-${line.severity}`;
+			row.textContent = `${line.severity.toUpperCase()} - ${line.message}`;
+			toolsFinishLog.appendChild(row);
+		}
+	}
+	toolsFinishModal.hidden = false;
+	requestAnimationFrame(() => toolsFinishClose.focus());
+}
+
+function finishToolRun(
+	summary: string,
+	severity: FeedbackSeverity = 'info'
+): void {
+	const run = activeToolRun;
+	if (!run) return;
+	addRunLine(summary, severity);
+	setToolProgress(run.total, run.total, summary);
+	activeToolRun = null;
+	showToolFinishModal(run, summary, severity);
 }
 
 function setBusy(button: HTMLButtonElement, busy: boolean, label?: string): void {
@@ -208,13 +410,35 @@ function setBusy(button: HTMLButtonElement, busy: boolean, label?: string): void
 	if (label) button.textContent = label;
 }
 
+function updateAvailabilityDot(hasTools: boolean): void {
+	availabilityDot.dataset.available = String(hasTools);
+	availabilityDot.title = hasTools ? 'Tools available' : 'No tools available';
+}
+
+function isFolderTool(
+	tool: ToolId | null
+): tool is Exclude<ToolId, 'universal-clipboard' | 'taskbot-json'> {
+	return tool === 'copy-files' || tool === 'update-packages' || tool === 'export-bots';
+}
+
+function setToolPanelHidden(panel: HTMLElement, hidden: boolean): void {
+	panel.hidden = hidden;
+	panel.setAttribute('aria-hidden', String(hidden));
+}
+
+function setSelectedToolPanel(tool: ToolId | null): void {
+	setToolPanelHidden(universalClipboardSection, tool !== 'universal-clipboard');
+	setToolPanelHidden(taskbotSection, tool !== 'taskbot-json');
+	setToolPanelHidden(fileSection, !isFolderTool(tool));
+}
+
 async function refreshToolsContext(): Promise<void> {
-	setResults('');
 	actionsContainer.textContent = '';
-	fileSection.hidden = true;
-	taskbotSection.hidden = true;
+	setSelectedToolPanel(null);
 	taskbotJson.value = '';
+	validateTaskbotJson();
 	taskbotJsonFileId = null;
+	updateAvailabilityDot(false);
 
 	try {
 		const active = await getActiveAutomationAnywhereContext();
@@ -222,34 +446,52 @@ async function refreshToolsContext(): Promise<void> {
 			runtime = null;
 			currentTool = null;
 			contextText.textContent = 'Unsupported page. Open Automation Anywhere folder or taskbot.';
+			setSelectedToolPanel(null);
+			renderActionButtons();
 			return;
 		}
 
+		const capabilities = await getToolCapabilities(active.tabId);
 		const authToken = await getAutomationAnywhereAuthToken(active.tabId);
 		runtime = {
 			...active,
 			api: new AutomationAnywhereApi(active.context.baseUrl, authToken),
+			capabilities,
 		};
 		contextText.textContent = getContextLabel(active.context);
-		renderActionButtons();
+		const tools = getAvailableTools(active.context, capabilities);
+		updateAvailabilityDot(tools.length > 0);
 
 		if (isFolderContext(active.context)) {
-			currentTool = getAvailableTools(active.context)[0] ?? null;
+			currentTool = null;
+			setSelectedToolPanel(null);
 			renderActionButtons();
-			if (currentTool) await loadFolderPage(true);
 			return;
 		}
 
-		currentTool = 'taskbot-json';
+		currentTool = null;
+		setSelectedToolPanel(null);
 		renderActionButtons();
-		taskbotSection.hidden = false;
-		await loadTaskbotJson();
 	} catch (error) {
 		runtime = null;
 		currentTool = null;
+		setSelectedToolPanel(null);
 		contextText.textContent =
 			error instanceof Error ? error.message : 'Tools context failed.';
 		setToolStatus(contextText.textContent, 'error');
+	}
+}
+
+async function getToolCapabilities(tabId: number): Promise<ToolCapabilities> {
+	try {
+		const response = (await browser.tabs.sendMessage(tabId, {
+			type: 'GET_TOOL_CAPABILITIES',
+		})) as ContentActionResponse | undefined;
+		return response?.ok && response.capabilities
+			? response.capabilities
+			: EMPTY_TOOL_CAPABILITIES;
+	} catch {
+		return EMPTY_TOOL_CAPABILITIES;
 	}
 }
 
@@ -273,18 +515,29 @@ function isFolderContext(context: AutomationAnywherePageContext): boolean {
 	return context.pageType === 'private-folder' || context.pageType === 'public-folder';
 }
 
-function getAvailableTools(context: AutomationAnywherePageContext): ToolId[] {
+function getAvailableTools(
+	context: AutomationAnywherePageContext,
+	capabilities: ToolCapabilities = runtime?.capabilities ?? EMPTY_TOOL_CAPABILITIES
+): ToolId[] {
+	const tools: ToolId[] = [];
+	if (capabilities.universalClipboard) tools.push('universal-clipboard');
 	if (context.pageType === 'private-folder') {
-		return ['copy-files', 'update-packages', 'export-bots'];
+		tools.push('copy-files', 'update-packages', 'export-bots');
+		return tools;
 	}
-	if (context.pageType === 'public-folder') return ['export-bots'];
+	if (context.pageType === 'public-folder') {
+		tools.push('export-bots');
+		return tools;
+	}
 	if (context.pageType === 'private-taskbot' || context.pageType === 'public-taskbot') {
-		return ['taskbot-json'];
+		tools.push('taskbot-json');
+		return tools;
 	}
-	return [];
+	return tools;
 }
 
 function getToolLabel(tool: ToolId): string {
+	if (tool === 'universal-clipboard') return 'Universal Clipboard';
 	if (tool === 'copy-files') return 'Copy Files';
 	if (tool === 'update-packages') return 'Update Packages';
 	if (tool === 'export-bots') return 'Export Bots';
@@ -300,6 +553,7 @@ function renderActionButtons(): void {
 		const button = document.createElement('button');
 		button.type = 'button';
 		button.textContent = getToolLabel(tool);
+		button.dataset.toolAction = tool;
 		button.className = tool === currentTool ? 'is-active tool-action-button' : 'tool-action-button';
 		button.addEventListener('click', () => {
 			void selectTool(tool);
@@ -311,9 +565,9 @@ function renderActionButtons(): void {
 async function selectTool(tool: ToolId): Promise<void> {
 	currentTool = tool;
 	renderActionButtons();
-	setResults('');
-	taskbotSection.hidden = tool !== 'taskbot-json';
-	fileSection.hidden = tool === 'taskbot-json';
+	setSelectedToolPanel(tool);
+
+	if (tool === 'universal-clipboard') return;
 
 	if (tool === 'taskbot-json') {
 		await loadTaskbotJson();
@@ -331,7 +585,10 @@ function getCurrentFolderId(): string | null {
 async function loadFolderPage(reset: boolean): Promise<void> {
 	const activeRuntime = runtime;
 	const folderId = getCurrentFolderId();
-	if (!activeRuntime || !folderId || !currentTool) return;
+	const selectedTool = currentTool;
+	if (!activeRuntime || !folderId || !isFolderTool(selectedTool)) {
+		return;
+	}
 
 	setBusy(loadMoreButton, true, reset ? 'Loading...' : 'Loading more...');
 	if (reset) {
@@ -348,12 +605,13 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 			folderId,
 			offset: loadedOffset,
 			length: PAGE_LENGTH,
-			taskbotsOnly: currentTool === 'update-packages' || currentTool === 'export-bots',
-			filesOnly: currentTool === 'copy-files',
+			taskbotsOnly: selectedTool === 'update-packages' || selectedTool === 'export-bots',
+			filesOnly: selectedTool === 'copy-files',
 		});
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		const rawList = response.list ?? [];
 		lastRawPageLength = rawList.length;
-		const filtered = filterItemsForTool(rawList);
+		const filtered = filterItemsForTool(rawList, selectedTool);
 		const byId = new Map(loadedItems.map((item) => [getAutomationAnywhereFileId(item), item]));
 		for (const item of filtered) byId.set(getAutomationAnywhereFileId(item), item);
 		loadedItems = [...byId.values()];
@@ -365,21 +623,27 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 			Math.max(loadedItems.length, loadedTotal);
 		pruneSelection();
 		renderFileList();
-		fileSection.hidden = false;
+		setSelectedToolPanel(selectedTool);
 		setToolStatus(`${loadedItems.length} item(s) loaded.`);
 	} catch (error) {
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		setToolStatus(
 			error instanceof Error ? error.message : 'Folder list failed.',
 			'error'
 		);
 	} finally {
-		setBusy(loadMoreButton, false, 'Load more');
+		if (runtime === activeRuntime && currentTool === selectedTool) {
+			setBusy(loadMoreButton, false, 'Load more');
+		}
 	}
 }
 
-function filterItemsForTool(items: AutomationAnywhereFile[]): AutomationAnywhereFile[] {
-	if (currentTool === 'copy-files') return items.filter((item) => !isAutomationAnywhereFolder(item));
-	if (currentTool === 'update-packages' || currentTool === 'export-bots') {
+function filterItemsForTool(
+	items: AutomationAnywhereFile[],
+	tool: ToolId
+): AutomationAnywhereFile[] {
+	if (tool === 'copy-files') return items.filter((item) => !isAutomationAnywhereFolder(item));
+	if (tool === 'update-packages' || tool === 'export-bots') {
 		return items.filter(isAutomationAnywhereTaskbot);
 	}
 	return items;
@@ -503,14 +767,25 @@ function copySelectedFiles(): void {
 	const folderId = getCurrentFolderId();
 	const context = runtime?.context;
 	if (!folderId || !context) return;
-	copiedFiles = getSelectedItems().map((item) => ({
-		id: getAutomationAnywhereFileId(item),
-		name: getAutomationAnywhereFileName(item),
-		sourceFolderId: folderId,
-		hostname: context.hostname,
-	}));
-	setResults(`Copied ${copiedFiles.length} file reference(s). Open target folder, then Paste.`);
-	setToolStatus(`${copiedFiles.length} file reference(s) copied.`);
+	const items = getSelectedItems();
+	if (!items.length) return;
+	startToolRun('Copy Files', items.length, `Copying ${items.length} file reference(s)...`);
+	copiedFiles = [];
+	for (let index = 0; index < items.length; index += 1) {
+		const item = items[index];
+		const name = getAutomationAnywhereFileName(item);
+		copiedFiles.push({
+			id: getAutomationAnywhereFileId(item),
+			name,
+			sourceFolderId: folderId,
+			hostname: context.hostname,
+		});
+		appendToolLog(`Copied reference: ${name}`);
+		setToolProgress(index + 1, items.length, `Copied ${index + 1}/${items.length}`);
+	}
+	const summary = `${copiedFiles.length} file reference(s) copied. Open target folder, then Paste.`;
+	setToolStatus(summary);
+	finishToolRun(summary);
 	updateActionBar();
 }
 
@@ -533,7 +808,11 @@ async function pasteCopiedFiles(): Promise<void> {
 	if (!activeRuntime || !folderId || !canPasteCopiedFiles()) return;
 
 	setBusy(pasteActionButton, true, 'Pasting...');
-	setResults('Pasting copied files...');
+	startToolRun(
+		'Paste Copied Files',
+		copiedFiles.length,
+		`Pasting ${copiedFiles.length} copied file(s)...`
+	);
 	try {
 		const destinationItems = await loadAllFolderItems(folderId, true);
 		const destinationNames = new Set(
@@ -543,35 +822,49 @@ async function pasteCopiedFiles(): Promise<void> {
 		let skipped = 0;
 		let failed = 0;
 
-		for (const item of copiedFiles) {
+		for (let index = 0; index < copiedFiles.length; index += 1) {
+			const item = copiedFiles[index];
 			if (destinationNames.has(item.name.toLowerCase())) {
 				skipped += 1;
-				appendResult(`Skipped duplicate: ${item.name}`);
+				appendToolLog(`Skipped duplicate: ${item.name}`, 'warn');
+				setToolProgress(
+					index + 1,
+					copiedFiles.length,
+					`Processed ${index + 1}/${copiedFiles.length}`
+				);
 				continue;
 			}
 			try {
 				await activeRuntime.api.copyFile(item.id, item.name, folderId);
 				copied += 1;
 				destinationNames.add(item.name.toLowerCase());
-				appendResult(`Copied: ${item.name}`);
+				appendToolLog(`Copied: ${item.name}`);
 			} catch (error) {
 				failed += 1;
-				appendResult(
+				appendToolLog(
 					`Failed: ${item.name} - ${
 						error instanceof Error ? error.message : 'copy failed'
-					}`
+					}`,
+					'error'
 				);
 			}
+			setToolProgress(
+				index + 1,
+				copiedFiles.length,
+				`Processed ${index + 1}/${copiedFiles.length}`
+			);
 		}
 
-		await options.sendActiveTabMessage({ type: 'REFRESH_AA_FOLDER_LIST' });
+		await refreshAutomationAnywhereFolderList(activeRuntime.tabId);
 		await loadFolderPage(true);
-		setToolStatus(
-			`Paste done. Copied ${copied}, skipped ${skipped}, failed ${failed}.`,
-			failed ? 'warn' : 'info'
-		);
+		const summary = `Paste done. Copied ${copied}, skipped ${skipped}, failed ${failed}.`;
+		const severity = failed ? 'warn' : 'info';
+		setToolStatus(summary, severity);
+		finishToolRun(summary, severity);
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : 'Paste failed.', 'error');
+		const message = error instanceof Error ? error.message : 'Paste failed.';
+		setToolStatus(message, 'error');
+		finishToolRun(message, 'error');
 	} finally {
 		setBusy(pasteActionButton, false);
 		updateActionBar();
@@ -606,96 +899,65 @@ async function updateSelectedPackages(): Promise<void> {
 	if (!bots.length) return;
 
 	setBusy(primaryActionButton, true, 'Updating...');
-	setResults('Loading default package versions...');
+	startToolRun('Update Packages', bots.length, 'Loading default package versions...');
 	try {
 		const defaults = await activeRuntime.api.getDefaultPackageVersions();
-		const changedFileIds: string[] = [];
-		const packageInfo = new Map<string, AutomationAnywherePackageInfo>();
-
-		for (const bot of bots) {
-			const fileId = getAutomationAnywhereFileId(bot);
-			const content = await activeRuntime.api.getBotContent(fileId);
-			const packages = extractAutomationAnywherePackages(content);
-			const changes = packages.filter((pkg) => {
-				const target = defaults.get(pkg.name);
-				return target && target !== pkg.version;
-			});
-			if (!changes.length) {
-				appendResult(`Skipped: ${getAutomationAnywhereFileName(bot)} - no package change`);
-				continue;
-			}
-			changedFileIds.push(fileId);
-			for (const change of changes) {
-				const target = defaults.get(change.name);
-				if (!target) continue;
-				packageInfo.set(change.name, {
-					package_name: change.name,
-					package_version: target,
-				});
-			}
-			appendResult(`Queued: ${getAutomationAnywhereFileName(bot)} - ${changes.length} package(s)`);
-		}
-
-		if (!changedFileIds.length) {
-			setToolStatus('No package updates needed.');
+		if (!defaults.size) {
+			const message = 'No default package versions found.';
+			setToolStatus(message, 'error');
+			finishToolRun(message, 'error');
 			return;
 		}
 
-		try {
-			await activeRuntime.api.updatePackageVersions(changedFileIds, [...packageInfo.values()]);
-			appendResult(`packagesVersionUpdate succeeded for ${changedFileIds.length} bot(s).`);
-			setToolStatus(`Updated ${changedFileIds.length} bot(s).`);
-		} catch (error) {
-			appendResult(
-				`packagesVersionUpdate failed: ${
-					error instanceof Error ? error.message : 'request failed'
-				}`
-			);
-			await fallbackUpdatePackageJson(activeRuntime, bots, defaults, changedFileIds);
+		appendToolLog(`Loaded ${defaults.size} default package version(s).`);
+		let updated = 0;
+		let skipped = 0;
+		let failed = 0;
+
+		for (let index = 0; index < bots.length; index += 1) {
+			const bot = bots[index];
+			const fileId = getAutomationAnywhereFileId(bot);
+			const botName = getAutomationAnywhereFileName(bot);
+			try {
+				const content = await activeRuntime.api.getBotContent(fileId);
+				const packages = extractAutomationAnywherePackages(content);
+				const changes = packages.filter((pkg) => {
+					const target = defaults.get(pkg.name);
+					return target && target !== pkg.version;
+				});
+				const result = applyPackageVersionsToContent(content, defaults);
+				if (!result.changed) {
+					skipped += 1;
+					appendToolLog(`Skipped: ${botName} - no package change`);
+					setToolProgress(index + 1, bots.length, `Processed ${index + 1}/${bots.length}`);
+					continue;
+				}
+				await activeRuntime.api.updateBotContent(fileId, result.content);
+				updated += 1;
+				appendToolLog(`Updated: ${botName} - ${changes.length} package(s)`);
+			} catch (error) {
+				failed += 1;
+				appendToolLog(
+					`Failed: ${botName} - ${
+						error instanceof Error ? error.message : 'update failed'
+					}`,
+					'error'
+				);
+			}
+			setToolProgress(index + 1, bots.length, `Processed ${index + 1}/${bots.length}`);
 		}
+		const summary = `Update packages done. Updated ${updated}, skipped ${skipped}, failed ${failed}.`;
+		const severity = failed ? 'warn' : 'info';
+		setToolStatus(summary, severity);
+		finishToolRun(summary, severity);
 	} catch (error) {
-		setToolStatus(
-			error instanceof Error ? error.message : 'Update packages failed.',
-			'error'
-		);
+		const message = error instanceof Error ? error.message : 'Update packages failed.';
+		setToolStatus(message, 'error');
+		finishToolRun(message, 'error');
 	} finally {
 		setBusy(primaryActionButton, false);
 		updateActionBar();
 	}
-}
-
-async function fallbackUpdatePackageJson(
-	activeRuntime: ToolsRuntime,
-	bots: AutomationAnywhereFile[],
-	defaults: Map<string, string>,
-	changedFileIds: string[]
-): Promise<void> {
-	let updated = 0;
-	let failed = 0;
-	const changedSet = new Set(changedFileIds);
-	for (const bot of bots) {
-		const fileId = getAutomationAnywhereFileId(bot);
-		if (!changedSet.has(fileId)) continue;
-		try {
-			const content = await activeRuntime.api.getBotContent(fileId);
-			const result = applyPackageVersionsToContent(content, defaults);
-			if (!result.changed) {
-				appendResult(`Skipped fallback: ${getAutomationAnywhereFileName(bot)}`);
-				continue;
-			}
-			await activeRuntime.api.updateBotContent(fileId, result.content);
-			updated += 1;
-			appendResult(`Fallback updated: ${getAutomationAnywhereFileName(bot)}`);
-		} catch (error) {
-			failed += 1;
-			appendResult(
-				`Fallback failed: ${getAutomationAnywhereFileName(bot)} - ${
-					error instanceof Error ? error.message : 'update failed'
-				}`
-			);
-		}
-	}
-	setToolStatus(`Fallback done. Updated ${updated}, failed ${failed}.`, failed ? 'warn' : 'info');
 }
 
 async function exportSelectedBots(): Promise<void> {
@@ -706,47 +968,58 @@ async function exportSelectedBots(): Promise<void> {
 
 	setBusy(primaryActionButton, true, 'Exporting...');
 	const exportName = `better-aa-export-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-	setResults('Starting BLM export. Do not close sidepanel.');
+	startToolRun(
+		'Export Bots',
+		5,
+		`Starting ZIP export for ${bots.length} bot(s). Do not close sidepanel.`
+	);
 	try {
-		const exportResponse = await activeRuntime.api.exportBots(
-			bots.map(getAutomationAnywhereFileId),
-			exportName
-		);
-		const requestId = findStringByKeys(exportResponse, ['requestId', 'id']);
-		let downloadFileId = findStringByKeys(exportResponse, [
-			'downloadFileId',
-			'download_file_id',
-			'fileId',
-		]);
-
-		if (!downloadFileId) {
-			if (!requestId) throw new Error('BLM export did not return requestId.');
-			for (let attempt = 1; attempt <= EXPORT_POLL_LIMIT; attempt += 1) {
-				await sleep(EXPORT_POLL_DELAY_MS);
-				const status = await activeRuntime.api.getBlmStatus(requestId);
-				const state = String(status.status ?? '').toUpperCase();
-				appendResult(`BLM status ${attempt}: ${state || 'UNKNOWN'}`);
-				if (state === 'FAILED' || state === 'ERROR') {
-					throw new Error(status.message || 'BLM export failed.');
-				}
-				downloadFileId = findStringByKeys(status, [
-					'downloadFileId',
-					'download_file_id',
-					'fileId',
-				]);
-				if (state === 'COMPLETED' || state === 'SUCCESS' || downloadFileId) break;
-			}
+		const rootIds = new Set(bots.map(getAutomationAnywhereFileId));
+		setToolProgress(0, 5, 'Fetching dependency graph...');
+		appendToolLog('Fetching dependency graph...');
+		const dependencyResponse = await activeRuntime.api.getBotDependencies([...rootIds]);
+		const dependencyItems = dependencyResponse.dependencies ?? [];
+		const exportItems = dedupeAutomationAnywhereFiles([...bots, ...dependencyItems]);
+		if (!exportItems.length) {
+			throw new Error(
+				`Dependency graph is empty. Response: ${stringifyForFeedback(dependencyResponse)}`
+			);
 		}
 
-		if (!downloadFileId) throw new Error('BLM export completed without downloadFileId.');
-		const download = await activeRuntime.api.downloadBlmExport(downloadFileId);
-		const blob = automationAnywhereBlobResponseToBlob(download);
-		const fileName = download.fileName || `${exportName}.zip`;
-		downloadBlob(blob, fileName);
-		appendResult(`Downloaded: ${fileName}`);
-		setToolStatus(`Export downloaded: ${fileName}`);
+		appendToolLog(`Dependency graph loaded: ${exportItems.length} file(s).`);
+		const taskbots = exportItems.filter(isExportTaskbot);
+		setToolProgress(1, 5, `Dependency graph loaded: ${exportItems.length} file(s).`);
+		appendToolLog(`Scanning ${taskbots.length} taskbot file(s) for metadata paths...`);
+		const metadataReferences = await scanMetadataReferences(activeRuntime, taskbots);
+		if (metadataReferences.length) {
+			appendToolLog(`Metadata references found: ${metadataReferences.length}.`);
+		}
+		setToolProgress(2, 5, `Metadata scan done: ${metadataReferences.length} reference(s).`);
+
+		appendToolLog(
+			`Downloading ${exportItems.length + metadataReferences.length} export file(s)...`
+		);
+		const fileBlobs = await downloadExportFiles(activeRuntime, exportItems, rootIds);
+		const metadataBlobs = await downloadMetadataFiles(activeRuntime, metadataReferences);
+		setToolProgress(3, 5, 'Export file downloads done.');
+		appendToolLog('Creating export archive...');
+		const archive = await createExportArchive(
+			exportItems,
+			metadataReferences,
+			fileBlobs,
+			metadataBlobs
+		);
+		setToolProgress(4, 5, 'Export archive created.');
+		const fileName = `${exportName}.zip`;
+		downloadBlob(archive, fileName);
+		appendToolLog(`Downloaded: ${fileName}`);
+		const summary = `Export downloaded: ${fileName}`;
+		setToolStatus(summary);
+		finishToolRun(summary);
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : 'Export failed.', 'error');
+		const message = error instanceof Error ? error.message : 'Export failed.';
+		setToolStatus(message, 'error');
+		finishToolRun(message, 'error');
 	} finally {
 		setBusy(primaryActionButton, false);
 		updateActionBar();
@@ -756,18 +1029,25 @@ async function exportSelectedBots(): Promise<void> {
 async function loadTaskbotJson(): Promise<void> {
 	const activeRuntime = runtime;
 	const fileId = activeRuntime?.context.fileId;
-	if (!activeRuntime || !fileId) return;
+	const selectedTool = currentTool;
+	if (!activeRuntime || !fileId || selectedTool !== 'taskbot-json') return;
 
-	taskbotSection.hidden = false;
+	setSelectedToolPanel(selectedTool);
 	taskbotJsonMeta.textContent = `File ${fileId}`;
 	taskbotJson.value = '';
 	taskbotJsonFileId = fileId;
-	setResults('');
 	try {
 		const content = await activeRuntime.api.getBotContent(fileId);
+		if (runtime !== activeRuntime || currentTool !== selectedTool || taskbotJsonFileId !== fileId) {
+			return;
+		}
 		taskbotJson.value = JSON.stringify(content, null, 2);
+		validateTaskbotJson();
 		setToolStatus('Taskbot JSON loaded.');
 	} catch (error) {
+		if (runtime !== activeRuntime || currentTool !== selectedTool || taskbotJsonFileId !== fileId) {
+			return;
+		}
 		setToolStatus(
 			error instanceof Error ? error.message : 'Taskbot JSON load failed.',
 			'error'
@@ -792,18 +1072,37 @@ function formatTaskbotJson(): void {
 	try {
 		taskbotJson.value = options.prettyJson(taskbotJson.value);
 		JSON.parse(taskbotJson.value);
+		validateTaskbotJson();
 		setToolStatus('Taskbot JSON formatted.');
-	} catch {
-		setToolStatus('Invalid JSON.', 'error');
+	} catch (error) {
+		validateTaskbotJson();
+		setToolStatus(error instanceof Error ? error.message : 'Invalid JSON.', 'error');
 	}
 }
 
-function validateTaskbotJson(): void {
+function validateTaskbotJson(): boolean {
+	const value = taskbotJson.value.trim();
+	if (!value) {
+		taskbotJson.classList.remove('is-invalid');
+		taskbotJson.removeAttribute('aria-invalid');
+		taskbotJsonError.textContent = '';
+		taskbotJsonError.hidden = true;
+		return true;
+	}
+
 	try {
 		JSON.parse(taskbotJson.value);
-		setToolStatus('Taskbot JSON valid.');
+		taskbotJson.classList.remove('is-invalid');
+		taskbotJson.removeAttribute('aria-invalid');
+		taskbotJsonError.textContent = '';
+		taskbotJsonError.hidden = true;
+		return true;
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : 'Invalid JSON.', 'error');
+		taskbotJson.classList.add('is-invalid');
+		taskbotJson.setAttribute('aria-invalid', 'true');
+		taskbotJsonError.textContent = error instanceof Error ? error.message : 'Invalid JSON.';
+		taskbotJsonError.hidden = false;
+		return false;
 	}
 }
 
@@ -814,6 +1113,10 @@ async function saveTaskbotJson(): Promise<void> {
 
 	let parsed: unknown;
 	try {
+		if (!validateTaskbotJson()) {
+			setToolStatus(taskbotJsonError.textContent || 'Invalid JSON.', 'error');
+			return;
+		}
 		parsed = JSON.parse(taskbotJson.value);
 	} catch (error) {
 		setToolStatus(error instanceof Error ? error.message : 'Invalid JSON.', 'error');
@@ -831,20 +1134,314 @@ async function saveTaskbotJson(): Promise<void> {
 	}
 }
 
-function findStringByKeys(value: unknown, keys: string[]): string | null {
-	if (!value || typeof value !== 'object') return null;
-	const record = value as Record<string, unknown>;
-	for (const key of keys) {
-		const candidate = record[key];
-		if (typeof candidate === 'string' && candidate) return candidate;
-		if (typeof candidate === 'number') return String(candidate);
+function dedupeAutomationAnywhereFiles(
+	items: AutomationAnywhereFile[]
+): AutomationAnywhereFile[] {
+	const byId = new Map<string, AutomationAnywhereFile>();
+	for (const item of items) {
+		const id = getAutomationAnywhereFileId(item);
+		if (!id) continue;
+		byId.set(id, { ...byId.get(id), ...item });
 	}
-	for (const nested of Object.values(record)) {
-		if (!nested || typeof nested !== 'object') continue;
-		const found = findStringByKeys(nested, keys);
-		if (found) return found;
+	return [...byId.values()];
+}
+
+function isExportTaskbot(file: AutomationAnywhereFile): boolean {
+	const type = getAutomationAnywhereFileType(file);
+	return (
+		type === AUTOMATION_ANYWHERE_TASKBOT_TYPE ||
+		type === AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE
+	);
+}
+
+async function scanMetadataReferences(
+	activeRuntime: ToolsRuntime,
+	taskbots: AutomationAnywhereFile[]
+): Promise<ExportMetadataReference[]> {
+	const references: ExportMetadataReference[] = [];
+	for (let index = 0; index < taskbots.length; index += EXPORT_BATCH_SIZE) {
+		const batch = taskbots.slice(index, index + EXPORT_BATCH_SIZE);
+		const results = await Promise.allSettled(
+			batch.map(async (bot) => {
+				const content = await activeRuntime.api.getBotContent(getAutomationAnywhereFileId(bot));
+				const paths = collectMetadataPaths(content);
+				return paths.map((metadataPath) => ({
+					fileId: getAutomationAnywhereFileId(bot),
+					botPath: getAutomationAnywherePath(bot),
+					metadataPath,
+					fileName: getPathFileName(metadataPath),
+				}));
+			})
+		);
+
+		for (const result of results) {
+			if (result.status === 'fulfilled') {
+				references.push(...result.value);
+			} else {
+				appendToolLog(`Metadata scan skipped: ${getErrorMessage(result.reason)}`, 'warn');
+			}
+		}
+		appendToolLog(
+			`Metadata scan progress: ${Math.min(index + batch.length, taskbots.length)}/${taskbots.length}`
+		);
 	}
+	return references;
+}
+
+function collectMetadataPaths(value: unknown, paths = new Set<string>()): string[] {
+	if (!value || typeof value !== 'object') return [...paths];
+	if (Array.isArray(value)) {
+		for (const item of value) collectMetadataPaths(item, paths);
+		return [...paths];
+	}
+
+	for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+		if (key.endsWith('MetadataPath') && typeof item === 'string' && item) {
+			paths.add(item);
+		}
+		if (item && typeof item === 'object') collectMetadataPaths(item, paths);
+	}
+	return [...paths];
+}
+
+async function downloadExportFiles(
+	activeRuntime: ToolsRuntime,
+	items: AutomationAnywhereFile[],
+	rootIds: Set<string>
+): Promise<Map<string, Blob>> {
+	const blobs = new Map<string, Blob>();
+	for (let index = 0; index < items.length; index += EXPORT_BATCH_SIZE) {
+		const batch = items.slice(index, index + EXPORT_BATCH_SIZE);
+		const results = await Promise.allSettled(
+			batch.map(async (item) => {
+				const id = getAutomationAnywhereFileId(item);
+				const response = await activeRuntime.api.downloadFileContent(id);
+				return { id, item, blob: automationAnywhereBlobResponseToBlob(response) };
+			})
+		);
+
+		for (const result of results) {
+			if (result.status === 'fulfilled') {
+				blobs.set(result.value.id, result.value.blob);
+				continue;
+			}
+			const item = batch[results.indexOf(result)];
+			const id = getAutomationAnywhereFileId(item);
+			const message = `${getAutomationAnywhereFileName(item)} - ${getErrorMessage(
+				result.reason
+			)}`;
+			if (rootIds.has(id)) throw new Error(`Selected bot download failed: ${message}`);
+			appendToolLog(`Dependency omitted: ${message}`, 'warn');
+		}
+		appendToolLog(
+			`File download progress: ${Math.min(index + batch.length, items.length)}/${items.length}`
+		);
+	}
+	return blobs;
+}
+
+async function downloadMetadataFiles(
+	activeRuntime: ToolsRuntime,
+	references: ExportMetadataReference[]
+): Promise<Map<string, Blob>> {
+	const blobs = new Map<string, Blob>();
+	for (let index = 0; index < references.length; index += EXPORT_BATCH_SIZE) {
+		const batch = references.slice(index, index + EXPORT_BATCH_SIZE);
+		const results = await Promise.allSettled(
+			batch.map(async (reference) => {
+				const response = await activeRuntime.api.downloadMetadataContent(
+					reference.fileId,
+					reference.metadataPath
+				);
+				return {
+					key: getMetadataKey(reference),
+					reference,
+					blob: automationAnywhereBlobResponseToBlob(response),
+				};
+			})
+		);
+
+		for (const result of results) {
+			if (result.status === 'fulfilled') {
+				blobs.set(result.value.key, result.value.blob);
+				continue;
+			}
+			appendToolLog(`Metadata omitted: ${getErrorMessage(result.reason)}`, 'warn');
+		}
+		appendToolLog(
+			`Metadata download progress: ${Math.min(
+				index + batch.length,
+				references.length
+			)}/${references.length}`
+		);
+	}
+	return blobs;
+}
+
+async function createExportArchive(
+	items: AutomationAnywhereFile[],
+	metadataReferences: ExportMetadataReference[],
+	fileBlobs: Map<string, Blob>,
+	metadataBlobs: Map<string, Blob>
+): Promise<Blob> {
+	const zip = new JSZip();
+	const fileEntries: ExportManifestEntry[] = [];
+	const metadataEntries: ExportManifestEntry[] = [];
+	const scannedDependencies = buildScannedDependencyPaths(items);
+
+	for (const item of items) {
+		const id = getAutomationAnywhereFileId(item);
+		const blob = fileBlobs.get(id);
+		if (!blob) continue;
+		const path = getAutomationAnywherePath(item);
+		addBlobToZip(zip, path, blob);
+		fileEntries.push(createDependencyManifestEntry(item, scannedDependencies.get(id) ?? []));
+	}
+
+	for (const reference of metadataReferences) {
+		const blob = metadataBlobs.get(getMetadataKey(reference));
+		if (!blob) continue;
+		addBlobToZip(zip, getMetadataZipPath(reference), blob);
+		metadataEntries.push(createMetadataManifestEntry(reference));
+	}
+
+	const manifest: ExportManifest = {
+		files: [...fileEntries, ...metadataEntries],
+		packages: [],
+		globalValues: [],
+	};
+	zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+	return zip.generateAsync({
+		type: 'blob',
+		compression: 'DEFLATE',
+		compressionOptions: { level: 6 },
+	});
+}
+
+function addBlobToZip(zip: JSZip, path: string, blob: Blob): void {
+	const parts = splitAutomationPath(path);
+	if (!parts.length) return;
+	let folder = zip;
+	for (const part of parts.slice(0, -1)) {
+		const next = folder.folder(part);
+		if (!next) throw new Error(`Failed to create ZIP folder: ${part}`);
+		folder = next;
+	}
+	folder.file(parts[parts.length - 1], blob);
+}
+
+function buildScannedDependencyPaths(
+	items: AutomationAnywhereFile[]
+): Map<string, string[]> {
+	const pathsById = new Map(
+		items.map((item) => [getAutomationAnywhereFileId(item), getAutomationAnywherePath(item)])
+	);
+	const dependencies = new Map<string, string[]>();
+	for (const item of items) {
+		const parentId = getOptionalString(item.requiredByFileId);
+		if (!parentId || parentId === '0' || !pathsById.has(parentId)) continue;
+		if (!dependencies.has(parentId)) dependencies.set(parentId, []);
+		dependencies.get(parentId)?.push(getAutomationAnywherePath(item));
+	}
+	return dependencies;
+}
+
+function createDependencyManifestEntry(
+	item: AutomationAnywhereFile,
+	scannedDependencies: string[]
+): ExportManifestEntry {
+	return {
+		path: getAutomationAnywherePath(item),
+		newPath: null,
+		contentType: getFileContentType(item),
+		metadataForFile: null,
+		manualDependencies: [],
+		scannedDependencies,
+		manualDependenciesNewPaths: [],
+		scannedDependenciesNewPaths: [],
+		description: '',
+		author: '',
+		tags: getFileTags(item),
+		excluded: false,
+	};
+}
+
+function createMetadataManifestEntry(reference: ExportMetadataReference): ExportManifestEntry {
+	return {
+		path: `${reference.botPath}\\${reference.fileName}`,
+		newPath: null,
+		contentType: getContentTypeFromPath(reference.fileName),
+		metadataForFile: reference.botPath,
+		manualDependencies: null,
+		scannedDependencies: null,
+		manualDependenciesNewPaths: [],
+		scannedDependenciesNewPaths: [],
+		description: '',
+		author: '',
+		tags: [],
+		excluded: false,
+	};
+}
+
+function getFileContentType(item: AutomationAnywhereFile): string {
+	return (
+		getAutomationAnywhereFileType(item) ||
+		getContentTypeFromPath(getAutomationAnywherePath(item)) ||
+		'application/octet-stream'
+	);
+}
+
+function getContentTypeFromPath(path: string): string {
+	const extension = path.toLowerCase().split('.').pop() ?? '';
+	return CONTENT_TYPE_BY_EXTENSION[extension] ?? 'application/octet-stream';
+}
+
+function getAutomationAnywherePath(item: AutomationAnywhereFile): string {
+	const path = getOptionalString(item.path);
+	if (path) return path;
+	return getAutomationAnywhereFileName(item);
+}
+
+function splitAutomationPath(path: string): string[] {
+	return path.split(/[\\/]+/).filter(Boolean);
+}
+
+function getPathFileName(path: string): string {
+	return splitAutomationPath(path).pop() || path;
+}
+
+function getMetadataZipPath(reference: ExportMetadataReference): string {
+	const botPath = splitAutomationPath(reference.botPath);
+	const botFileName = botPath.pop() || reference.botPath;
+	return [...botPath, `${botFileName}Metadata`, reference.fileName].join('\\');
+}
+
+function getOptionalString(value: unknown): string | null {
+	if (typeof value === 'string' && value) return value;
+	if (typeof value === 'number') return String(value);
 	return null;
+}
+
+function getFileTags(item: AutomationAnywhereFile): string[] {
+	return Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === 'string') : [];
+}
+
+function getMetadataKey(reference: ExportMetadataReference): string {
+	return `${reference.fileId}\u0000${reference.metadataPath}`;
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error || 'request failed');
+}
+
+function stringifyForFeedback(value: unknown): string {
+	if (value === undefined) return '';
+	if (typeof value === 'string') return value;
+	try {
+		return JSON.stringify(value);
+	} catch {
+		return String(value);
+	}
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {
@@ -856,10 +1453,4 @@ function downloadBlob(blob: Blob, fileName: string): void {
 	anchor.click();
 	anchor.remove();
 	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
 }

@@ -39,6 +39,8 @@ export interface AutomationAnywhereFile {
 	modifiedOn?: string;
 	updatedOn?: string;
 	path?: string;
+	requiredByFileId?: string | number;
+	tags?: string[];
 	[key: string]: unknown;
 }
 
@@ -54,19 +56,8 @@ export interface AutomationAnywhereFolderListResponse {
 	total?: number;
 }
 
-export interface AutomationAnywherePackageInfo {
-	package_name: string;
-	package_version: string;
-}
-
-export interface AutomationAnywhereBlmStatus {
-	status?: string;
-	progress?: number;
-	message?: string;
-	requestId?: string;
-	downloadFileId?: string;
-	download_file_id?: string;
-	fileId?: string;
+export interface AutomationAnywhereDependenciesResponse {
+	dependencies?: AutomationAnywhereFile[];
 	[key: string]: unknown;
 }
 
@@ -169,16 +160,85 @@ export async function getAutomationAnywhereAuthToken(tabId: number): Promise<str
 			type: 'GET_AA_AUTH_TOKEN',
 		})) as ContentActionResponse | undefined;
 	} catch {
+		const fallbackToken = await getAutomationAnywhereAuthTokenViaScripting(tabId);
+		if (fallbackToken) return fallbackToken;
 		throw new Error('Refresh Automation Anywhere tab.');
 	}
 
 	if (!response?.ok) {
+		const fallbackToken = await getAutomationAnywhereAuthTokenViaScripting(tabId);
+		if (fallbackToken) return fallbackToken;
 		throw new Error(response?.error || 'Refresh Automation Anywhere tab.');
 	}
 	if (!response.authToken) {
+		const fallbackToken = await getAutomationAnywhereAuthTokenViaScripting(tabId);
+		if (fallbackToken) return fallbackToken;
 		throw new Error('Log in to Control Room or refresh page.');
 	}
 	return response.authToken;
+}
+
+export async function refreshAutomationAnywhereFolderList(tabId: number): Promise<boolean> {
+	try {
+		const response = (await browser.tabs.sendMessage(tabId, {
+			type: 'REFRESH_AA_FOLDER_LIST',
+		})) as ContentActionResponse | undefined;
+		if (response?.ok) return true;
+	} catch {
+		// Chrome sometimes misses declarative content-script injection after reload.
+	}
+	return (
+		(await executeAutomationAnywhereScript<boolean>(tabId, () => {
+			const refreshButton = document.getElementsByName('table-refresh')[0];
+			if (!(refreshButton instanceof HTMLElement)) return false;
+			refreshButton.click();
+			return true;
+		})) ?? false
+	);
+}
+
+async function getAutomationAnywhereAuthTokenViaScripting(
+	tabId: number
+): Promise<string | null> {
+	return (
+		(await executeAutomationAnywhereScript<string | null>(tabId, () => {
+			try {
+				const raw = localStorage.getItem('authToken');
+				if (!raw) return null;
+				try {
+					const parsed = JSON.parse(raw);
+					return typeof parsed === 'string' ? parsed : raw;
+				} catch {
+					return raw;
+				}
+			} catch {
+				return null;
+			}
+		})) ?? null
+	);
+}
+
+async function executeAutomationAnywhereScript<T>(
+	tabId: number,
+	func: () => T
+): Promise<T | null> {
+	const api = browser as unknown as {
+		scripting?: {
+			executeScript(args: {
+				target: { tabId: number };
+				func: () => T;
+			}): Promise<Array<{ result?: T }>>;
+		};
+	};
+	const scripting =
+		api.scripting ??
+		((globalThis as { chrome?: typeof api }).chrome?.scripting as typeof api.scripting);
+	if (!scripting?.executeScript) return null;
+	const results = await scripting.executeScript({
+		target: { tabId },
+		func,
+	});
+	return results[0]?.result ?? null;
 }
 
 export function isAutomationAnywhereFolder(file: AutomationAnywhereFile): boolean {
@@ -360,6 +420,13 @@ export class AutomationAnywhereApi {
 		});
 	}
 
+	downloadFileContent(fileId: string): Promise<AutomationAnywhereApiBlobResponse> {
+		return this.request<AutomationAnywhereApiBlobResponse>(
+			`/v2/repository/files/${fileId}/content`,
+			{ responseType: 'blob' }
+		);
+	}
+
 	updateBotContent(fileId: string, content: unknown): Promise<unknown> {
 		return this.request<unknown>(`/v2/repository/files/${fileId}/content`, {
 			method: 'PUT',
@@ -384,31 +451,17 @@ export class AutomationAnywhereApi {
 			const pkg = item as {
 				name?: unknown;
 				packageName?: unknown;
-				version?: unknown;
 				packageVersion?: unknown;
 				defaultVersion?: unknown;
+				package_version?: unknown;
 			};
-			const name = String(pkg.name ?? pkg.packageName ?? '');
-			const version = String(pkg.version ?? pkg.packageVersion ?? pkg.defaultVersion ?? '');
-			if (name && version) versions.set(name, version);
+			const name = String(pkg.name ?? pkg.packageName ?? '').trim();
+			const version = String(
+				pkg.packageVersion ?? pkg.defaultVersion ?? pkg.package_version ?? ''
+			).trim();
+			if (name && version && version !== '0') versions.set(name, version);
 		}
 		return versions;
-	}
-
-	updatePackageVersions(
-		fileIds: string[],
-		packageInfo: AutomationAnywherePackageInfo[]
-	): Promise<unknown> {
-		return this.request<unknown>('/v2/repository/files/packagesVersionUpdate', {
-			method: 'POST',
-			body: {
-				name: 'Update packages',
-				description: 'Better AA package version update',
-				package_info: packageInfo,
-				file_ids: fileIds,
-				downgrade_version: true,
-			},
-		});
 	}
 
 	copyFile(fileId: string, name: string, parentId: string): Promise<unknown> {
@@ -418,29 +471,21 @@ export class AutomationAnywhereApi {
 		});
 	}
 
-	exportBots(fileIds: string[], name: string): Promise<unknown> {
-		return this.request<unknown>('/v2/blm/export', {
+	getBotDependencies(fileIds: string[]): Promise<AutomationAnywhereDependenciesResponse> {
+		return this.request<AutomationAnywhereDependenciesResponse>('/v2/repository/dependencies', {
 			method: 'POST',
-			body: {
-				name,
-				fileIds,
-				includePackages: true,
-				includeGlobalValues: false,
-			},
+			body: { fileIds },
 		});
 	}
 
-	getBlmStatus(requestId: string, timeout?: number): Promise<AutomationAnywhereBlmStatus> {
-		const suffix =
-			timeout === undefined
-				? `/v2/blm/status/${requestId}`
-				: `/v2/blm/status/${requestId}/timeout/${timeout}`;
-		return this.request<AutomationAnywhereBlmStatus>(suffix);
-	}
-
-	downloadBlmExport(downloadFileId: string): Promise<AutomationAnywhereApiBlobResponse> {
+	downloadMetadataContent(
+		fileId: string,
+		metadataPath: string
+	): Promise<AutomationAnywhereApiBlobResponse> {
 		return this.request<AutomationAnywhereApiBlobResponse>(
-			`/v2/blm/download/${downloadFileId}`,
+			`/v2/repository/files/${fileId}/metadata/content?path=${encodeURIComponent(
+				metadataPath
+			)}`,
 			{ responseType: 'blob' }
 		);
 	}
