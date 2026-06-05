@@ -19,8 +19,12 @@ import {
 	debugEnabled,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
+	getOpenSidebarShortcut,
+	getOpenSidebarShortcutLabel,
 	getStylesEnabled,
 	normalizeCommandPaletteShortcut,
+	normalizeOpenSidebarShortcut,
+	openSidebarShortcut,
 	runButton,
 	showSuggestions,
 	soundsEnabled,
@@ -30,7 +34,7 @@ import {
 } from '../src/ts/settings';
 import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
 
-const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Ctrl+Shift+L';
+const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
 
 async function broadcastToAutomationTabs(
 	message: SettingsBackgroundMessage
@@ -247,6 +251,18 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 			shortcut,
 		});
 	}
+	if (message.type === 'SET_OPEN_SIDEBAR_SHORTCUT') {
+		const shortcut = normalizeOpenSidebarShortcut(message.shortcut);
+		await openSidebarShortcut.setValue(shortcut);
+		await updateNativeOpenSidebarShortcut(shortcut);
+		void debugInfo('settings', 'Sidebar shortcut saved.', {
+			shortcut: getOpenSidebarShortcutLabel(shortcut),
+		});
+		await broadcastToAutomationTabs({
+			type: 'SET_OPEN_SIDEBAR_SHORTCUT',
+			shortcut,
+		});
+	}
 	if (message.type === 'SET_STYLE_FEATURE') {
 		await styleFeatureItems[message.key].setValue(message.enabled);
 		void debugInfo('userstyle', 'Style feature saved.', {
@@ -266,15 +282,38 @@ async function getExtensionShortcuts(): Promise<{
 	openSidebar: string;
 	commandPalette: string;
 }> {
-	const commands = await browser.commands.getAll().catch(() => []);
-	const openSidebarCommand = commands.find((command) =>
-		command.name === 'open-sidebar' || command.name === '_execute_sidebar_action'
-	);
+	const openSidebar = await getOpenSidebarShortcut();
 	const commandPalette = await getCommandPaletteShortcut();
 	return {
-		openSidebar: openSidebarCommand?.shortcut || FALLBACK_OPEN_SIDEBAR_SHORTCUT,
+		openSidebar:
+			getOpenSidebarShortcutLabel(openSidebar) || FALLBACK_OPEN_SIDEBAR_SHORTCUT,
 		commandPalette: getCommandPaletteShortcutLabel(commandPalette),
 	};
+}
+
+function getNativeOpenSidebarCommandName(): string {
+	return import.meta.env.FIREFOX ? '_execute_sidebar_action' : 'open-sidebar';
+}
+
+async function updateNativeOpenSidebarShortcut(
+	shortcut: Awaited<ReturnType<typeof getOpenSidebarShortcut>>
+): Promise<void> {
+	const commandsApi = browser.commands as unknown as {
+		update?: (details: { name: string; shortcut: string }) => Promise<void>;
+	};
+	if (typeof commandsApi.update !== 'function') return;
+
+	try {
+		await commandsApi.update({
+			name: getNativeOpenSidebarCommandName(),
+			shortcut: getOpenSidebarShortcutLabel(shortcut).replace(/\s+/g, ''),
+		});
+	} catch (error) {
+		void debugWarn('settings', 'Native sidebar shortcut update failed.', {
+			error,
+			shortcut: getOpenSidebarShortcutLabel(shortcut),
+		}, { feedback: true });
+	}
 }
 
 function parseContentDispositionFileName(disposition: string | null): string | undefined {

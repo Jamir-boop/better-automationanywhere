@@ -15,10 +15,12 @@ import {
 import {
 	COMMAND_PALETTE_SHORTCUTS,
 	DEFAULT_DEBUG_ENABLED,
+	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
 	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
 	DEFAULT_STYLES_ENABLED,
 	EXTENSION_VERSION,
+	OPEN_SIDEBAR_SHORTCUT_OPTIONS,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
 	commandPaletteShortcut,
@@ -26,17 +28,22 @@ import {
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
 	getDebugEnabled,
+	getOpenSidebarShortcut,
+	getOpenSidebarShortcutLabel,
 	getShowSuggestions,
 	getSoundsEnabled,
 	getStyleFeatureValues,
 	getStyleValues,
 	getStylesEnabled,
+	normalizeOpenSidebarShortcut,
+	openSidebarShortcut,
 	showSuggestions,
 	soundsEnabled,
 	styleFeatureItems,
 	styleValueItems,
 	stylesEnabled,
 	type CommandPaletteShortcut,
+	type OpenSidebarShortcut,
 	type StyleFeatureKey,
 	type StyleValueKey,
 } from '@/src/ts/settings';
@@ -76,6 +83,7 @@ const ALLOWED_BACKGROUND_MIME_TYPES = new Set([
 	'image/gif',
 ]);
 let currentShortcut: CommandPaletteShortcut = COMMAND_PALETTE_SHORTCUTS.ALT_P;
+let currentOpenSidebarShortcut: OpenSidebarShortcut = DEFAULT_OPEN_SIDEBAR_SHORTCUT;
 const BACKGROUND_COLOR_KEYS = [
 	'backgroundColor1',
 	'backgroundColor2',
@@ -127,6 +135,15 @@ function renderToolsConfigSection(): string {
 				<select id="commandPaletteShortcut">
 					<option value="${COMMAND_PALETTE_SHORTCUTS.ALT_P}">Alt + P</option>
 					<option value="${COMMAND_PALETTE_SHORTCUTS.SLASH}">/</option>
+				</select>
+			</label>
+			<label class="select-row">
+				<span>
+					<strong>Sidebar shortcut</strong>
+					<small id="openSidebarShortcutLabel"></small>
+				</span>
+				<select id="openSidebarShortcut" class="shortcut-select">
+					${OPEN_SIDEBAR_SHORTCUT_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join('')}
 				</select>
 			</label>
 			<label class="setting-row">
@@ -262,7 +279,7 @@ app.innerHTML = `
 			<h1>Better AA Developer Experience</h1>
 		</div>
 		<div class="header-controls">
-			<span class="version-chip">v${extensionVersion}</span>
+			<span class="version-chip">${extensionVersion}</span>
 			<label class="debug-toggle">
 				<span>Debug Mode</span>
 				<input id="debugEnabled" type="checkbox">
@@ -274,7 +291,7 @@ app.innerHTML = `
 		<div class="section-heading-row">
 			<h2>Debug Log</h2>
 			<span class="feedback-actions">
-				<button id="toggleDebugLog" class="debug-log-toggle" type="button" aria-expanded="false" aria-label="Expand debug log" title="Expand debug log">▾</button>
+				<button id="toggleDebugLog" class="debug-log-toggle" type="button" aria-expanded="false" aria-label="Expand debug log" title="Expand debug log"></button>
 				<button id="copyFeedback" type="button">Copy details</button>
 				<button id="clearFeedback" type="button">Clear</button>
 			</span>
@@ -326,7 +343,7 @@ app.innerHTML = `
 				<h2>Configuration shortcuts</h2>
 				<div class="info-row">
 					<span>Sidebar shortcut</span>
-					<strong id="sidebarShortcutValue">Ctrl+Shift+L</strong>
+					<strong id="sidebarShortcutValue">Alt + Shift + L</strong>
 				</div>
 				<div class="info-row">
 					<span>Command palette shortcut</span>
@@ -359,7 +376,13 @@ const debugInput = document.querySelector<HTMLInputElement>('#debugEnabled')!;
 const shortcutSelect = document.querySelector<HTMLSelectElement>(
 	'#commandPaletteShortcut'
 )!;
+const openSidebarShortcutSelect = document.querySelector<HTMLSelectElement>(
+	'#openSidebarShortcut'
+)!;
 const shortcutLabel = document.querySelector<HTMLElement>('#shortcutLabel')!;
+const openSidebarShortcutLabel = document.querySelector<HTMLElement>(
+	'#openSidebarShortcutLabel'
+)!;
 const sidebarShortcutValue = document.querySelector<HTMLElement>('#sidebarShortcutValue')!;
 const settingsCommandPaletteShortcut = document.querySelector<HTMLElement>(
 	'#settingsCommandPaletteShortcut'
@@ -392,7 +415,7 @@ const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
 let debugLogCollapsed = true;
 let currentExtensionShortcuts: ExtensionShortcuts = {
-	openSidebar: 'Ctrl+Shift+L',
+	openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
 	commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
 };
 let lastSidepanelRequestNonce: string | null = null;
@@ -414,7 +437,6 @@ function setStatus(
 function updateDebugLogState(): void {
 	debugLogSection.classList.toggle('is-collapsed', debugLogCollapsed);
 	feedbackList.dataset.collapsed = String(debugLogCollapsed);
-	toggleDebugLogButton.textContent = debugLogCollapsed ? '▾' : '▴';
 	toggleDebugLogButton.title = debugLogCollapsed ? 'Expand debug log' : 'Collapse debug log';
 	toggleDebugLogButton.setAttribute(
 		'aria-label',
@@ -529,6 +551,13 @@ function updateShortcutLabel(shortcut: CommandPaletteShortcut): void {
 	updateSettingsShortcutLabels();
 }
 
+function updateOpenSidebarShortcutLabel(shortcut: OpenSidebarShortcut): void {
+	const label = getOpenSidebarShortcutLabel(shortcut);
+	openSidebarShortcutLabel.textContent = `Current: ${label}`;
+	currentExtensionShortcuts.openSidebar = label;
+	updateSettingsShortcutLabels();
+}
+
 function updateSettingsShortcutLabels(): void {
 	sidebarShortcutValue.textContent = currentExtensionShortcuts.openSidebar;
 	settingsCommandPaletteShortcut.textContent = currentExtensionShortcuts.commandPalette;
@@ -540,13 +569,15 @@ async function refreshExtensionShortcuts(): Promise<void> {
 			type: 'GET_EXTENSION_SHORTCUTS',
 		})) as ExtensionShortcuts | undefined;
 		currentExtensionShortcuts = {
-			openSidebar: response?.openSidebar || 'Ctrl+Shift+L',
+			openSidebar:
+				response?.openSidebar ||
+				getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
 			commandPalette:
 				response?.commandPalette || getCommandPaletteShortcutLabel(currentShortcut),
 		};
 	} catch {
 		currentExtensionShortcuts = {
-			openSidebar: 'Ctrl+Shift+L',
+			openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
 			commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
 		};
 	}
@@ -937,12 +968,22 @@ async function setStyleValueAndNotify(
 }
 
 async function loadState(): Promise<void> {
-	const [styles, sounds, suggestions, debug, shortcut, styleFeatures, styleValues] = await Promise.all([
+	const [
+		styles,
+		sounds,
+		suggestions,
+		debug,
+		shortcut,
+		sidebarShortcut,
+		styleFeatures,
+		styleValues,
+	] = await Promise.all([
 		getStylesEnabled(),
 		getSoundsEnabled(),
 		getShowSuggestions(),
 		getDebugEnabled(),
 		getCommandPaletteShortcut(),
+		getOpenSidebarShortcut(),
 		getStyleFeatureValues(),
 		getStyleValues(),
 	]);
@@ -955,6 +996,9 @@ async function loadState(): Promise<void> {
 	shortcutSelect.value = shortcut;
 	currentShortcut = shortcut;
 	updateShortcutLabel(shortcut);
+	openSidebarShortcutSelect.value = sidebarShortcut;
+	currentOpenSidebarShortcut = sidebarShortcut;
+	updateOpenSidebarShortcutLabel(sidebarShortcut);
 	await refreshExtensionShortcuts();
 	renderStaticAboutHelp(shortcut);
 
@@ -1031,6 +1075,23 @@ shortcutSelect.addEventListener('change', () => {
 	}).then(() => {
 		void refreshExtensionShortcuts();
 	});
+});
+
+openSidebarShortcutSelect.addEventListener('change', () => {
+	const shortcut = normalizeOpenSidebarShortcut(openSidebarShortcutSelect.value);
+	currentOpenSidebarShortcut = shortcut;
+	openSidebarShortcutSelect.value = shortcut;
+	updateOpenSidebarShortcutLabel(shortcut);
+	renderStaticAboutHelp(currentShortcut);
+	void sendBackgroundMessage({
+		type: 'SET_OPEN_SIDEBAR_SHORTCUT',
+		shortcut,
+	}).then(() => {
+		void refreshExtensionShortcuts().then(() => {
+			renderStaticAboutHelp(currentShortcut);
+		});
+	});
+	setStatus('Sidebar shortcut saved.', 'info', 'settings');
 });
 
 STYLE_FEATURES.forEach((feature) => {
@@ -1335,6 +1396,15 @@ commandPaletteShortcut.watch((value) => {
 	updateShortcutLabel(value);
 	void refreshExtensionShortcuts();
 	renderStaticAboutHelp(value);
+});
+openSidebarShortcut.watch((value) => {
+	const shortcut = normalizeOpenSidebarShortcut(value);
+	currentOpenSidebarShortcut = shortcut;
+	openSidebarShortcutSelect.value = shortcut;
+	updateOpenSidebarShortcutLabel(shortcut);
+	void refreshExtensionShortcuts().then(() => {
+		renderStaticAboutHelp(currentShortcut);
+	});
 });
 STYLE_FEATURES.forEach((feature) => {
 	styleFeatureItems[feature.key].watch((value) => {

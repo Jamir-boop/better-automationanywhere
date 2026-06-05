@@ -21,11 +21,14 @@ import { callInitializeRepeatedly } from '../src/ts/initialize';
 import type { ContentActionResponse, RuntimeMessage } from '../src/ts/messages';
 import {
 	getCommandPaletteShortcut,
+	getOpenSidebarShortcut,
 	getShowSuggestions,
 	getSoundsEnabled,
 	getStyleFeatureValues,
 	getStylesEnabled,
 	getStyleValues,
+	normalizeOpenSidebarShortcut,
+	openSidebarShortcut,
 	RUN_BUTTON_CLASS,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
@@ -37,7 +40,10 @@ import {
 } from '../src/ts/settings';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
-import { setActiveCommandPaletteShortcut } from '../src/ts/utils';
+import {
+	setActiveCommandPaletteShortcut,
+	setActiveOpenSidebarShortcut,
+} from '../src/ts/utils';
 
 const DEFAULT_LOADING_IMAGE_CSS = `url("${browser.runtime.getURL(
 	'media/loading.gif' as any
@@ -52,12 +58,40 @@ const TASK_EDITOR_CAPABILITY_SELECTORS = [
 	'.editor-layout__canvas',
 ];
 const OPEN_SIDEBAR_BUTTON_ID = 'better-aa-open-sidebar-button';
+const FOLDERS_ROUTE_CLASS = 'better-aa-route-folders';
+const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
+const FOLDERS_ROUTE_RE = /.*automationanywhere\.digital.*?folders.*$/i;
+const TASKBOT_ROUTE_RE = /.*automationanywhere\.digital.*private\/files\/task\/.*/i;
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
 		'--better-aa-loading-image-url',
 		DEFAULT_LOADING_IMAGE_CSS
 	);
+}
+
+function applyRouteClasses(): void {
+	const href = location.href;
+	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, FOLDERS_ROUTE_RE.test(href));
+	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, TASKBOT_ROUTE_RE.test(href));
+}
+
+function watchRouteChanges(): void {
+	const update = () => {
+		requestAnimationFrame(applyRouteClasses);
+	};
+	const wrapHistoryMethod = (method: 'pushState' | 'replaceState') => {
+		const original = history[method];
+		history[method] = function (...args) {
+			const result = original.apply(this, args);
+			update();
+			return result;
+		};
+	};
+	wrapHistoryMethod('pushState');
+	wrapHistoryMethod('replaceState');
+	window.addEventListener('popstate', update);
+	window.addEventListener('hashchange', update);
 }
 
 async function applyStyleClasses(): Promise<void> {
@@ -102,6 +136,7 @@ async function applyInitialSettings(): Promise<void> {
 		setSoundsEnabled(await getSoundsEnabled());
 		setSuggestionsEnabled(await getShowSuggestions());
 		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
+		setActiveOpenSidebarShortcut(await getOpenSidebarShortcut());
 	} catch (error) {
 		void debugError('content', 'Initial settings failed.', { error }, {
 			feedback: true,
@@ -246,6 +281,10 @@ async function handleRuntimeMessage(
 			setActiveCommandPaletteShortcut(message.shortcut);
 			return;
 		}
+		if (message.type === 'SET_OPEN_SIDEBAR_SHORTCUT') {
+			setActiveOpenSidebarShortcut(message.shortcut);
+			return;
+		}
 		if (message.type === 'SET_STYLE_FEATURE') {
 			const feature = STYLE_FEATURES.find((item) => item.key === message.key);
 			if (feature) {
@@ -313,6 +352,8 @@ export default defineContentScript({
 		document.documentElement.dataset.betterAaContentScript = 'loaded';
 		void debugInfo('content', 'Content script loaded.', { url: location.href });
 		applyBundledAssetVariables();
+		applyRouteClasses();
+		watchRouteChanges();
 		await applyInitialSettings();
 		startGlobalClipboardWatcher();
 
@@ -328,6 +369,9 @@ export default defineContentScript({
 		});
 		showSuggestions.watch((value) => {
 			setSuggestionsEnabled(value ?? true);
+		});
+		openSidebarShortcut.watch((value) => {
+			setActiveOpenSidebarShortcut(normalizeOpenSidebarShortcut(value));
 		});
 		STYLE_FEATURES.forEach((feature) => {
 			if (feature.key === 'runButton') return;

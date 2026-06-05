@@ -15,7 +15,8 @@ export type AutomationAnywherePageType =
 	| 'private-folder'
 	| 'public-folder'
 	| 'private-taskbot'
-	| 'public-taskbot';
+	| 'public-taskbot'
+	| 'packages';
 
 export interface AutomationAnywherePageContext {
 	url: string;
@@ -56,6 +57,33 @@ export interface AutomationAnywhereFolderListResponse {
 	total?: number;
 }
 
+export interface AutomationAnywherePackage {
+	id?: string | number;
+	name?: string;
+	packageName?: string;
+	package_name?: string;
+	packageVersion?: string | number;
+	version?: string | number;
+	package_version?: string | number;
+	pkgDownloadUrl?: string;
+	packageDownloadUrl?: string;
+	downloadUrl?: string;
+	status?: string;
+	[key: string]: unknown;
+}
+
+export interface AutomationAnywherePackageListResponse {
+	list?: AutomationAnywherePackage[];
+	items?: AutomationAnywherePackage[];
+	page?: {
+		offset?: number;
+		length?: number;
+		total?: number;
+		totalFilter?: number;
+	};
+	total?: number;
+}
+
 export interface AutomationAnywhereDependenciesResponse {
 	dependencies?: AutomationAnywhereFile[];
 	[key: string]: unknown;
@@ -86,6 +114,15 @@ export function parseAutomationAnywherePageContext(
 	}
 
 	const route = `${parsed.pathname}${parsed.hash}`;
+	if (/\/bots\/packages\/versions(?:[/?#]|$)/i.test(route)) {
+		return {
+			url,
+			baseUrl: parsed.origin,
+			hostname: parsed.hostname,
+			pageType: 'packages',
+		};
+	}
+
 	const privateFolder = route.match(/\/bots\/repository\/private\/folders\/([^/?#]+)/i);
 	if (privateFolder) {
 		return {
@@ -462,6 +499,30 @@ export class AutomationAnywhereApi {
 			if (name && version && version !== '0') versions.set(name, version);
 		}
 		return versions;
+	}
+
+	async listPackages(params: {
+		offset?: number;
+		length?: number;
+	}): Promise<AutomationAnywherePackageListResponse> {
+		const response = await this.request<AutomationAnywherePackageListResponse>(
+			'/v3/packages/package/list',
+			{
+				method: 'POST',
+				body: {
+					includeDownloadUrls: true,
+					page: {
+						offset: params.offset ?? 0,
+						length: params.length ?? 200,
+					},
+				},
+			}
+		);
+		const list = response.list ?? response.items ?? [];
+		return {
+			...response,
+			list,
+		};
 	}
 
 	copyFile(fileId: string, name: string, parentId: string): Promise<unknown> {

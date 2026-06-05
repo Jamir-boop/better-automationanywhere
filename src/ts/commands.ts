@@ -404,9 +404,9 @@ async function getOpenSidebarShortcut(): Promise<string> {
 		const response = (await browser.runtime.sendMessage({
 			type: 'GET_EXTENSION_SHORTCUTS',
 		})) as { openSidebar?: string } | undefined;
-		return response?.openSidebar || 'Ctrl+Shift+L';
+		return response?.openSidebar || 'Alt + Shift + L';
 	} catch {
-		return 'Ctrl+Shift+L';
+		return 'Alt + Shift + L';
 	}
 }
 

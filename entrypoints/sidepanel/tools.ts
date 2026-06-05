@@ -15,6 +15,7 @@ import {
 	type ActiveAutomationAnywhereContext,
 	type AutomationAnywhereFile,
 	type AutomationAnywherePageContext,
+	type AutomationAnywherePackage,
 } from '@/src/ts/automation-anywhere-api';
 import type {
 	ContentActionResponse,
@@ -27,7 +28,9 @@ type ToolId =
 	| 'copy-files'
 	| 'update-packages'
 	| 'export-bots'
+	| 'download-packages'
 	| 'taskbot-json';
+type ToolListItem = AutomationAnywhereFile | AutomationAnywherePackage;
 
 interface ToolsRuntime extends ActiveAutomationAnywhereContext {
 	api: AutomationAnywhereApi;
@@ -120,7 +123,7 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
 let options: InitializeToolsOptions;
 let runtime: ToolsRuntime | null = null;
 let currentTool: ToolId | null = null;
-let loadedItems: AutomationAnywhereFile[] = [];
+let loadedItems: ToolListItem[] = [];
 let selectedIds = new Set<string>();
 let loadedOffset = 0;
 let loadedTotal = 0;
@@ -170,7 +173,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						</button>
 					</span>
 				</div>
-				<p id="toolsContext" class="tools-context">Open Automation Anywhere folder or taskbot.</p>
+				<p id="toolsContext" class="tools-context">Open Automation Anywhere folder, taskbot, or packages page.</p>
 				<div id="toolsActions" class="tool-action-grid"></div>
 			</section>
 
@@ -276,7 +279,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 		void pasteCopiedFiles();
 	});
 	loadMoreButton.addEventListener('click', () => {
-		void loadFolderPage(false);
+		void loadListPage(false);
 	});
 	toolsFinishClose.addEventListener('click', hideToolFinishModal);
 	toolsFinishModal.addEventListener('click', (event) => {
@@ -417,8 +420,14 @@ function updateAvailabilityDot(hasTools: boolean): void {
 
 function isFolderTool(
 	tool: ToolId | null
-): tool is Exclude<ToolId, 'universal-clipboard' | 'taskbot-json'> {
+): tool is 'copy-files' | 'update-packages' | 'export-bots' {
 	return tool === 'copy-files' || tool === 'update-packages' || tool === 'export-bots';
+}
+
+function isListTool(
+	tool: ToolId | null
+): tool is 'copy-files' | 'update-packages' | 'export-bots' | 'download-packages' {
+	return isFolderTool(tool) || tool === 'download-packages';
 }
 
 function setToolPanelHidden(panel: HTMLElement, hidden: boolean): void {
@@ -429,7 +438,7 @@ function setToolPanelHidden(panel: HTMLElement, hidden: boolean): void {
 function setSelectedToolPanel(tool: ToolId | null): void {
 	setToolPanelHidden(universalClipboardSection, tool !== 'universal-clipboard');
 	setToolPanelHidden(taskbotSection, tool !== 'taskbot-json');
-	setToolPanelHidden(fileSection, !isFolderTool(tool));
+	setToolPanelHidden(fileSection, !isListTool(tool));
 }
 
 async function refreshToolsContext(): Promise<void> {
@@ -445,7 +454,8 @@ async function refreshToolsContext(): Promise<void> {
 		if (!active || active.context.pageType === 'unsupported') {
 			runtime = null;
 			currentTool = null;
-			contextText.textContent = 'Unsupported page. Open Automation Anywhere folder or taskbot.';
+			contextText.textContent =
+				'Unsupported page. Open Automation Anywhere folder, taskbot, or packages page.';
 			setSelectedToolPanel(null);
 			renderActionButtons();
 			return;
@@ -508,6 +518,9 @@ function getContextLabel(context: AutomationAnywherePageContext): string {
 	if (context.pageType === 'public-taskbot') {
 		return `Public taskbot ${context.fileId} on ${context.hostname}`;
 	}
+	if (context.pageType === 'packages') {
+		return `Packages on ${context.hostname}`;
+	}
 	return 'Unsupported page.';
 }
 
@@ -533,6 +546,10 @@ function getAvailableTools(
 		tools.push('taskbot-json');
 		return tools;
 	}
+	if (context.pageType === 'packages') {
+		tools.push('download-packages');
+		return tools;
+	}
 	return tools;
 }
 
@@ -541,6 +558,7 @@ function getToolLabel(tool: ToolId): string {
 	if (tool === 'copy-files') return 'Copy Files';
 	if (tool === 'update-packages') return 'Update Packages';
 	if (tool === 'export-bots') return 'Export Bots';
+	if (tool === 'download-packages') return 'Download Packages';
 	return 'Taskbot JSON';
 }
 
@@ -574,7 +592,15 @@ async function selectTool(tool: ToolId): Promise<void> {
 		return;
 	}
 
-	await loadFolderPage(true);
+	await loadListPage(true);
+}
+
+async function loadListPage(reset: boolean): Promise<void> {
+	if (currentTool === 'download-packages') {
+		await loadPackagePage(reset);
+		return;
+	}
+	await loadFolderPage(reset);
 }
 
 function getCurrentFolderId(): string | null {
@@ -612,8 +638,8 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 		const rawList = response.list ?? [];
 		lastRawPageLength = rawList.length;
 		const filtered = filterItemsForTool(rawList, selectedTool);
-		const byId = new Map(loadedItems.map((item) => [getAutomationAnywhereFileId(item), item]));
-		for (const item of filtered) byId.set(getAutomationAnywhereFileId(item), item);
+		const byId = new Map(loadedItems.map((item) => [getToolItemId(item), item]));
+		for (const item of filtered) byId.set(getToolItemId(item), item);
 		loadedItems = [...byId.values()];
 		loadedOffset += PAGE_LENGTH;
 		loadedTotal =
@@ -638,6 +664,57 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 	}
 }
 
+async function loadPackagePage(reset: boolean): Promise<void> {
+	const activeRuntime = runtime;
+	const selectedTool = currentTool;
+	if (!activeRuntime || selectedTool !== 'download-packages') {
+		return;
+	}
+
+	setBusy(loadMoreButton, true, reset ? 'Loading...' : 'Loading more...');
+	if (reset) {
+		loadedItems = [];
+		selectedIds = new Set<string>();
+		loadedOffset = 0;
+		loadedTotal = 0;
+		lastRawPageLength = 0;
+		searchInput.value = '';
+	}
+
+	try {
+		const response = await activeRuntime.api.listPackages({
+			offset: loadedOffset,
+			length: PAGE_LENGTH,
+		});
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		const rawList = response.list ?? [];
+		lastRawPageLength = rawList.length;
+		const byId = new Map(loadedItems.map((item) => [getToolItemId(item), item]));
+		for (const item of rawList) byId.set(getToolItemId(item), item);
+		loadedItems = [...byId.values()];
+		loadedOffset += PAGE_LENGTH;
+		loadedTotal =
+			response.page?.totalFilter ??
+			response.page?.total ??
+			response.total ??
+			Math.max(loadedItems.length, loadedTotal);
+		pruneSelection();
+		renderFileList();
+		setSelectedToolPanel(selectedTool);
+		setToolStatus(`${loadedItems.length} package(s) loaded.`);
+	} catch (error) {
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		setToolStatus(
+			error instanceof Error ? error.message : 'Package list failed.',
+			'error'
+		);
+	} finally {
+		if (runtime === activeRuntime && currentTool === selectedTool) {
+			setBusy(loadMoreButton, false, 'Load more');
+		}
+	}
+}
+
 function filterItemsForTool(
 	items: AutomationAnywhereFile[],
 	tool: ToolId
@@ -649,35 +726,103 @@ function filterItemsForTool(
 	return items;
 }
 
+function isAutomationAnywherePackageItem(
+	item: ToolListItem
+): item is AutomationAnywherePackage {
+	return (
+		'packageVersion' in item ||
+		'package_version' in item ||
+		'packageName' in item ||
+		'package_name' in item ||
+		'pkgDownloadUrl' in item ||
+		'packageDownloadUrl' in item ||
+		'downloadUrl' in item
+	);
+}
+
+function getAutomationAnywherePackageName(pkg: AutomationAnywherePackage): string {
+	return String(pkg.name ?? pkg.packageName ?? pkg.package_name ?? '').trim();
+}
+
+function getAutomationAnywherePackageVersion(pkg: AutomationAnywherePackage): string {
+	return String(pkg.packageVersion ?? pkg.version ?? pkg.package_version ?? '').trim();
+}
+
+function getAutomationAnywherePackageDownloadUrl(
+	pkg: AutomationAnywherePackage
+): string {
+	return String(pkg.pkgDownloadUrl ?? pkg.packageDownloadUrl ?? pkg.downloadUrl ?? '').trim();
+}
+
+function getAutomationAnywherePackageId(pkg: AutomationAnywherePackage): string {
+	const explicitId = getOptionalString(pkg.id);
+	if (explicitId) return explicitId;
+	return `${getAutomationAnywherePackageName(pkg)}\u0000${getAutomationAnywherePackageVersion(pkg)}`;
+}
+
+function getToolItemId(item: ToolListItem): string {
+	return isAutomationAnywherePackageItem(item)
+		? getAutomationAnywherePackageId(item)
+		: getAutomationAnywhereFileId(item);
+}
+
+function getToolItemName(item: ToolListItem): string {
+	if (!isAutomationAnywherePackageItem(item)) return getAutomationAnywhereFileName(item);
+	return getAutomationAnywherePackageName(item) || getAutomationAnywherePackageId(item);
+}
+
+function getToolItemSearchText(item: ToolListItem): string {
+	return isAutomationAnywherePackageItem(item)
+		? `${getAutomationAnywherePackageName(item)} ${getAutomationAnywherePackageVersion(item)}`
+		: getAutomationAnywhereFileName(item);
+}
+
+function getToolItemMeta(item: ToolListItem): string {
+	if (!isAutomationAnywherePackageItem(item)) return getItemMeta(item);
+	const version = getAutomationAnywherePackageVersion(item) || 'unknown';
+	const hasDownloadUrl = Boolean(getAutomationAnywherePackageDownloadUrl(item));
+	return hasDownloadUrl
+		? `Version ${version}`
+		: `Version ${version} | missing pkgDownloadUrl`;
+}
+
 function pruneSelection(): void {
-	const available = new Set(loadedItems.map(getAutomationAnywhereFileId));
+	const available = new Set(loadedItems.map(getToolItemId));
 	selectedIds = new Set([...selectedIds].filter((id) => available.has(id)));
 }
 
 function renderFileList(): void {
 	const search = searchInput.value.trim().toLowerCase();
 	const visible = loadedItems.filter((item) =>
-		getAutomationAnywhereFileName(item).toLowerCase().includes(search)
+		getToolItemSearchText(item).toLowerCase().includes(search)
 	);
+	searchInput.placeholder =
+		currentTool === 'download-packages' ? 'Search packages' : 'Search files';
 
 	listTitle.textContent =
 		currentTool === 'copy-files'
 			? 'Copy Files'
 			: currentTool === 'update-packages'
 				? 'Update Packages'
-				: 'Export Bots';
+				: currentTool === 'export-bots'
+					? 'Export Bots'
+					: 'Download Packages';
 	selectedCountText.textContent = `${selectedIds.size} selected / ${loadedItems.length} loaded`;
 	fileList.textContent = '';
 
 	if (!visible.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-empty';
-		empty.textContent = loadedItems.length ? 'No matches.' : 'No files found.';
+		empty.textContent = loadedItems.length
+			? 'No matches.'
+			: currentTool === 'download-packages'
+				? 'No packages found.'
+				: 'No files found.';
 		fileList.appendChild(empty);
 	}
 
 	for (const item of visible) {
-		const id = getAutomationAnywhereFileId(item);
+		const id = getToolItemId(item);
 		const row = document.createElement('label');
 		row.className = 'tool-file-row';
 		const checkbox = document.createElement('input');
@@ -689,9 +834,9 @@ function renderFileList(): void {
 			renderFileList();
 		});
 		const name = document.createElement('strong');
-		name.textContent = getAutomationAnywhereFileName(item);
+		name.textContent = getToolItemName(item);
 		const meta = document.createElement('small');
-		meta.textContent = getItemMeta(item);
+		meta.textContent = getToolItemMeta(item);
 		const text = document.createElement('span');
 		text.className = 'tool-file-text';
 		text.append(name, meta);
@@ -700,8 +845,8 @@ function renderFileList(): void {
 	}
 
 	const allVisibleSelected =
-		visible.length > 0 && visible.every((item) => selectedIds.has(getAutomationAnywhereFileId(item)));
-	const someVisibleSelected = visible.some((item) => selectedIds.has(getAutomationAnywhereFileId(item)));
+		visible.length > 0 && visible.every((item) => selectedIds.has(getToolItemId(item)));
+	const someVisibleSelected = visible.some((item) => selectedIds.has(getToolItemId(item)));
 	selectAllInput.checked = allVisibleSelected;
 	selectAllInput.indeterminate = someVisibleSelected && !allVisibleSelected;
 	updateActionBar();
@@ -716,10 +861,10 @@ function getItemMeta(item: AutomationAnywhereFile): string {
 function toggleVisibleSelection(): void {
 	const search = searchInput.value.trim().toLowerCase();
 	const visible = loadedItems.filter((item) =>
-		getAutomationAnywhereFileName(item).toLowerCase().includes(search)
+		getToolItemSearchText(item).toLowerCase().includes(search)
 	);
 	for (const item of visible) {
-		const id = getAutomationAnywhereFileId(item);
+		const id = getToolItemId(item);
 		if (selectAllInput.checked) selectedIds.add(id);
 		else selectedIds.delete(id);
 	}
@@ -732,6 +877,9 @@ function updateActionBar(): void {
 	if (currentTool === 'copy-files') primaryActionButton.textContent = `Copy ${count} file(s)`;
 	if (currentTool === 'update-packages') primaryActionButton.textContent = `Update ${count} bot(s)`;
 	if (currentTool === 'export-bots') primaryActionButton.textContent = `Export ${count} bot(s)`;
+	if (currentTool === 'download-packages') {
+		primaryActionButton.textContent = `Download ${count} package(s)`;
+	}
 
 	const canPaste = canPasteCopiedFiles();
 	pasteActionButton.hidden = !canPaste;
@@ -745,8 +893,18 @@ function hasMoreItems(): boolean {
 	return lastRawPageLength >= PAGE_LENGTH || loadedItems.length < loadedTotal;
 }
 
-function getSelectedItems(): AutomationAnywhereFile[] {
-	return loadedItems.filter((item) => selectedIds.has(getAutomationAnywhereFileId(item)));
+function getSelectedItems(): ToolListItem[] {
+	return loadedItems.filter((item) => selectedIds.has(getToolItemId(item)));
+}
+
+function getSelectedFiles(): AutomationAnywhereFile[] {
+	return getSelectedItems().filter(
+		(item): item is AutomationAnywhereFile => !isAutomationAnywherePackageItem(item)
+	);
+}
+
+function getSelectedPackages(): AutomationAnywherePackage[] {
+	return getSelectedItems().filter(isAutomationAnywherePackageItem);
 }
 
 async function runPrimaryToolAction(): Promise<void> {
@@ -760,6 +918,10 @@ async function runPrimaryToolAction(): Promise<void> {
 	}
 	if (currentTool === 'export-bots') {
 		await exportSelectedBots();
+		return;
+	}
+	if (currentTool === 'download-packages') {
+		await downloadSelectedPackages();
 	}
 }
 
@@ -767,7 +929,7 @@ function copySelectedFiles(): void {
 	const folderId = getCurrentFolderId();
 	const context = runtime?.context;
 	if (!folderId || !context) return;
-	const items = getSelectedItems();
+	const items = getSelectedFiles();
 	if (!items.length) return;
 	startToolRun('Copy Files', items.length, `Copying ${items.length} file reference(s)...`);
 	copiedFiles = [];
@@ -895,7 +1057,7 @@ async function loadAllFolderItems(
 async function updateSelectedPackages(): Promise<void> {
 	const activeRuntime = runtime;
 	if (!activeRuntime) return;
-	const bots = getSelectedItems();
+	const bots = getSelectedFiles();
 	if (!bots.length) return;
 
 	setBusy(primaryActionButton, true, 'Updating...');
@@ -963,7 +1125,7 @@ async function updateSelectedPackages(): Promise<void> {
 async function exportSelectedBots(): Promise<void> {
 	const activeRuntime = runtime;
 	if (!activeRuntime) return;
-	const bots = getSelectedItems().filter(isAutomationAnywhereTaskbot);
+	const bots = getSelectedFiles().filter(isAutomationAnywhereTaskbot);
 	if (!bots.length) return;
 
 	setBusy(primaryActionButton, true, 'Exporting...');
@@ -1018,6 +1180,65 @@ async function exportSelectedBots(): Promise<void> {
 		finishToolRun(summary);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Export failed.';
+		setToolStatus(message, 'error');
+		finishToolRun(message, 'error');
+	} finally {
+		setBusy(primaryActionButton, false);
+		updateActionBar();
+	}
+}
+
+async function downloadSelectedPackages(): Promise<void> {
+	const packages = getSelectedPackages();
+	if (!packages.length) return;
+
+	setBusy(primaryActionButton, true, 'Downloading...');
+	startToolRun(
+		'Download Packages',
+		packages.length,
+		`Downloading ${packages.length} package(s)...`
+	);
+	try {
+		let downloaded = 0;
+		let skipped = 0;
+		let failed = 0;
+
+		for (let index = 0; index < packages.length; index += 1) {
+			const pkg = packages[index];
+			const label = getPackageLabel(pkg);
+			const downloadUrl = getAutomationAnywherePackageDownloadUrl(pkg);
+			if (!downloadUrl) {
+				skipped += 1;
+				appendToolLog(`Skipped: ${label} - missing pkgDownloadUrl`, 'warn');
+				setToolProgress(index + 1, packages.length, `Processed ${index + 1}/${packages.length}`);
+				if (index < packages.length - 1) await delay(300);
+				continue;
+			}
+
+			try {
+				const fileName = getPackageJarFileName(pkg);
+				downloadUrlFile(downloadUrl, fileName);
+				downloaded += 1;
+				appendToolLog(`Downloaded: ${fileName}`);
+			} catch (error) {
+				failed += 1;
+				appendToolLog(
+					`Failed: ${label} - ${
+						error instanceof Error ? error.message : 'download failed'
+					}`,
+					'error'
+				);
+			}
+			setToolProgress(index + 1, packages.length, `Processed ${index + 1}/${packages.length}`);
+			if (index < packages.length - 1) await delay(300);
+		}
+
+		const summary = `Download packages done. Downloaded ${downloaded}, skipped ${skipped}, failed ${failed}.`;
+		const severity = skipped || failed ? 'warn' : 'info';
+		setToolStatus(summary, severity);
+		finishToolRun(summary, severity);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'Download packages failed.';
 		setToolStatus(message, 'error');
 		finishToolRun(message, 'error');
 	} finally {
@@ -1442,6 +1663,42 @@ function stringifyForFeedback(value: unknown): string {
 	} catch {
 		return String(value);
 	}
+}
+
+function getPackageLabel(pkg: AutomationAnywherePackage): string {
+	const name = getAutomationAnywherePackageName(pkg) || 'package';
+	const version = getAutomationAnywherePackageVersion(pkg) || 'unknown';
+	return `${name} ${version}`;
+}
+
+function sanitizeDownloadFileName(value: string): string {
+	const sanitized = value
+		.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.replace(/[. ]+$/g, '');
+	return sanitized || 'package';
+}
+
+function getPackageJarFileName(pkg: AutomationAnywherePackage): string {
+	const name = getAutomationAnywherePackageName(pkg) || 'package';
+	const version = getAutomationAnywherePackageVersion(pkg) || 'unknown';
+	return `${sanitizeDownloadFileName(`${name}-${version}`)}.jar`;
+}
+
+function downloadUrlFile(url: string, fileName: string): void {
+	const anchor = document.createElement('a');
+	anchor.href = url;
+	anchor.download = fileName;
+	document.body.appendChild(anchor);
+	anchor.click();
+	anchor.remove();
+}
+
+function delay(milliseconds: number): Promise<void> {
+	return new Promise((resolve) => {
+		setTimeout(resolve, milliseconds);
+	});
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {

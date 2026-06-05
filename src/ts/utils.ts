@@ -1,15 +1,21 @@
-import { showActions, showVariables } from './commands';
+import { openSidebarCommandPalette, showActions, showVariables } from './commands';
 import { debugWarn } from './debug';
 import * as palette from './palette';
 import {
 	COMMAND_PALETTE_SHORTCUTS,
-	type CommandPaletteShortcut,
 	DEFAULT_COMMAND_PALETTE_SHORTCUT,
+	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
+	OPEN_SIDEBAR_SHORTCUTS,
+	getOpenSidebarShortcutLabel,
+	type CommandPaletteShortcut,
+	type OpenSidebarShortcut,
 } from './settings';
 import * as ui from './ui';
 
 let activeCommandPaletteShortcut: CommandPaletteShortcut =
 	DEFAULT_COMMAND_PALETTE_SHORTCUT;
+let activeOpenSidebarShortcut: OpenSidebarShortcut =
+	DEFAULT_OPEN_SIDEBAR_SHORTCUT;
 
 interface SelectorDebugOptions {
 	feedback?: boolean;
@@ -21,10 +27,18 @@ export function setActiveCommandPaletteShortcut(shortcut: CommandPaletteShortcut
 	activeCommandPaletteShortcut = shortcut;
 }
 
+export function setActiveOpenSidebarShortcut(shortcut: OpenSidebarShortcut): void {
+	activeOpenSidebarShortcut = shortcut;
+}
+
 export function getActiveCommandPaletteShortcutLabel(): string {
 	return activeCommandPaletteShortcut === COMMAND_PALETTE_SHORTCUTS.SLASH
 		? '/'
 		: 'Alt + P';
+}
+
+export function getActiveOpenSidebarShortcutLabel(): string {
+	return getOpenSidebarShortcutLabel(activeOpenSidebarShortcut);
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -116,6 +130,25 @@ export function isCommandPaletteShortcutPressed(e: KeyboardEvent): boolean {
 	);
 }
 
+export function isOpenSidebarShortcutPressed(e: KeyboardEvent): boolean {
+	if (isTypingTarget(e.target)) return false;
+
+	const withoutMeta = !e.metaKey;
+	switch (activeOpenSidebarShortcut) {
+		case OPEN_SIDEBAR_SHORTCUTS.CTRL_SHIFT_L:
+			return e.code === 'KeyL' && e.ctrlKey && e.shiftKey && !e.altKey && withoutMeta;
+		case OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_S:
+			return e.code === 'KeyS' && e.altKey && e.shiftKey && !e.ctrlKey && withoutMeta;
+		case OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_O:
+			return e.code === 'KeyO' && e.altKey && e.shiftKey && !e.ctrlKey && withoutMeta;
+		case OPEN_SIDEBAR_SHORTCUTS.CTRL_SHIFT_SPACE:
+			return e.code === 'Space' && e.ctrlKey && e.shiftKey && !e.altKey && withoutMeta;
+		case OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L:
+		default:
+			return e.code === 'KeyL' && e.altKey && e.shiftKey && !e.ctrlKey && withoutMeta;
+	}
+}
+
 export function waitForElement(
 	selector: string,
 	timeout = 5000,
@@ -205,6 +238,13 @@ export function registerKeyboardShortcuts(): void {
 			return;
 		}
 		palette.closeCommandPalette();
+	});
+
+	document.addEventListener('keydown', (e) => {
+		if (isOpenSidebarShortcutPressed(e)) {
+			e.preventDefault();
+			openSidebarCommandPalette();
+		}
 	});
 
 	document.addEventListener('keydown', (e) => {

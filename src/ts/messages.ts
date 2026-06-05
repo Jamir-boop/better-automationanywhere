@@ -1,5 +1,6 @@
 import type {
 	CommandPaletteShortcut,
+	OpenSidebarShortcut,
 	StyleFeatureKey,
 	StyleValueKey,
 } from './settings';
@@ -40,6 +41,7 @@ export type SettingsBackgroundMessage =
 	| { type: 'SET_SHOW_SUGGESTIONS'; enabled: boolean }
 	| { type: 'SET_DEBUG_ENABLED'; enabled: boolean }
 	| { type: 'SET_COMMAND_PALETTE_SHORTCUT'; shortcut: CommandPaletteShortcut }
+	| { type: 'SET_OPEN_SIDEBAR_SHORTCUT'; shortcut: OpenSidebarShortcut }
 	| { type: 'SET_STYLE_FEATURE'; key: StyleFeatureKey; enabled: boolean }
 	| { type: 'SET_STYLE_VALUE'; key: StyleValueKey; value: string }
 	| { type: 'OPEN_SIDEBAR'; tab?: SidepanelTab; focus?: SidepanelFocusTarget };

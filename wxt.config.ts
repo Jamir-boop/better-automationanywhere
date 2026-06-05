@@ -8,7 +8,7 @@ export default defineConfig({
 	targetBrowsers: ['chrome', 'firefox'],
 	manifest: ({ browser }) => ({
 		name: 'Better AA Developer Experience',
-		version: '1.0.0',
+		version: '1.1.1',
 		description: 'Better AA Developer Experience for Automation Anywhere.',
 		author: 'jamir-boop',
 		permissions: [
@@ -49,14 +49,14 @@ export default defineConfig({
 				? {
 						'_execute_sidebar_action': {
 							suggested_key: {
-								default: 'Ctrl+Shift+L',
+								default: 'Alt+Shift+L',
 							},
 						},
 					}
 				: {
 						'open-sidebar': {
 							suggested_key: {
-								default: 'Ctrl+Shift+L',
+								default: 'Alt+Shift+L',
 							},
 							description: 'Open extension sidebar',
 						},

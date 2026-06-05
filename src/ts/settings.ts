@@ -2,15 +2,25 @@ import { storage } from '#imports';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.0.0';
+export const EXTENSION_VERSION = '1.1.1';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',
 	SLASH: 'slash',
 } as const;
 
+export const OPEN_SIDEBAR_SHORTCUTS = {
+	ALT_SHIFT_L: 'alt+shift+l',
+	CTRL_SHIFT_L: 'ctrl+shift+l',
+	ALT_SHIFT_S: 'alt+shift+s',
+	ALT_SHIFT_O: 'alt+shift+o',
+	CTRL_SHIFT_SPACE: 'ctrl+shift+space',
+} as const;
+
 export type CommandPaletteShortcut =
 	(typeof COMMAND_PALETTE_SHORTCUTS)[keyof typeof COMMAND_PALETTE_SHORTCUTS];
+export type OpenSidebarShortcut =
+	(typeof OPEN_SIDEBAR_SHORTCUTS)[keyof typeof OPEN_SIDEBAR_SHORTCUTS];
 
 export const stylesEnabled = storage.defineItem<boolean>('local:stylesEnabled');
 export const runButton = storage.defineItem<boolean>('local:runButton');
@@ -20,6 +30,9 @@ export const debugEnabled = storage.defineItem<boolean>('local:debugEnabled');
 export const commandPaletteShortcut = storage.defineItem<CommandPaletteShortcut>(
 	'local:commandPaletteShortcut'
 );
+export const openSidebarShortcut = storage.defineItem<OpenSidebarShortcut>(
+	'local:openSidebarShortcut'
+);
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;
@@ -27,6 +40,22 @@ export const DEFAULT_SOUNDS_ENABLED = false;
 export const DEFAULT_SHOW_SUGGESTIONS = true;
 export const DEFAULT_DEBUG_ENABLED = false;
 export const DEFAULT_COMMAND_PALETTE_SHORTCUT = COMMAND_PALETTE_SHORTCUTS.ALT_P;
+export const DEFAULT_OPEN_SIDEBAR_SHORTCUT = OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L;
+
+export const OPEN_SIDEBAR_SHORTCUT_LABELS: Record<OpenSidebarShortcut, string> = {
+	[OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L]: 'Alt + Shift + L',
+	[OPEN_SIDEBAR_SHORTCUTS.CTRL_SHIFT_L]: 'Ctrl + Shift + L',
+	[OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_S]: 'Alt + Shift + S',
+	[OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_O]: 'Alt + Shift + O',
+	[OPEN_SIDEBAR_SHORTCUTS.CTRL_SHIFT_SPACE]: 'Ctrl + Shift + Space',
+};
+
+export const OPEN_SIDEBAR_SHORTCUT_OPTIONS = Object.values(
+	OPEN_SIDEBAR_SHORTCUTS
+).map((value) => ({
+	value,
+	label: OPEN_SIDEBAR_SHORTCUT_LABELS[value],
+}));
 
 export const STYLE_FEATURES = [
 	{
@@ -186,14 +215,32 @@ export function normalizeCommandPaletteShortcut(
 		: COMMAND_PALETTE_SHORTCUTS.ALT_P;
 }
 
+export function normalizeOpenSidebarShortcut(
+	value: unknown
+): OpenSidebarShortcut {
+	return Object.values(OPEN_SIDEBAR_SHORTCUTS).includes(
+		value as OpenSidebarShortcut
+	)
+		? (value as OpenSidebarShortcut)
+		: DEFAULT_OPEN_SIDEBAR_SHORTCUT;
+}
+
 export async function getCommandPaletteShortcut(): Promise<CommandPaletteShortcut> {
 	return normalizeCommandPaletteShortcut(await commandPaletteShortcut.getValue());
+}
+
+export async function getOpenSidebarShortcut(): Promise<OpenSidebarShortcut> {
+	return normalizeOpenSidebarShortcut(await openSidebarShortcut.getValue());
 }
 
 export function getCommandPaletteShortcutLabel(
 	value: CommandPaletteShortcut
 ): string {
 	return value === COMMAND_PALETTE_SHORTCUTS.SLASH ? '/' : 'Alt + P';
+}
+
+export function getOpenSidebarShortcutLabel(value: OpenSidebarShortcut): string {
+	return OPEN_SIDEBAR_SHORTCUT_LABELS[value];
 }
 
 export function getStyleFeatureDefault(key: StyleFeatureKey): boolean {
