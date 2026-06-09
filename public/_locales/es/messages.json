@@ -1,0 +1,22 @@
+{
+  "extensionName": {
+    "message": "Better AA Developer Experience",
+    "description": "Extension name"
+  },
+  "extensionShortName": {
+    "message": "Better AA",
+    "description": "Short browser action title"
+  },
+  "extensionDescription": {
+    "message": "Mejoras de experiencia para desarrolladores en Automation Anywhere.",
+    "description": "Extension description"
+  },
+  "openSidebarCommandDescription": {
+    "message": "Abrir panel de la extension",
+    "description": "Command description for opening the sidebar"
+  },
+  "toggleStylesCommandDescription": {
+    "message": "Alternar todos los estilos personalizados",
+    "description": "Command description for toggling injected styles"
+  }
+}

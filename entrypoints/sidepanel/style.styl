@@ -111,9 +111,8 @@ textarea
 		background: var(--accent-hover)
 
 	&.is-active
-		color: var(--text-on-accent)
-		background: var(--accent-active)
-		font-weight: 700
+		outline: 1px solid var(--accent-active)
+		outline-offset: -1px
 
 main
 	display: flex
@@ -155,6 +154,68 @@ main
 	#restoreUserstyleDefaults
 		flex: 0 0 auto
 		font-size: .72rem
+
+.inline-hint
+	margin: -2px 0 0
+	color: var(--text-muted)
+	font-size: .68rem
+	line-height: 1.28
+	overflow-wrap: anywhere
+
+.help-wrapper
+	position: relative
+	display: inline-flex
+	min-width: 0
+
+.help-anchor
+	position: relative
+
+.help-tooltip
+	position: absolute
+	top: calc(100% + 6px)
+	right: 0
+	z-index: 1200
+	width: max-content
+	max-width: 240px
+	padding: 6px 8px
+	color: var(--text)
+	background: var(--surface-0)
+	border: 1px solid var(--border-strong)
+	border-radius: 6px
+	box-shadow: 0 10px 26px rgba(0, 0, 0, .48)
+	font-size: .68rem
+	font-weight: 400
+	line-height: 1.25
+	text-align: left
+	text-transform: none
+	white-space: normal
+	overflow-wrap: anywhere
+	opacity: 0
+	pointer-events: none
+	transform: translateY(-2px)
+	transition: opacity .12s ease, transform .12s ease
+
+.help-wrapper:hover .help-tooltip,
+.help-wrapper:focus-within .help-tooltip,
+.help-anchor:hover + .help-tooltip,
+.help-anchor:focus-visible + .help-tooltip
+	opacity: 1
+	transform: translateY(0)
+
+.button-grid .help-wrapper,
+.tool-action-grid .help-wrapper,
+.tools-action-bar .help-wrapper,
+.slot-row .help-wrapper,
+.upload-row .help-wrapper
+	display: flex
+	width: 100%
+
+.button-grid .help-wrapper > button,
+.tool-action-grid .help-wrapper > button,
+.tools-action-bar .help-wrapper > button,
+.slot-row .help-wrapper > button,
+.upload-row .help-wrapper > button
+	width: 100%
 
 .style-feature-group
 	display: flex
@@ -417,6 +478,10 @@ button
 		padding-right: 6px
 		padding-left: 6px
 
+	.help-tooltip
+		color: var(--text)
+		font-size: .68rem
+
 .slot-state
 	color: var(--text-muted) !important
 	font-size: .68rem !important
@@ -447,23 +512,32 @@ button
 		display: none
 
 .feedback-section
+	gap: 6px
+	padding: 8px
+
+	h2
+		font-size: .74rem
+
+	.section-heading-row
+		gap: 6px
+
 	.feedback-actions
 		display: inline-flex
 		align-items: center
-		gap: 6px
+		gap: 4px
 		flex: 0 0 auto
 
 		button
-			padding: 5px 8px
-			font-size: .72rem
+			padding: 3px 6px
+			font-size: .66rem
 
 		.debug-log-toggle
 			position: relative
 			display: inline-flex
 			align-items: center
 			justify-content: center
-			width: 28px
-			height: 26px
+			width: 24px
+			height: 22px
 			padding: 0
 			font-size: 0
 			line-height: 0
@@ -474,7 +548,7 @@ button
 				top: 50%
 				left: 50%
 				color: currentColor
-				font-size: .9rem
+				font-size: .78rem
 				line-height: 1
 				transform: translate(-50%, -50%)
 
@@ -482,11 +556,11 @@ button
 				content: '▴'
 
 .feedback-list
-	--feedback-row-height: 32px
+	--feedback-row-height: 26px
 	display: flex
 	flex-direction: column
-	gap: 4px
-	max-height: calc(var(--feedback-row-height) * 5 + 16px)
+	gap: 3px
+	max-height: calc(var(--feedback-row-height) * 4 + 12px)
 	overflow: auto
 
 .feedback-section.is-collapsed .feedback-list
@@ -496,22 +570,22 @@ button
 .feedback-empty
 	margin: 0
 	color: var(--text-muted)
-	font-size: .74rem
+	font-size: .68rem
 
 .feedback-line
 	display: grid
-	grid-template-columns: minmax(112px, .55fr) minmax(0, 1fr)
+	grid-template-columns: minmax(96px, .5fr) minmax(0, 1fr)
 	align-items: center
-	gap: 8px
+	gap: 6px
 	min-height: var(--feedback-row-height)
-	padding: 4px 7px
+	padding: 2px 6px
 	border: 1px solid var(--border)
 	border-radius: 6px
 	background: var(--surface-0)
 
 	small
 		color: var(--text-muted)
-		font-size: .58rem
+		font-size: .52rem
 		text-transform: uppercase
 		overflow: hidden
 		text-overflow: ellipsis
@@ -519,8 +593,8 @@ button
 
 	span
 		color: var(--text)
-		font-size: .72rem
-		line-height: 1.25
+		font-size: .68rem
+		line-height: 1.18
 		overflow: hidden
 		text-overflow: ellipsis
 		white-space: nowrap
@@ -610,6 +684,13 @@ button
 	line-height: 1.35
 	overflow-wrap: anywhere
 
+.tools-clipboard-status
+	margin: -4px 0 0
+	color: var(--accent)
+	font-size: .72rem
+	font-weight: 700
+	line-height: 1.25
+
 .tools-refresh-group
 	display: inline-flex
 	align-items: center
@@ -635,6 +716,20 @@ button
 	border-radius: 999px
 	font-size: 1rem
 	line-height: 1
+
+.tools-refresh-button
+	width: 34px
+	height: 34px
+	font-size: 1.22rem
+	font-weight: 800
+
+	span
+		line-height: 1
+
+	&[data-has-tools='false']
+		color: var(--text-on-accent)
+		background: var(--accent)
+		border-color: var(--accent)
 
 .tool-action-grid
 	display: grid

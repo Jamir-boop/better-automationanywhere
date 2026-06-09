@@ -1,5 +1,6 @@
 import * as palette from './palette';
 import { debugInfo } from './debug';
+import { t } from './i18n';
 import * as ui from './ui';
 import { getActiveCommandPaletteShortcutLabel } from './utils';
 
@@ -27,13 +28,13 @@ function showTip(key: string, message: string): void {
 	if (now - lastTipAt < TIP_COOLDOWN_MS) return;
 	shownTips.add(key);
 	lastTipAt = now;
-	ui.showNotification('Tip', message, 4200);
+	ui.showNotification(t('Tip'), message, 4200);
 }
 
 function getCustomPaletteButtonLabel(target: HTMLElement): string {
 	return target
 		.closest<HTMLElement>('.customActionVariableButton')
-		?.textContent?.trim()
+		?.dataset.aaLabel?.trim()
 		.toLowerCase() ?? '';
 }
 
@@ -47,7 +48,7 @@ function handleClick(event: MouseEvent): void {
 			'div.editor-layout__resize:nth-child(2) > button:nth-child(2), button[aria-label="Expand"], button[aria-label="Collapse"]'
 		)
 	) {
-		showTip('editorPalette', 'Tip: toggle editor palette with Ctrl+D.');
+		showTip('editorPalette', t('Tip: toggle editor palette with Ctrl+D.'));
 		return;
 	}
 
@@ -56,7 +57,7 @@ function handleClick(event: MouseEvent): void {
 		customPaletteLabel === 'variables' ||
 		target.closest('button[data-path="EditorPalette.section.button"][aria-label="Variables"]')
 	) {
-		showTip('variables', 'Tip: open variables with Alt+V.');
+		showTip('variables', t('Tip: open variables with Alt+V.'));
 		return;
 	}
 
@@ -66,7 +67,7 @@ function handleClick(event: MouseEvent): void {
 			'div.editor-palette__accordion button[aria-label="Actions"], button[data-path="EditorPalette.section.button"][aria-label="Actions"]'
 		)
 	) {
-		showTip('actions', 'Tip: open actions with Alt+A.');
+		showTip('actions', t('Tip: open actions with Alt+A.'));
 		return;
 	}
 
@@ -75,7 +76,9 @@ function handleClick(event: MouseEvent): void {
 	) {
 		showTip(
 			'commandPalette',
-			`Tip: open command palette with ${getActiveCommandPaletteShortcutLabel()}.`
+			t('Tip: open command palette with {shortcut}.', {
+				shortcut: getActiveCommandPaletteShortcutLabel(),
+			})
 		);
 		return;
 	}
@@ -83,7 +86,9 @@ function handleClick(event: MouseEvent): void {
 	if (palette.isCommandPaletteVisible()) {
 		showTip(
 			'commandPalette',
-			`Tip: open command palette with ${getActiveCommandPaletteShortcutLabel()}.`
+			t('Tip: open command palette with {shortcut}.', {
+				shortcut: getActiveCommandPaletteShortcutLabel(),
+			})
 		);
 	}
 }

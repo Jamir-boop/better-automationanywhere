@@ -1,9 +1,41 @@
 import * as commands from './commands';
 import { debugWarn } from './debug';
+import { t } from './i18n';
 import { escapeHtml } from './utils';
+
+const NOTIFICATION_MIN_DURATION_MS = 8000;
+
+let customEditorPaletteButtonsEnabled = true;
+
+export function setCustomEditorPaletteButtonsEnabled(enabled: boolean): void {
+	customEditorPaletteButtonsEnabled = enabled;
+	syncCustomEditorPaletteButtons();
+}
+
+export function syncCustomEditorPaletteButtons(): void {
+	if (customEditorPaletteButtonsEnabled) {
+		insertCustomEditorPaletteButtons();
+		return;
+	}
+	removeCustomEditorPaletteButtons();
+}
+
+export function removeCustomEditorPaletteButtons(): void {
+	document.getElementById('customActionVariableButtons')?.remove();
+	document.getElementById('customActionVariableButtons-style')?.remove();
+}
+
+export function updateCustomEditorPaletteButtonLabels(): void {
+	document
+		.querySelectorAll<HTMLButtonElement>('#customActionVariableButtons button')
+		.forEach((button) => {
+			if (button.dataset.aaLabel) button.textContent = t(button.dataset.aaLabel);
+		});
+}
 
 export function insertCustomEditorPaletteButtons(): void {
 	if (document.getElementById('customActionVariableButtons')) {
+		updateCustomEditorPaletteButtonLabels();
 		return;
 	}
 	const containerDiv = document.createElement('div');
@@ -11,7 +43,8 @@ export function insertCustomEditorPaletteButtons(): void {
 
 	const variableButton = document.createElement('button');
 	variableButton.className = 'customActionVariableButton';
-	variableButton.textContent = 'Variables';
+	variableButton.dataset.aaLabel = 'Variables';
+	variableButton.textContent = t('Variables');
 	variableButton.onclick = () => {
 		void commands.showVariables();
 		updateActiveButton();
@@ -19,7 +52,8 @@ export function insertCustomEditorPaletteButtons(): void {
 
 	const actionButton = document.createElement('button');
 	actionButton.className = 'customActionVariableButton';
-	actionButton.textContent = 'Actions';
+	actionButton.dataset.aaLabel = 'Actions';
+	actionButton.textContent = t('Actions');
 	actionButton.onclick = () => {
 		void commands.showActions();
 		updateActiveButton();
@@ -27,7 +61,8 @@ export function insertCustomEditorPaletteButtons(): void {
 
 	const triggerButton = document.createElement('button');
 	triggerButton.className = 'customActionVariableButton';
-	triggerButton.textContent = 'Triggers';
+	triggerButton.dataset.aaLabel = 'Triggers';
+	triggerButton.textContent = t('Triggers');
 	triggerButton.onclick = () => {
 		commands.showTriggers();
 		updateActiveButton();
@@ -107,7 +142,10 @@ export function updateActiveButton(): void {
 	)?.innerText;
 	const buttons = document.querySelectorAll('.customActionVariableButton');
 	buttons.forEach((button) => {
-		button.classList.toggle('buttonToolbarActive', button.textContent === activeSection);
+		button.classList.toggle(
+			'buttonToolbarActive',
+			(button as HTMLElement).dataset.aaLabel === activeSection
+		);
 	});
 }
 
@@ -117,11 +155,9 @@ export function ensureNotificationStyles(): void {
 	const style = document.createElement('style');
 	style.id = 'better-aa-toast-style';
 	style.textContent = `
-		@keyframes betterToastInOut {
+		@keyframes betterToastIn {
 			0% { opacity: 0; transform: translateX(-20px); }
-			15% { opacity: 1; transform: translateX(0); }
-			85% { opacity: 1; transform: translateX(0); }
-			100% { opacity: 0; transform: translateX(20px); }
+			100% { opacity: 1; transform: translateX(0); }
 		}
 		#better-aa-toast-host {
 			position: fixed;
@@ -138,7 +174,7 @@ export function ensureNotificationStyles(): void {
 			margin-bottom: 8px;
 			opacity: 0;
 			transform: translateX(-20px);
-			animation: betterToastInOut 3s ease forwards;
+			animation: betterToastIn 180ms ease-out forwards;
 		}
 		#better-aa-toast-host .toast {
 			position: relative;
@@ -149,10 +185,11 @@ export function ensureNotificationStyles(): void {
 			max-inline-size: min(460px, calc(100vw - 24px)) !important;
 			width: 300px !important;
 			padding: 10px 12px;
-			border-radius: 10px;
-			background: #000 !important;
-			color: #fff !important;
-			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+			border: 1px solid #664A00 !important;
+			border-radius: 4px;
+			background: #000000 !important;
+			color: #FFFFFF !important;
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.95) !important;
 			pointer-events: auto;
 		}
 		#better-aa-toast-host .toast-content {
@@ -163,11 +200,11 @@ export function ensureNotificationStyles(): void {
 		}
 		#better-aa-toast-host .toast-title {
 			font-weight: 700;
-			color: #fff !important;
+			color: #FFFFFF !important;
 		}
 		#better-aa-toast-host .toast-message {
 			margin-top: 2px;
-			color: #fff !important;
+			color: #A0A0A0 !important;
 			word-break: break-word;
 		}
 		#better-aa-toast-host .toast-close {
@@ -180,10 +217,10 @@ export function ensureNotificationStyles(): void {
 			min-width: 20px;
 			height: 20px;
 			padding: 0 6px;
-			border: 1px solid #fff !important;
-			border-radius: 6px;
-			background: #000 !important;
-			color: #fff !important;
+			border: 1px solid #FFB900 !important;
+			border-radius: 4px;
+			background: #000000 !important;
+			color: #FFB900 !important;
 			font-size: 14px;
 			font-weight: 700;
 			line-height: 1;
@@ -191,12 +228,12 @@ export function ensureNotificationStyles(): void {
 			transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 		}
 		#better-aa-toast-host .toast-close:hover {
-			background: #fff !important;
-			color: #000 !important;
-			border-color: #000 !important;
+			background: #FFB900 !important;
+			color: #000000 !important;
+			border-color: #FFB900 !important;
 		}
 		#better-aa-toast-host .toast-close:focus-visible {
-			outline: 2px solid #fff;
+			outline: 2px solid #FFB900;
 			outline-offset: 2px;
 		}
 		#better-aa-toast-host .toast-close svg,
@@ -228,7 +265,7 @@ function getNotificationTray(): Element {
 export function showNotification(
 	title: string,
 	message = '',
-	duration = 5000
+	duration = NOTIFICATION_MIN_DURATION_MS
 ): void {
 	ensureNotificationStyles();
 
@@ -241,18 +278,35 @@ export function showNotification(
 				${title ? `<div class="toast-title">${escapeHtml(title)}</div>` : ''}
 				${message ? `<div class="toast-message">${escapeHtml(message)}</div>` : ''}
 			</div>
-			<button type="button" aria-label="Close notification" class="toast-close">×</button>
+			<button type="button" aria-label="${escapeHtml(t('Close notification'))}" class="toast-close">&times;</button>
 		</div>
 	`;
 
+	let closeTimer: ReturnType<typeof setTimeout> | null = null;
 	const close = () => {
 		if (!toastWrapper.isConnected) return;
+		if (closeTimer !== null) {
+			clearTimeout(closeTimer);
+			closeTimer = null;
+		}
 		toastWrapper.remove();
+	};
+	const clearCloseTimer = () => {
+		if (closeTimer === null) return;
+		clearTimeout(closeTimer);
+		closeTimer = null;
+	};
+	const scheduleClose = () => {
+		clearCloseTimer();
+		closeTimer = setTimeout(close, Math.max(duration, NOTIFICATION_MIN_DURATION_MS));
 	};
 
 	toastWrapper.querySelector('.toast-close')?.addEventListener('click', close);
+	const toast = toastWrapper.querySelector('.toast');
+	toast?.addEventListener('mouseenter', clearCloseTimer);
+	toast?.addEventListener('mouseleave', close);
 	tray.prepend(toastWrapper);
-	setTimeout(close, duration);
+	scheduleClose();
 }
 
 export function showToast(message: string, _type = 'alert', duration = 5000): void {

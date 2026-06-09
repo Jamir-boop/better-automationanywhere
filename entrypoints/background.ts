@@ -1,8 +1,8 @@
 import type {
 	AutomationAnywhereApiRequestMessage,
 	AutomationAnywhereApiResponse,
-	BackgroundMessage,
 	ContentActionResponse,
+	RuntimeMessage,
 	SettingsBackgroundMessage,
 } from '../src/ts/messages';
 import {
@@ -15,14 +15,19 @@ import {
 	isAutomationAnywhereUrl,
 } from '../src/ts/automation-anywhere';
 import {
+	blockTaskbotNodeLabelClicks,
+	commandPaletteEnabled,
 	commandPaletteShortcut,
 	debugEnabled,
+	extensionLanguage,
+	forceEnglishLocale,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getStylesEnabled,
 	normalizeCommandPaletteShortcut,
+	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
 	openSidebarShortcut,
 	runButton,
@@ -168,7 +173,6 @@ function openChromeSidePanelFromUserAction(request?: SidebarOpenRequest): void {
 }
 
 async function openSidebar(request?: SidebarOpenRequest): Promise<void> {
-
 	if (import.meta.env.CHROME) {
 		const activeTabs = await browser.tabs.query({ active: true, currentWindow: true });
 		const windowId = activeTabs[0]?.windowId;
@@ -181,17 +185,26 @@ async function openSidebar(request?: SidebarOpenRequest): Promise<void> {
 		return;
 	}
 
+	await writeSidepanelRequest(request);
+	if (!request?.userAction) return;
+
 	const sidebarAction = (browser as any).sidebarAction;
 	try {
-		if (request?.userAction) {
-			await sidebarAction?.toggle?.();
-		} else {
-			await sidebarAction?.open?.();
-		}
+		await sidebarAction?.toggle?.();
 	} catch (error) {
 		reportSidebarOpenBlocked(error, request ? 'OPEN_SIDEBAR' : 'open-sidebar');
 	}
+}
+
+async function handleFirefoxOpenSidebarMessage(
+	request?: SidebarOpenRequest
+): Promise<ContentActionResponse> {
 	await writeSidepanelRequest(request);
+	const shortcut = getOpenSidebarShortcutLabel(await getOpenSidebarShortcut());
+	return {
+		ok: false,
+		error: `Firefox blocks programmatic sidebar open. Use ${shortcut} or toolbar button.`,
+	};
 }
 
 async function setPanelActionBehavior(): Promise<void> {
@@ -243,6 +256,38 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 		await debugEnabled.setValue(message.enabled);
 		void debugInfo('debug', 'Debug setting saved.', { enabled: message.enabled });
 	}
+	if (message.type === 'SET_COMMAND_PALETTE_ENABLED') {
+		await commandPaletteEnabled.setValue(message.enabled);
+		void debugInfo('settings', 'Command palette setting saved.', {
+			enabled: message.enabled,
+		});
+		await broadcastToAutomationTabs(message);
+	}
+	if (message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS') {
+		await blockTaskbotNodeLabelClicks.setValue(message.enabled);
+		void debugInfo('settings', 'Taskbot link click setting saved.', {
+			enabled: message.enabled,
+		});
+		await broadcastToAutomationTabs(message);
+	}
+	if (message.type === 'SET_FORCE_ENGLISH_LOCALE') {
+		await forceEnglishLocale.setValue(message.enabled);
+		void debugInfo('settings', 'Force English locale setting saved.', {
+			enabled: message.enabled,
+		});
+		await broadcastToAutomationTabs(message);
+	}
+	if (message.type === 'SET_EXTENSION_LANGUAGE') {
+		const language = normalizeExtensionLanguage(message.language);
+		await extensionLanguage.setValue(language);
+		void debugInfo('settings', 'Extension language setting saved.', {
+			language,
+		});
+		await broadcastToAutomationTabs({
+			type: 'SET_EXTENSION_LANGUAGE',
+			language,
+		});
+	}
 	if (message.type === 'SET_COMMAND_PALETTE_SHORTCUT') {
 		const shortcut = normalizeCommandPaletteShortcut(message.shortcut);
 		await commandPaletteShortcut.setValue(shortcut);
@@ -289,6 +334,25 @@ async function getExtensionShortcuts(): Promise<{
 			getOpenSidebarShortcutLabel(openSidebar) || FALLBACK_OPEN_SIDEBAR_SHORTCUT,
 		commandPalette: getCommandPaletteShortcutLabel(commandPalette),
 	};
+}
+
+function isSettingsBackgroundMessage(message: RuntimeMessage): message is SettingsBackgroundMessage {
+	return (
+		message.type === 'OPEN_SIDEBAR' ||
+		message.type === 'TOGGLE_STYLES' ||
+		message.type === 'SET_RUN_BUTTON_STYLE' ||
+		message.type === 'SET_SOUNDS_ENABLED' ||
+		message.type === 'SET_SHOW_SUGGESTIONS' ||
+		message.type === 'SET_DEBUG_ENABLED' ||
+		message.type === 'SET_COMMAND_PALETTE_ENABLED' ||
+		message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS' ||
+		message.type === 'SET_FORCE_ENGLISH_LOCALE' ||
+		message.type === 'SET_EXTENSION_LANGUAGE' ||
+		message.type === 'SET_COMMAND_PALETTE_SHORTCUT' ||
+		message.type === 'SET_OPEN_SIDEBAR_SHORTCUT' ||
+		message.type === 'SET_STYLE_FEATURE' ||
+		message.type === 'SET_STYLE_VALUE'
+	);
 }
 
 function getNativeOpenSidebarCommandName(): string {
@@ -449,8 +513,9 @@ export default defineBackground(() => {
 		}
 	});
 
-	browser.runtime.onMessage.addListener((message: BackgroundMessage, sender) => {
+	browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 		if (!message || typeof message.type !== 'string') return;
+		if (message.type === 'AA_ROUTE_CHANGED') return;
 		if (
 			message.type === 'OPEN_SIDEBAR' &&
 			import.meta.env.CHROME &&
@@ -462,8 +527,15 @@ export default defineBackground(() => {
 				userAction: true,
 			});
 		}
+		if (message.type === 'OPEN_SIDEBAR' && import.meta.env.FIREFOX) {
+			return handleFirefoxOpenSidebarMessage({
+				tab: message.tab,
+				focus: message.focus,
+			});
+		}
 		if (message.type === 'AA_API_REQUEST') return handleApiRequest(message);
 		if (message.type === 'GET_EXTENSION_SHORTCUTS') return getExtensionShortcuts();
+		if (!isSettingsBackgroundMessage(message)) return;
 		void handleSettingsMessage(message).catch((error) => {
 			void debugError('background', 'Settings message failed.', {
 				error,

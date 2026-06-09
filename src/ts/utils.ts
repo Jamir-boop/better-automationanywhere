@@ -1,8 +1,11 @@
 import { openSidebarCommandPalette, showActions, showVariables } from './commands';
 import { debugWarn } from './debug';
+import { t } from './i18n';
 import * as palette from './palette';
 import {
 	COMMAND_PALETTE_SHORTCUTS,
+	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
+	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_COMMAND_PALETTE_SHORTCUT,
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
 	OPEN_SIDEBAR_SHORTCUTS,
@@ -14,8 +17,10 @@ import * as ui from './ui';
 
 let activeCommandPaletteShortcut: CommandPaletteShortcut =
 	DEFAULT_COMMAND_PALETTE_SHORTCUT;
+let activeCommandPaletteEnabled = DEFAULT_COMMAND_PALETTE_ENABLED;
 let activeOpenSidebarShortcut: OpenSidebarShortcut =
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT;
+let activeBlockTaskbotNodeLabelClicks = DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS;
 
 interface SelectorDebugOptions {
 	feedback?: boolean;
@@ -27,8 +32,17 @@ export function setActiveCommandPaletteShortcut(shortcut: CommandPaletteShortcut
 	activeCommandPaletteShortcut = shortcut;
 }
 
+export function setActiveCommandPaletteEnabled(value: boolean): void {
+	activeCommandPaletteEnabled = value;
+	if (!value) palette.closeCommandPalette();
+}
+
 export function setActiveOpenSidebarShortcut(shortcut: OpenSidebarShortcut): void {
 	activeOpenSidebarShortcut = shortcut;
+}
+
+export function setActiveBlockTaskbotNodeLabelClicks(value: boolean): void {
+	activeBlockTaskbotNodeLabelClicks = value;
 }
 
 export function getActiveCommandPaletteShortcutLabel(): string {
@@ -211,6 +225,7 @@ export function registerKeyboardShortcuts(): void {
 	document.addEventListener(
 		'click',
 		(e) => {
+			if (!activeBlockTaskbotNodeLabelClicks) return;
 			const target = e.target as HTMLElement | null;
 			const nodeLink = target?.closest?.(
 				'.taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]'
@@ -241,6 +256,7 @@ export function registerKeyboardShortcuts(): void {
 	});
 
 	document.addEventListener('keydown', (e) => {
+		if (import.meta.env.FIREFOX) return;
 		if (isOpenSidebarShortcutPressed(e)) {
 			e.preventDefault();
 			openSidebarCommandPalette();
@@ -248,10 +264,11 @@ export function registerKeyboardShortcuts(): void {
 	});
 
 	document.addEventListener('keydown', (e) => {
+		if (!activeCommandPaletteEnabled) return;
 		if (isCommandPaletteShortcutPressed(e)) {
 			e.preventDefault();
 			palette.insertCommandPalette();
-			ui.insertCustomEditorPaletteButtons();
+			ui.syncCustomEditorPaletteButtons();
 			palette.togglePaletteVisibility();
 		}
 	});
@@ -310,8 +327,8 @@ export function ensureEnglishLocale(): void {
 	const lng = localStorage.getItem('i18nextLng');
 	if (lng !== 'en-US') {
 		ui.showNotification(
-			'Language changed',
-			'For correct functioning of this extension, the language will be set to English (en-US). The page will reload.',
+			t('Language changed'),
+			t('For correct functioning of this extension, the language will be set to English (en-US). The page will reload.'),
 			3600
 		);
 		localStorage.setItem('i18nextLng', 'en-US');

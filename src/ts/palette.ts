@@ -1,24 +1,26 @@
 import * as command from './commands';
 import { getCommandsWithNavigation } from './commands';
 import { debugError } from './debug';
+import { t } from './i18n';
 import * as utils from './utils';
 
 let activePredictionIndex = -1;
 
 export function insertCommandPalette(retryCount = 0): void {
 	if (document.querySelector('#commandPalette')) {
+		updateCommandPaletteLanguage();
 		return;
 	}
 	const containerDiv = document.createElement('div');
 	containerDiv.id = 'commandPalette';
 	containerDiv.className = 'command_palette--hidden';
 	containerDiv.hidden = true;
+	containerDiv.style.display = 'none';
 	containerDiv.setAttribute('aria-hidden', 'true');
 	containerDiv.innerHTML = `
-		<input type="text" id="commandInput" placeholder="Enter command...">
-		<div id="commandPredictions" class="command_predictions"></div>
+		<input type="text" id="commandInput" placeholder="${utils.escapeHtml(t('Search commands...'))}" aria-label="${utils.escapeHtml(t('Search commands'))}">
+		<div id="commandPredictions" class="command_predictions" role="listbox"></div>
 	`;
-	document.body.appendChild(containerDiv);
 
 	if (!document.getElementById('commandPalette-style')) {
 		const style = document.createElement('style');
@@ -29,8 +31,6 @@ export function insertCommandPalette(retryCount = 0): void {
 				#commandPalette,
 				#commandPalette * {
 					box-sizing: border-box !important;
-					color: #000 !important;
-					font-size: 1.15rem !important;
 					font-family: Museo Sans, Arial, sans-serif !important;
 					letter-spacing: 0 !important;
 				}
@@ -39,60 +39,97 @@ export function insertCommandPalette(retryCount = 0): void {
 					top: 50%;
 					left: 50%;
 					transform: translate(-50%, -50%);
-					background-color: #fff !important;
-					color: #000 !important;
-					border-radius: 8px 8px 0 0;
-					display: flex !important;
+					background-color: #000000 !important;
+					color: #FFFFFF !important;
+					border: 1px solid #664A00;
+					border-radius: 4px;
+					display: flex;
 					flex-direction: column;
-					align-items: center;
-					min-width: 30vw;
-					max-width: 80vw;
-					width: 600px;
+					align-items: stretch;
+					width: min(640px, calc(100vw - 32px));
+					max-width: calc(100vw - 32px);
 					z-index: 99999 !important;
-					box-shadow: 0 0 0 5000px #00000054;
+					box-shadow: 0 24px 80px rgba(0, 0, 0, 0.95);
 				}
 				#commandInput, #commandInput:focus-visible, #commandInput:active {
 					all: unset;
-					background-color: #fff !important;
-					color: #000 !important;
-					caret-color: #000 !important;
-					padding: 10px;
-					width: 93%;
-					margin-bottom: 10px;
-					border: 2px solid transparent;
-					border-radius: 5px;
+					background-color: #050505 !important;
+					color: #FFFFFF !important;
+					caret-color: #FFB900 !important;
+					padding: 12px;
+					margin: 12px 12px 8px;
+					border: 1px solid #332500;
+					border-radius: 4px;
+					font-size: 1rem !important;
+					line-height: 1.35;
+				}
+				#commandInput:focus-visible {
+					border-color: #FFB900;
+					outline: 2px solid #FFB900;
+					outline-offset: 2px;
+					box-shadow: none;
 				}
 				#commandInput::placeholder {
-					color: #555 !important;
+					color: #A0A0A0 !important;
 					opacity: 1 !important;
 				}
 				#commandPredictions {
-					position: absolute;
-					top: 100%;
-					left: 0;
 					width: 100%;
-					background-color: #fff !important;
-					color: #000 !important;
-					box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-					border-radius: 0 0 8px 8px;
-					max-height: 200px;
+					background-color: #000000 !important;
+					color: #FFFFFF !important;
+					border-top: 1px solid #332500;
+					border-radius: 0 0 4px 4px;
+					max-height: min(420px, 60vh);
 					overflow-y: auto;
 					z-index: 100000;
+					padding: 6px;
 				}
 				.command_prediction-item {
-					background-color: #fff !important;
-					color: #000 !important;
-					padding: 8px;
+					all: unset;
+					box-sizing: border-box !important;
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) auto;
+					gap: 4px 12px;
+					width: 100%;
+					padding: 10px 12px;
 					cursor: pointer;
-					border-bottom: 1px solid #eee;
+					border: 1px solid transparent;
+					border-radius: 0;
+					background-color: transparent !important;
+					color: #FFFFFF !important;
 				}
 				.command_prediction-item strong {
-					color: #000 !important;
+					display: block;
+					color: #FFFFFF !important;
 					font-weight: bold;
+					font-size: 0.95rem !important;
+					line-height: 1.3;
+				}
+				.command_prediction-description {
+					display: block;
+					margin-top: 2px;
+					color: #A0A0A0 !important;
+					font-size: 0.82rem !important;
+					line-height: 1.35;
+				}
+				.command_prediction-aliases {
+					align-self: center;
+					max-width: 220px;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					white-space: nowrap;
+					color: #A0A0A0 !important;
+					font-size: 0.72rem !important;
 				}
 				.command_prediction-item:hover, .command_prediction-item.active {
-					background-color: #f0f0f0 !important;
-					color: #000 !important;
+					background-color: #FFB900 !important;
+					border-color: #FFB900;
+					color: #000000 !important;
+				}
+				.command_prediction-item:hover *,
+				.command_prediction-item.active * {
+					color: #000000 !important;
+					-webkit-text-fill-color: #000000 !important;
 				}
 				@keyframes fadeIn {
 					from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
@@ -109,6 +146,7 @@ export function insertCommandPalette(retryCount = 0): void {
 		document.head.appendChild(style);
 	}
 
+	document.body.appendChild(containerDiv);
 	setupCommandInputEventListeners();
 
 	if (!document.querySelector('#commandPalette')) {
@@ -120,6 +158,14 @@ export function insertCommandPalette(retryCount = 0): void {
 			}, { feedback: true });
 		}
 	}
+}
+
+export function updateCommandPaletteLanguage(): void {
+	const input = getCommandInput();
+	if (!input) return;
+	input.placeholder = t('Search commands...');
+	input.setAttribute('aria-label', t('Search commands'));
+	updatePredictions(input.value);
 }
 
 export function setupCommandInputEventListeners(): void {
@@ -156,6 +202,7 @@ export function closeCommandPalette(): void {
 	commandPalette.classList.remove('command_palette--visible');
 	commandPalette.classList.add('command_palette--hidden');
 	commandPalette.hidden = true;
+	commandPalette.style.display = 'none';
 	commandPalette.setAttribute('aria-hidden', 'true');
 	if (input) {
 		input.value = '';
@@ -170,42 +217,76 @@ export function clearPredictions(): void {
 	if (predictions) predictions.innerHTML = '';
 }
 
+function createPredictionItem(options: {
+	title: string;
+	description: string;
+	aliases?: readonly string[];
+	action: () => void;
+}): HTMLElement {
+	const predictionItem = document.createElement('button');
+	predictionItem.type = 'button';
+	predictionItem.className = 'command_prediction-item';
+	predictionItem.setAttribute('role', 'option');
+	const aliasText = options.aliases?.length ? options.aliases.join(', ') : '';
+	predictionItem.innerHTML = `
+		<span>
+			<strong>${utils.escapeHtml(options.title)}</strong>
+			<span class="command_prediction-description">${utils.escapeHtml(options.description)}</span>
+		</span>
+		${aliasText ? `<span class="command_prediction-aliases">${utils.escapeHtml(aliasText)}</span>` : ''}
+	`;
+	utils.safeAddClick(predictionItem, options.action);
+	return predictionItem;
+}
+
+function getDisplayAliases(aliases: readonly string[], title: string): string[] {
+	return aliases.filter((alias) => alias !== title).slice(0, 4);
+}
+
 export function updatePredictions(input: string): void {
 	clearPredictions();
-	if (!input) {
-		activePredictionIndex = -1;
-		return;
-	}
 
 	const normalizedInput = utils.normalizeCommandText(input);
 	const jumpToLineMatch = input.match(/^:(\d+)$/);
 	if (jumpToLineMatch) {
 		const lineNumber = parseInt(jumpToLineMatch[1], 10);
-		const predictionItem = document.createElement('div');
-		predictionItem.classList.add('command_prediction-item');
-		predictionItem.innerHTML = `<strong>Go to line ${lineNumber}</strong>`;
-		utils.safeAddClick(predictionItem, () => {
-			command.scrollToLineNumber(lineNumber);
-			clearPredictions();
-			closeCommandPalette();
+		const predictionItem = createPredictionItem({
+			title: t('Go to line {line}', { line: lineNumber }),
+			description: t('Scroll the taskbot editor to a specific line.'),
+			action: () => {
+				command.scrollToLineNumber(lineNumber);
+				clearPredictions();
+				closeCommandPalette();
+			},
 		});
 		getCommandPredictions()?.appendChild(predictionItem);
+		const items = getCommandPredictions()?.getElementsByClassName(
+			'command_prediction-item'
+		);
+		if (items) {
+			activePredictionIndex = 0;
+			updateActivePrediction(items);
+		}
 		return;
 	}
 
 	Object.entries(getCommandsWithNavigation()).forEach(
 		([, { action, aliases, description }]) => {
-			const match = aliases.find((alias) => alias.startsWith(normalizedInput));
+			const match = normalizedInput
+				? aliases.find((alias) => alias.startsWith(normalizedInput))
+				: aliases[0];
 			if (!match) return;
 
-			const predictionItem = document.createElement('div');
-			predictionItem.classList.add('command_prediction-item');
-			predictionItem.innerHTML = `<strong>${utils.escapeHtml(match)}</strong> - ${utils.escapeHtml(description)}`;
-			utils.safeAddClick(predictionItem, () => {
-				const inputEl = getCommandInput();
-				if (inputEl) inputEl.value = match;
-				executeCommand(action);
-				clearPredictions();
+			const predictionItem = createPredictionItem({
+				title: match,
+				description,
+				aliases: getDisplayAliases(aliases, match),
+				action: () => {
+					const inputEl = getCommandInput();
+					if (inputEl) inputEl.value = match;
+					executeCommand(action);
+					clearPredictions();
+				},
 			});
 			getCommandPredictions()?.appendChild(predictionItem);
 		}
@@ -292,8 +373,10 @@ export function togglePaletteVisibility(): void {
 	}
 
 	commandPalette.hidden = false;
+	commandPalette.style.removeProperty('display');
 	commandPalette.setAttribute('aria-hidden', 'false');
 	commandPalette.classList.remove('command_palette--hidden');
 	commandPalette.classList.add('command_palette--visible');
+	updatePredictions(input?.value ?? '');
 	input?.focus();
 }

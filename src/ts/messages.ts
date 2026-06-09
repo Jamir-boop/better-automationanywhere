@@ -1,5 +1,6 @@
 import type {
 	CommandPaletteShortcut,
+	LanguagePreference,
 	OpenSidebarShortcut,
 	StyleFeatureKey,
 	StyleValueKey,
@@ -40,6 +41,10 @@ export type SettingsBackgroundMessage =
 	| { type: 'SET_SOUNDS_ENABLED'; enabled: boolean }
 	| { type: 'SET_SHOW_SUGGESTIONS'; enabled: boolean }
 	| { type: 'SET_DEBUG_ENABLED'; enabled: boolean }
+	| { type: 'SET_COMMAND_PALETTE_ENABLED'; enabled: boolean }
+	| { type: 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS'; enabled: boolean }
+	| { type: 'SET_FORCE_ENGLISH_LOCALE'; enabled: boolean }
+	| { type: 'SET_EXTENSION_LANGUAGE'; language: LanguagePreference }
 	| { type: 'SET_COMMAND_PALETTE_SHORTCUT'; shortcut: CommandPaletteShortcut }
 	| { type: 'SET_OPEN_SIDEBAR_SHORTCUT'; shortcut: OpenSidebarShortcut }
 	| { type: 'SET_STYLE_FEATURE'; key: StyleFeatureKey; enabled: boolean }
@@ -55,10 +60,16 @@ export type ExtensionShortcutsMessage = {
 	type: 'GET_EXTENSION_SHORTCUTS';
 };
 
+export type RouteChangedMessage = {
+	type: 'AA_ROUTE_CHANGED';
+	url: string;
+};
+
 export type BackgroundMessage =
 	| SettingsBackgroundMessage
 	| AutomationAnywhereApiRequestMessage
-	| ExtensionShortcutsMessage;
+	| ExtensionShortcutsMessage
+	| RouteChangedMessage;
 
 export type ContentActionMessage =
 	| { type: 'COPY_TO_SLOT'; slot: number }

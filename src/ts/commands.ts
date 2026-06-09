@@ -1,6 +1,8 @@
 import * as cb from './clipboard';
 import { debugError, debugWarn } from './debug';
-import { COMMAND_HELP, renderHelpHtml } from './help';
+import { getCommandHelp, renderHelpHtml } from './help';
+import { t } from './i18n';
+import type { ContentActionResponse } from './messages';
 import type { SidepanelFocusTarget, SidepanelTab } from './sidepanel-state';
 import * as ui from './ui';
 import * as utils from './utils';
@@ -172,12 +174,19 @@ async function openSidebar(
 	focus?: SidepanelFocusTarget
 ): Promise<void> {
 	try {
-		await browser.runtime.sendMessage({ type: 'OPEN_SIDEBAR', tab, focus });
+		const response = (await browser.runtime.sendMessage({
+			type: 'OPEN_SIDEBAR',
+			tab,
+			focus,
+		})) as ContentActionResponse | undefined;
+		if (response && !response.ok) {
+			ui.showNotification(t('Open sidebar manually'), response.error);
+		}
 	} catch (error) {
 		void debugError('commands', 'Failed to open sidebar.', { error }, {
 			feedback: true,
 		});
-		ui.showNotification('Sidebar failed', 'Could not open extension sidebar.');
+		ui.showNotification(t('Sidebar failed'), t('Could not open extension sidebar.'));
 	}
 }
 
@@ -197,16 +206,19 @@ export async function exportActionToClipboard(): Promise<void> {
 	try {
 		const universalClipboard = await cb.universalCopy();
 		if (!universalClipboard) {
-			ui.showNotification('Export failed', 'Universal clipboard is empty.');
+			ui.showNotification(t('Export failed'), t('Universal clipboard is empty.'));
 			return;
 		}
 		await navigator.clipboard.writeText(universalClipboard);
-		ui.showNotification('Exported', 'Action JSON copied to your clipboard.');
+		ui.showNotification(t('Exported'), t('Action JSON copied to your clipboard.'));
 	} catch (error) {
 		void debugError('clipboard', 'Failed to export action to clipboard.', { error }, {
 			feedback: true,
 		});
-		ui.showNotification('Export failed', 'Could not write action JSON to the clipboard.');
+		ui.showNotification(
+			t('Export failed'),
+			t('Could not write action JSON to the clipboard.')
+		);
 	}
 }
 
@@ -214,52 +226,55 @@ export function importActionFromJson(): void {
 	void openSidebar('tools', 'actionJson');
 }
 
-export const commandsWithAliases: Record<string, Command> = {
-	openSidebar: {
-		action: openSidebarCommandPalette,
-		...COMMAND_HELP.openSidebar,
-	},
-	addVariable: {
-		action: addVariable,
-		...COMMAND_HELP.addVariable,
-	},
-	showActions: {
-		action: showActions,
-		...COMMAND_HELP.showActions,
-	},
-	showVariables: {
-		action: showVariables,
-		...COMMAND_HELP.showVariables,
-	},
-	showTriggers: {
-		action: showTriggers,
-		...COMMAND_HELP.showTriggers,
-	},
-	deleteUnusedVariables: {
-		action: deleteUnusedVariables,
-		...COMMAND_HELP.deleteUnusedVariables,
-	},
-	showHelp: {
-		action: showHelp,
-		...COMMAND_HELP.showHelp,
-	},
-	universalCopy: {
-		action: universalCopyCommandPalette,
-		...COMMAND_HELP.universalCopy,
-	},
-	universalPaste: {
-		action: universalPasteCommandPalette,
-		...COMMAND_HELP.universalPaste,
-	},
-	exportActionToClipboard: {
-		action: exportActionToClipboard,
-		...COMMAND_HELP.exportActionToClipboard,
-	},
-	importActionFromJson: {
-		action: importActionFromJson,
-		...COMMAND_HELP.importActionFromJson,
-	},
-};
+export function getCommandsWithAliases(): Record<string, Command> {
+	const commandHelp = getCommandHelp();
+	return {
+		openSidebar: {
+			action: openSidebarCommandPalette,
+			...commandHelp.openSidebar,
+		},
+		addVariable: {
+			action: addVariable,
+			...commandHelp.addVariable,
+		},
+		showActions: {
+			action: showActions,
+			...commandHelp.showActions,
+		},
+		showVariables: {
+			action: showVariables,
+			...commandHelp.showVariables,
+		},
+		showTriggers: {
+			action: showTriggers,
+			...commandHelp.showTriggers,
+		},
+		deleteUnusedVariables: {
+			action: deleteUnusedVariables,
+			...commandHelp.deleteUnusedVariables,
+		},
+		showHelp: {
+			action: showHelp,
+			...commandHelp.showHelp,
+		},
+		universalCopy: {
+			action: universalCopyCommandPalette,
+			...commandHelp.universalCopy,
+		},
+		universalPaste: {
+			action: universalPasteCommandPalette,
+			...commandHelp.universalPaste,
+		},
+		exportActionToClipboard: {
+			action: exportActionToClipboard,
+			...commandHelp.exportActionToClipboard,
+		},
+		importActionFromJson: {
+			action: importActionFromJson,
+			...commandHelp.importActionFromJson,
+		},
+	};
+}
 
 function addAlias(aliases: string[], value: unknown): void {
 	const alias = utils.normalizeCommandText(value);
@@ -335,7 +350,7 @@ function createNavigationCommand(
 		key,
 		action: () => redirectToPath(path),
 		aliases,
-		description: `Go to ${label}.`,
+		description: t('Go to {label}.', { label }),
 	};
 }
 
@@ -360,7 +375,7 @@ function getSidebarNavigationCommandDefinitions(): Array<Command & { key: string
 }
 
 function getSidebarNavigationCommands(
-	staticAliases = getCommandAliasSet(commandsWithAliases)
+	staticAliases = getCommandAliasSet(getCommandsWithAliases())
 ): Array<Command & { key: string }> {
 	const usedAliases = new Set(staticAliases);
 	return getSidebarNavigationCommandDefinitions().reduce<Array<Command & { key: string }>>(
@@ -377,6 +392,7 @@ function getSidebarNavigationCommands(
 }
 
 export function getCommandsWithNavigation(): Record<string, Command> {
+	const commandsWithAliases = getCommandsWithAliases();
 	const mergedCommands: Record<string, Command> = { ...commandsWithAliases };
 	const staticAliases = getCommandAliasSet(commandsWithAliases);
 
@@ -392,6 +408,7 @@ export function getCommandsWithNavigation(): Record<string, Command> {
 }
 
 export function getHelpHtml(): string {
+	const commandsWithAliases = getCommandsWithAliases();
 	return renderHelpHtml({
 		commands: Object.values(commandsWithAliases),
 		navigationCommands: getSidebarNavigationCommands(),
@@ -413,8 +430,10 @@ async function getOpenSidebarShortcut(): Promise<string> {
 export function showHelp(): void {
 	void getOpenSidebarShortcut().then((shortcut) => {
 		ui.showNotification(
-			'Help',
-			`Open sidebar with ${shortcut}, then go to Settings/About for help.`
+			t('Help'),
+			t('Open sidebar with {shortcut}, then go to Settings/About for help.', {
+				shortcut,
+			})
 		);
 	});
 }

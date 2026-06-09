@@ -1,16 +1,24 @@
-import * as palette from './palette';
 import { refreshSounds } from './sounds';
 import { registerMouseClickSuggestions } from './suggestions';
 import * as ui from './ui';
 import * as utils from './utils';
 
 let initialized = false;
+let forceEnglishLocaleEnabled = true;
+
+export function setCustomPaletteButtonsEnabled(enabled: boolean): void {
+	ui.setCustomEditorPaletteButtonsEnabled(enabled);
+}
+
+export function setForceEnglishLocaleEnabled(enabled: boolean): void {
+	forceEnglishLocaleEnabled = enabled;
+	if (enabled && initialized) {
+		utils.ensureEnglishLocale();
+	}
+}
 
 function injectUi(): void {
-	if (!document.querySelector('#commandPalette')) palette.insertCommandPalette();
-	if (!document.getElementById('customActionVariableButtons')) {
-		ui.insertCustomEditorPaletteButtons();
-	}
+	ui.syncCustomEditorPaletteButtons();
 	ui.removeInlineWidth();
 	refreshSounds();
 }
@@ -19,7 +27,9 @@ function initialize(): void {
 	injectUi();
 
 	if (!initialized) {
-		utils.ensureEnglishLocale();
+		if (forceEnglishLocaleEnabled) {
+			utils.ensureEnglishLocale();
+		}
 		utils.registerKeyboardShortcuts();
 		registerMouseClickSuggestions();
 		setInterval(ui.updateActiveButton, 1000);

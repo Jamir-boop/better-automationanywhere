@@ -17,8 +17,11 @@ import {
 	type AutomationAnywherePageContext,
 	type AutomationAnywherePackage,
 } from '@/src/ts/automation-anywhere-api';
+import { getHelpTipId, renderHelpTip, setHelpTip } from './help';
+import { t } from '@/src/ts/i18n';
 import type {
 	ContentActionResponse,
+	RuntimeMessage,
 	ToolCapabilities,
 } from '@/src/ts/messages';
 import JSZip from 'jszip';
@@ -131,9 +134,12 @@ let lastRawPageLength = 0;
 let copiedFiles: CopiedToolFile[] = [];
 let taskbotJsonFileId: string | null = null;
 let activeToolRun: ToolRunState | null = null;
+let refreshToolsContextTimer: ReturnType<typeof setTimeout> | null = null;
 
 let contextText: HTMLElement;
+let toolsClipboardStatus: HTMLElement;
 let availabilityDot: HTMLElement;
+let refreshButton: HTMLButtonElement;
 let actionsContainer: HTMLElement;
 let universalClipboardSection: HTMLElement;
 let fileSection: HTMLElement;
@@ -143,8 +149,11 @@ let selectAllInput: HTMLInputElement;
 let selectedCountText: HTMLElement;
 let fileList: HTMLElement;
 let primaryActionButton: HTMLButtonElement;
+let primaryActionHelp: HTMLElement;
 let pasteActionButton: HTMLButtonElement;
+let pasteActionWrapper: HTMLElement;
 let loadMoreButton: HTMLButtonElement;
+let toolsActionHint: HTMLElement;
 let toolsProgress: HTMLElement;
 let toolsProgressLabel: HTMLElement;
 let toolsProgressPercent: HTMLElement;
@@ -165,15 +174,23 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 		<section class="tab-panel is-active" role="tabpanel" data-panel="tools">
 			<section class="panel-section">
 				<div class="section-heading-row">
-					<h2>Tools</h2>
+					<h2>${t('Tools')}</h2>
 					<span class="tools-refresh-group">
-						<span id="toolsAvailabilityDot" class="tools-availability-dot" data-available="false" aria-hidden="true"></span>
-						<button id="toolsRefresh" class="icon-button" type="button" aria-label="Refresh tools" title="Refresh tools">
-							<span aria-hidden="true">&#8635;</span>
-						</button>
+						<span class="help-wrapper">
+							<span id="toolsAvailabilityDot" class="tools-availability-dot help-anchor" data-available="false" role="status" tabindex="0" aria-label="${t('Tools unavailable')}" aria-describedby="${getHelpTipId('tools-availability')}"></span>
+							${renderHelpTip('tools-availability', t('Green = tools available. Red = no tools here.'))}
+						</span>
+						<span class="help-wrapper">
+							<button id="toolsRefresh" class="icon-button tools-refresh-button help-anchor" type="button" aria-label="${t('Refresh tools')}" aria-describedby="${getHelpTipId('tools-refresh')}" data-has-tools="false">
+								<span aria-hidden="true">&#8635;</span>
+							</button>
+							${renderHelpTip('tools-refresh', t('Detect tools for current AA page.'))}
+						</span>
 					</span>
 				</div>
-				<p id="toolsContext" class="tools-context">Open Automation Anywhere folder, taskbot, or packages page.</p>
+				<p id="toolsContext" class="tools-context">${t('Open Automation Anywhere folder, taskbot, or packages page.')}</p>
+				<p class="inline-hint">${t('Open an Automation Anywhere folder, taskbot, or Packages page, then refresh.')}</p>
+				<p id="toolsClipboardStatus" class="tools-clipboard-status" hidden></p>
 				<div id="toolsActions" class="tool-action-grid"></div>
 			</section>
 
@@ -183,25 +200,32 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 
 			<section id="toolsFileSection" class="panel-section" hidden>
 				<div class="section-heading-row">
-					<h2 id="toolsListTitle">Files</h2>
-					<span id="toolsSelectedCount" class="tools-count">0 selected</span>
+					<h2 id="toolsListTitle">${t('Files')}</h2>
+					<span id="toolsSelectedCount" class="tools-count">${t('0 selected')}</span>
 				</div>
 				<div class="tools-list-toolbar">
-					<input id="toolsSearch" type="text" placeholder="Search files" autocomplete="off">
+					<input id="toolsSearch" type="text" placeholder="${t('Search files')}" autocomplete="off">
 					<label class="tools-select-all">
 						<input id="toolsSelectAll" type="checkbox">
-						<span>Select visible</span>
+						<span>${t('Select visible')}</span>
 					</label>
 				</div>
 				<div id="toolsFileList" class="tools-file-list"></div>
-				<button id="toolsLoadMore" type="button" hidden>Load more</button>
+				<button id="toolsLoadMore" type="button" hidden>${t('Load more')}</button>
+				<p id="toolsActionHint" class="inline-hint" hidden></p>
 				<div class="tools-action-bar">
-					<button id="toolsPrimaryAction" type="button" disabled>Run</button>
-					<button id="toolsPasteAction" type="button" hidden>Paste copied files</button>
+					<span class="help-wrapper">
+						<button id="toolsPrimaryAction" class="help-anchor" type="button" disabled aria-describedby="${getHelpTipId('tools-primary-action')}">${t('Run')}</button>
+						<span id="${getHelpTipId('tools-primary-action')}" class="help-tooltip" role="tooltip">${t('Run selected tool action.')}</span>
+					</span>
+					<span class="help-wrapper" id="toolsPasteActionWrapper">
+						<button id="toolsPasteAction" class="help-anchor" type="button" hidden aria-describedby="${getHelpTipId('tools-paste-action')}">${t('Paste copied files')}</button>
+						${renderHelpTip('tools-paste-action', t('Paste into this folder. Duplicates are skipped.'))}
+					</span>
 				</div>
 				<div id="toolsProgress" class="tools-progress" hidden aria-live="polite">
 					<div class="tools-progress-meta">
-						<span id="toolsProgressLabel">Idle</span>
+						<span id="toolsProgressLabel">${t('Idle')}</span>
 						<span id="toolsProgressPercent">0%</span>
 					</div>
 					<div id="toolsProgressBar" class="tools-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -210,27 +234,38 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				</div>
 				<div id="toolsFinishModal" class="tools-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="toolsFinishTitle" hidden>
 					<div class="tools-modal">
-						<h2 id="toolsFinishTitle">Tool finished</h2>
+						<h2 id="toolsFinishTitle">${t('Tool finished')}</h2>
 						<p id="toolsFinishSummary"></p>
 						<div id="toolsFinishLog" class="tools-finish-log"></div>
-						<button id="toolsFinishClose" type="button">Close</button>
+						<button id="toolsFinishClose" type="button">${t('Close')}</button>
 					</div>
 				</div>
 			</section>
 
 			<section id="taskbotJsonSection" class="panel-section" hidden>
 				<div class="section-heading-row">
-					<h2>Taskbot JSON</h2>
+					<h2>${t('Taskbot JSON')}</h2>
 					<span id="taskbotJsonMeta" class="tools-count"></span>
 				</div>
+				<p class="inline-hint">${t('Advanced: saves raw bot content back to Control Room.')}</p>
 				<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false" aria-describedby="taskbotJsonError"></textarea>
 				<p id="taskbotJsonError" class="json-inline-error" hidden></p>
 				<div class="button-grid">
-					<button id="taskbotLoadJson" type="button">Load from Control Room</button>
-					<button id="taskbotCopyJson" type="button">Copy to clipboard</button>
-					<button id="taskbotFormatJson" type="button">Format</button>
+					<span class="help-wrapper">
+						<button id="taskbotLoadJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-load-json')}">${t('Load from Control Room')}</button>
+						${renderHelpTip('taskbot-load-json', t('Load current taskbot content JSON.'))}
+					</span>
+					<span class="help-wrapper">
+						<button id="taskbotCopyJson" type="button">${t('Copy to clipboard')}</button>
+					</span>
+					<span class="help-wrapper">
+						<button id="taskbotFormatJson" type="button">${t('Format')}</button>
+					</span>
 				</div>
-				<button id="taskbotSaveJson" type="button">Save JSON</button>
+				<span class="help-wrapper">
+					<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
+					${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
+				</span>
 			</section>
 
 		</section>
@@ -240,7 +275,9 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 export function initializeToolsPanel(initOptions: InitializeToolsOptions): void {
 	options = initOptions;
 	contextText = getRequiredElement('#toolsContext');
+	toolsClipboardStatus = getRequiredElement('#toolsClipboardStatus');
 	availabilityDot = getRequiredElement('#toolsAvailabilityDot');
+	refreshButton = getRequiredElement<HTMLButtonElement>('#toolsRefresh');
 	actionsContainer = getRequiredElement('#toolsActions');
 	universalClipboardSection = getRequiredElement('#universalClipboardSection');
 	fileSection = getRequiredElement('#toolsFileSection');
@@ -250,8 +287,11 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	selectedCountText = getRequiredElement('#toolsSelectedCount');
 	fileList = getRequiredElement('#toolsFileList');
 	primaryActionButton = getRequiredElement<HTMLButtonElement>('#toolsPrimaryAction');
+	primaryActionHelp = getRequiredElement(`#${getHelpTipId('tools-primary-action')}`);
 	pasteActionButton = getRequiredElement<HTMLButtonElement>('#toolsPasteAction');
+	pasteActionWrapper = getRequiredElement('#toolsPasteActionWrapper');
 	loadMoreButton = getRequiredElement<HTMLButtonElement>('#toolsLoadMore');
+	toolsActionHint = getRequiredElement('#toolsActionHint');
 	toolsProgress = getRequiredElement('#toolsProgress');
 	toolsProgressLabel = getRequiredElement('#toolsProgressLabel');
 	toolsProgressPercent = getRequiredElement('#toolsProgressPercent');
@@ -267,7 +307,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	taskbotJsonMeta = getRequiredElement('#taskbotJsonMeta');
 	taskbotJsonError = getRequiredElement('#taskbotJsonError');
 
-	getRequiredElement<HTMLButtonElement>('#toolsRefresh').addEventListener('click', () => {
+	refreshButton.addEventListener('click', () => {
 		void refreshToolsContext();
 	});
 	searchInput.addEventListener('input', renderFileList);
@@ -300,6 +340,20 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	getRequiredElement<HTMLButtonElement>('#taskbotSaveJson').addEventListener('click', () => {
 		void saveTaskbotJson();
 	});
+	browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
+		if (message.type !== 'AA_ROUTE_CHANGED') return;
+		if (sender.tab?.active === false) return;
+		scheduleToolsContextRefresh();
+	});
+	browser.tabs.onActivated.addListener(() => {
+		scheduleToolsContextRefresh();
+	});
+	browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+		if (!changeInfo.url && changeInfo.status !== 'complete') return;
+		void browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+			if (tab?.id === tabId) scheduleToolsContextRefresh();
+		});
+	});
 
 	void refreshToolsContext();
 }
@@ -315,6 +369,28 @@ function setToolStatus(
 	severity: FeedbackSeverity = 'info'
 ): void {
 	options.setStatus(message, severity, 'tools');
+}
+
+function scheduleToolsContextRefresh(): void {
+	if (refreshToolsContextTimer) clearTimeout(refreshToolsContextTimer);
+	refreshToolsContextTimer = setTimeout(() => {
+		refreshToolsContextTimer = null;
+		void refreshToolsContext();
+	}, 250);
+}
+
+function updateCopiedFilesStatus(): void {
+	if (!copiedFiles.length) {
+		toolsClipboardStatus.hidden = true;
+		toolsClipboardStatus.textContent = '';
+		return;
+	}
+	const label = copiedFiles.length === 1 ? t('file') : t('files');
+	toolsClipboardStatus.textContent = t('{count} {label} in clipboard.', {
+		count: copiedFiles.length,
+		label,
+	});
+	toolsClipboardStatus.hidden = false;
 }
 
 function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void {
@@ -372,17 +448,20 @@ function showToolFinishModal(
 ): void {
 	toolsFinishTitle.textContent =
 		severity === 'error'
-			? `${run.title} failed`
+			? t('{title} failed', { title: run.title })
 			: severity === 'warn'
-				? `${run.title} finished with warnings`
-				: `${run.title} finished`;
+				? t('{title} finished with warnings', { title: run.title })
+				: t('{title} finished', { title: run.title });
 	const seconds = Math.max(0, Math.round((Date.now() - run.startedAt) / 1000));
-	toolsFinishSummary.textContent = `${summary} Duration: ${seconds}s.`;
+	toolsFinishSummary.textContent = t('{summary} Duration: {seconds}s.', {
+		summary,
+		seconds,
+	});
 	toolsFinishLog.textContent = '';
 	if (!run.lines.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-finish-empty';
-		empty.textContent = 'No actions recorded.';
+		empty.textContent = t('No actions recorded.');
 		toolsFinishLog.appendChild(empty);
 	} else {
 		for (const line of run.lines) {
@@ -415,7 +494,13 @@ function setBusy(button: HTMLButtonElement, busy: boolean, label?: string): void
 
 function updateAvailabilityDot(hasTools: boolean): void {
 	availabilityDot.dataset.available = String(hasTools);
-	availabilityDot.title = hasTools ? 'Tools available' : 'No tools available';
+	availabilityDot.setAttribute(
+		'aria-label',
+		hasTools
+			? t('Tools available on current page')
+			: t('No tools available on current page')
+	);
+	refreshButton.dataset.hasTools = String(hasTools);
 }
 
 function isFolderTool(
@@ -447,6 +532,7 @@ async function refreshToolsContext(): Promise<void> {
 	taskbotJson.value = '';
 	validateTaskbotJson();
 	taskbotJsonFileId = null;
+	updateCopiedFilesStatus();
 	updateAvailabilityDot(false);
 
 	try {
@@ -455,7 +541,7 @@ async function refreshToolsContext(): Promise<void> {
 			runtime = null;
 			currentTool = null;
 			contextText.textContent =
-				'Unsupported page. Open Automation Anywhere folder, taskbot, or packages page.';
+				t('Unsupported page. Open Automation Anywhere folder, taskbot, or packages page.');
 			setSelectedToolPanel(null);
 			renderActionButtons();
 			return;
@@ -473,9 +559,18 @@ async function refreshToolsContext(): Promise<void> {
 		updateAvailabilityDot(tools.length > 0);
 
 		if (isFolderContext(active.context)) {
-			currentTool = null;
-			setSelectedToolPanel(null);
+			const shouldSuggestPaste = canPasteCopiedFilesInContext(active.context);
+			currentTool = shouldSuggestPaste ? 'copy-files' : null;
+			setSelectedToolPanel(currentTool);
 			renderActionButtons();
+			if (shouldSuggestPaste) {
+				await loadListPage(true);
+				setToolStatus(
+					t('{count} file(s) in clipboard. Paste available.', {
+						count: copiedFiles.length,
+					})
+				);
+			}
 			return;
 		}
 
@@ -487,7 +582,7 @@ async function refreshToolsContext(): Promise<void> {
 		currentTool = null;
 		setSelectedToolPanel(null);
 		contextText.textContent =
-			error instanceof Error ? error.message : 'Tools context failed.';
+			error instanceof Error ? error.message : t('Tools context failed.');
 		setToolStatus(contextText.textContent, 'error');
 	}
 }
@@ -507,21 +602,33 @@ async function getToolCapabilities(tabId: number): Promise<ToolCapabilities> {
 
 function getContextLabel(context: AutomationAnywherePageContext): string {
 	if (context.pageType === 'private-folder') {
-		return `Private folder ${context.folderId} on ${context.hostname}`;
+		return t('Private folder {id} on {host}', {
+			id: context.folderId ?? '',
+			host: context.hostname,
+		});
 	}
 	if (context.pageType === 'public-folder') {
-		return `Public folder ${context.folderId} on ${context.hostname}`;
+		return t('Public folder {id} on {host}', {
+			id: context.folderId ?? '',
+			host: context.hostname,
+		});
 	}
 	if (context.pageType === 'private-taskbot') {
-		return `Private taskbot ${context.fileId} on ${context.hostname}`;
+		return t('Private taskbot {id} on {host}', {
+			id: context.fileId ?? '',
+			host: context.hostname,
+		});
 	}
 	if (context.pageType === 'public-taskbot') {
-		return `Public taskbot ${context.fileId} on ${context.hostname}`;
+		return t('Public taskbot {id} on {host}', {
+			id: context.fileId ?? '',
+			host: context.hostname,
+		});
 	}
 	if (context.pageType === 'packages') {
-		return `Packages on ${context.hostname}`;
+		return t('Packages on {host}', { host: context.hostname });
 	}
-	return 'Unsupported page.';
+	return t('Unsupported page.');
 }
 
 function isFolderContext(context: AutomationAnywherePageContext): boolean {
@@ -554,12 +661,41 @@ function getAvailableTools(
 }
 
 function getToolLabel(tool: ToolId): string {
-	if (tool === 'universal-clipboard') return 'Universal Clipboard';
-	if (tool === 'copy-files') return 'Copy Files';
-	if (tool === 'update-packages') return 'Update Packages';
-	if (tool === 'export-bots') return 'Export Bots';
-	if (tool === 'download-packages') return 'Download Packages';
-	return 'Taskbot JSON';
+	if (tool === 'universal-clipboard') return t('Universal Clipboard');
+	if (tool === 'copy-files') return t('Copy Files');
+	if (tool === 'update-packages') return t('Update Packages');
+	if (tool === 'export-bots') return t('Export Bots');
+	if (tool === 'download-packages') return t('Download Packages');
+	return t('Taskbot JSON');
+}
+
+function getToolActionHelp(tool: ToolId): string {
+	if (tool === 'universal-clipboard') return t('Use saved AA clipboard slots.');
+	if (tool === 'copy-files') return t('Copy file references inside this extension.');
+	if (tool === 'update-packages') return t('Apply default package versions to selected bots.');
+	if (tool === 'export-bots') return t('Export selected taskbots from this folder.');
+	if (tool === 'download-packages') return t('Download packages from this page.');
+	return t('Load and edit raw taskbot JSON.');
+}
+
+function getPrimaryActionHelp(tool: ToolId | null): string {
+	if (tool === 'copy-files') return t('Store selected file references inside extension.');
+	if (tool === 'update-packages') return t('Update selected bots using default package versions.');
+	if (tool === 'export-bots') return t('Export selected bots into a ZIP file.');
+	if (tool === 'download-packages') return t('Download selected package JAR files.');
+	return t('Run selected tool action.');
+}
+
+function getToolInlineHint(tool: ToolId | null): string {
+	if (tool === 'copy-files') {
+		return t('Stores file references inside extension. Open another folder on same host to paste.');
+	}
+	if (tool === 'update-packages') {
+		return t('Updates selected taskbots using package defaults from this Control Room.');
+	}
+	if (tool === 'export-bots') return t('Exports selected taskbots and dependencies where available.');
+	if (tool === 'download-packages') return t('Downloads selected packages from the Packages page.');
+	return '';
 }
 
 function renderActionButtons(): void {
@@ -568,15 +704,19 @@ function renderActionButtons(): void {
 	if (!context) return;
 
 	for (const tool of getAvailableTools(context)) {
+		const wrapper = document.createElement('span');
+		wrapper.className = 'help-wrapper';
 		const button = document.createElement('button');
 		button.type = 'button';
 		button.textContent = getToolLabel(tool);
 		button.dataset.toolAction = tool;
 		button.className = tool === currentTool ? 'is-active tool-action-button' : 'tool-action-button';
+		const helpTip = setHelpTip(button, `tool-action-${tool}`, getToolActionHelp(tool));
 		button.addEventListener('click', () => {
 			void selectTool(tool);
 		});
-		actionsContainer.appendChild(button);
+		wrapper.append(button, helpTip);
+		actionsContainer.appendChild(wrapper);
 	}
 }
 
@@ -616,7 +756,7 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 		return;
 	}
 
-	setBusy(loadMoreButton, true, reset ? 'Loading...' : 'Loading more...');
+	setBusy(loadMoreButton, true, reset ? t('Loading...') : t('Loading more...'));
 	if (reset) {
 		loadedItems = [];
 		selectedIds = new Set<string>();
@@ -650,16 +790,16 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 		pruneSelection();
 		renderFileList();
 		setSelectedToolPanel(selectedTool);
-		setToolStatus(`${loadedItems.length} item(s) loaded.`);
+		setToolStatus(t('{count} item(s) loaded.', { count: loadedItems.length }));
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		setToolStatus(
-			error instanceof Error ? error.message : 'Folder list failed.',
+			error instanceof Error ? error.message : t('Folder list failed.'),
 			'error'
 		);
 	} finally {
 		if (runtime === activeRuntime && currentTool === selectedTool) {
-			setBusy(loadMoreButton, false, 'Load more');
+			setBusy(loadMoreButton, false, t('Load more'));
 		}
 	}
 }
@@ -671,7 +811,7 @@ async function loadPackagePage(reset: boolean): Promise<void> {
 		return;
 	}
 
-	setBusy(loadMoreButton, true, reset ? 'Loading...' : 'Loading more...');
+	setBusy(loadMoreButton, true, reset ? t('Loading...') : t('Loading more...'));
 	if (reset) {
 		loadedItems = [];
 		selectedIds = new Set<string>();
@@ -701,16 +841,16 @@ async function loadPackagePage(reset: boolean): Promise<void> {
 		pruneSelection();
 		renderFileList();
 		setSelectedToolPanel(selectedTool);
-		setToolStatus(`${loadedItems.length} package(s) loaded.`);
+		setToolStatus(t('{count} package(s) loaded.', { count: loadedItems.length }));
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		setToolStatus(
-			error instanceof Error ? error.message : 'Package list failed.',
+			error instanceof Error ? error.message : t('Package list failed.'),
 			'error'
 		);
 	} finally {
 		if (runtime === activeRuntime && currentTool === selectedTool) {
-			setBusy(loadMoreButton, false, 'Load more');
+			setBusy(loadMoreButton, false, t('Load more'));
 		}
 	}
 }
@@ -779,11 +919,11 @@ function getToolItemSearchText(item: ToolListItem): string {
 
 function getToolItemMeta(item: ToolListItem): string {
 	if (!isAutomationAnywherePackageItem(item)) return getItemMeta(item);
-	const version = getAutomationAnywherePackageVersion(item) || 'unknown';
+	const version = getAutomationAnywherePackageVersion(item) || t('unknown');
 	const hasDownloadUrl = Boolean(getAutomationAnywherePackageDownloadUrl(item));
 	return hasDownloadUrl
-		? `Version ${version}`
-		: `Version ${version} | missing pkgDownloadUrl`;
+		? t('Version {version}', { version })
+		: t('Version {version} | missing pkgDownloadUrl', { version });
 }
 
 function pruneSelection(): void {
@@ -797,27 +937,30 @@ function renderFileList(): void {
 		getToolItemSearchText(item).toLowerCase().includes(search)
 	);
 	searchInput.placeholder =
-		currentTool === 'download-packages' ? 'Search packages' : 'Search files';
+		currentTool === 'download-packages' ? t('Search packages') : t('Search files');
 
 	listTitle.textContent =
 		currentTool === 'copy-files'
-			? 'Copy Files'
+			? t('Copy Files')
 			: currentTool === 'update-packages'
-				? 'Update Packages'
+				? t('Update Packages')
 				: currentTool === 'export-bots'
-					? 'Export Bots'
-					: 'Download Packages';
-	selectedCountText.textContent = `${selectedIds.size} selected / ${loadedItems.length} loaded`;
+					? t('Export Bots')
+					: t('Download Packages');
+	selectedCountText.textContent = t('{selected} selected / {loaded} loaded', {
+		selected: selectedIds.size,
+		loaded: loadedItems.length,
+	});
 	fileList.textContent = '';
 
 	if (!visible.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-empty';
 		empty.textContent = loadedItems.length
-			? 'No matches.'
+			? t('No matches.')
 			: currentTool === 'download-packages'
-				? 'No packages found.'
-				: 'No files found.';
+				? t('No packages found.')
+				: t('No files found.');
 		fileList.appendChild(empty);
 	}
 
@@ -853,7 +996,7 @@ function renderFileList(): void {
 }
 
 function getItemMeta(item: AutomationAnywhereFile): string {
-	const type = getAutomationAnywhereFileType(item) ?? 'unknown';
+	const type = getAutomationAnywhereFileType(item) ?? t('unknown');
 	const modified = item.lastModified ?? item.modifiedOn ?? item.updatedOn;
 	return modified ? `${type} | ${modified}` : type;
 }
@@ -874,17 +1017,25 @@ function toggleVisibleSelection(): void {
 function updateActionBar(): void {
 	const count = selectedIds.size;
 	primaryActionButton.disabled = count === 0;
-	if (currentTool === 'copy-files') primaryActionButton.textContent = `Copy ${count} file(s)`;
-	if (currentTool === 'update-packages') primaryActionButton.textContent = `Update ${count} bot(s)`;
-	if (currentTool === 'export-bots') primaryActionButton.textContent = `Export ${count} bot(s)`;
+	if (currentTool === 'copy-files') primaryActionButton.textContent = t('Copy {count} file(s)', { count });
+	if (currentTool === 'update-packages') primaryActionButton.textContent = t('Update {count} bot(s)', { count });
+	if (currentTool === 'export-bots') primaryActionButton.textContent = t('Export {count} bot(s)', { count });
 	if (currentTool === 'download-packages') {
-		primaryActionButton.textContent = `Download ${count} package(s)`;
+		primaryActionButton.textContent = t('Download {count} package(s)', { count });
 	}
+	primaryActionHelp.textContent = getPrimaryActionHelp(currentTool);
+
+	const hint = getToolInlineHint(currentTool);
+	toolsActionHint.textContent = hint;
+	toolsActionHint.hidden = !hint;
 
 	const canPaste = canPasteCopiedFiles();
+	pasteActionWrapper.hidden = !canPaste;
 	pasteActionButton.hidden = !canPaste;
 	pasteActionButton.disabled = !canPaste;
-	pasteActionButton.textContent = `Paste ${copiedFiles.length} copied file(s)`;
+	pasteActionButton.textContent = t('Paste {count} copied file(s)', {
+		count: copiedFiles.length,
+	});
 
 	loadMoreButton.hidden = !hasMoreItems();
 }
@@ -931,7 +1082,6 @@ function copySelectedFiles(): void {
 	if (!folderId || !context) return;
 	const items = getSelectedFiles();
 	if (!items.length) return;
-	startToolRun('Copy Files', items.length, `Copying ${items.length} file reference(s)...`);
 	copiedFiles = [];
 	for (let index = 0; index < items.length; index += 1) {
 		const item = items[index];
@@ -942,22 +1092,30 @@ function copySelectedFiles(): void {
 			sourceFolderId: folderId,
 			hostname: context.hostname,
 		});
-		appendToolLog(`Copied reference: ${name}`);
-		setToolProgress(index + 1, items.length, `Copied ${index + 1}/${items.length}`);
 	}
-	const summary = `${copiedFiles.length} file reference(s) copied. Open target folder, then Paste.`;
+	hideToolFinishModal();
+	toolsProgress.hidden = true;
+	updateCopiedFilesStatus();
+	const summary = t('{count} file(s) in clipboard. Open target folder to paste.', {
+		count: copiedFiles.length,
+	});
 	setToolStatus(summary);
-	finishToolRun(summary);
+	void options.addFeedback('info', 'tools', summary, {
+		count: copiedFiles.length,
+		sourceFolderId: folderId,
+	});
 	updateActionBar();
 }
 
 function canPasteCopiedFiles(): boolean {
-	const folderId = getCurrentFolderId();
 	const context = runtime?.context;
+	return Boolean(currentTool === 'copy-files' && context && canPasteCopiedFilesInContext(context));
+}
+
+function canPasteCopiedFilesInContext(context: AutomationAnywherePageContext): boolean {
+	const folderId = context.folderId ? String(context.folderId) : null;
 	return Boolean(
-		currentTool === 'copy-files' &&
-			folderId &&
-			context &&
+		folderId &&
 			copiedFiles.length &&
 			copiedFiles[0].hostname === context.hostname &&
 			copiedFiles[0].sourceFolderId !== folderId
@@ -969,11 +1127,11 @@ async function pasteCopiedFiles(): Promise<void> {
 	const folderId = getCurrentFolderId();
 	if (!activeRuntime || !folderId || !canPasteCopiedFiles()) return;
 
-	setBusy(pasteActionButton, true, 'Pasting...');
+	setBusy(pasteActionButton, true, t('Pasting...'));
 	startToolRun(
-		'Paste Copied Files',
+		t('Paste Copied Files'),
 		copiedFiles.length,
-		`Pasting ${copiedFiles.length} copied file(s)...`
+		t('Pasting {count} copied file(s)...', { count: copiedFiles.length })
 	);
 	try {
 		const destinationItems = await loadAllFolderItems(folderId, true);
@@ -988,11 +1146,14 @@ async function pasteCopiedFiles(): Promise<void> {
 			const item = copiedFiles[index];
 			if (destinationNames.has(item.name.toLowerCase())) {
 				skipped += 1;
-				appendToolLog(`Skipped duplicate: ${item.name}`, 'warn');
+				appendToolLog(t('Skipped duplicate: {name}', { name: item.name }), 'warn');
 				setToolProgress(
 					index + 1,
 					copiedFiles.length,
-					`Processed ${index + 1}/${copiedFiles.length}`
+					t('Processed {count}/{total}', {
+						count: index + 1,
+						total: copiedFiles.length,
+					})
 				);
 				continue;
 			}
@@ -1000,31 +1161,39 @@ async function pasteCopiedFiles(): Promise<void> {
 				await activeRuntime.api.copyFile(item.id, item.name, folderId);
 				copied += 1;
 				destinationNames.add(item.name.toLowerCase());
-				appendToolLog(`Copied: ${item.name}`);
+				appendToolLog(t('Copied: {name}', { name: item.name }));
 			} catch (error) {
 				failed += 1;
 				appendToolLog(
-					`Failed: ${item.name} - ${
-						error instanceof Error ? error.message : 'copy failed'
-					}`,
+					t('Failed: {name} - {message}', {
+						name: item.name,
+						message: error instanceof Error ? error.message : t('copy failed'),
+					}),
 					'error'
 				);
 			}
 			setToolProgress(
 				index + 1,
 				copiedFiles.length,
-				`Processed ${index + 1}/${copiedFiles.length}`
+				t('Processed {count}/{total}', {
+					count: index + 1,
+					total: copiedFiles.length,
+				})
 			);
 		}
 
 		await refreshAutomationAnywhereFolderList(activeRuntime.tabId);
 		await loadFolderPage(true);
-		const summary = `Paste done. Copied ${copied}, skipped ${skipped}, failed ${failed}.`;
+		const summary = t('Paste done. Copied {copied}, skipped {skipped}, failed {failed}.', {
+			copied,
+			skipped,
+			failed,
+		});
 		const severity = failed ? 'warn' : 'info';
 		setToolStatus(summary, severity);
 		finishToolRun(summary, severity);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Paste failed.';
+		const message = error instanceof Error ? error.message : t('Paste failed.');
 		setToolStatus(message, 'error');
 		finishToolRun(message, 'error');
 	} finally {
@@ -1060,18 +1229,22 @@ async function updateSelectedPackages(): Promise<void> {
 	const bots = getSelectedFiles();
 	if (!bots.length) return;
 
-	setBusy(primaryActionButton, true, 'Updating...');
-	startToolRun('Update Packages', bots.length, 'Loading default package versions...');
+	setBusy(primaryActionButton, true, t('Updating...'));
+	startToolRun(
+		t('Update Packages'),
+		bots.length,
+		t('Loading default package versions...')
+	);
 	try {
 		const defaults = await activeRuntime.api.getDefaultPackageVersions();
 		if (!defaults.size) {
-			const message = 'No default package versions found.';
+			const message = t('No default package versions found.');
 			setToolStatus(message, 'error');
 			finishToolRun(message, 'error');
 			return;
 		}
 
-		appendToolLog(`Loaded ${defaults.size} default package version(s).`);
+		appendToolLog(t('Loaded {count} default package version(s).', { count: defaults.size }));
 		let updated = 0;
 		let skipped = 0;
 		let failed = 0;
@@ -1090,30 +1263,43 @@ async function updateSelectedPackages(): Promise<void> {
 				const result = applyPackageVersionsToContent(content, defaults);
 				if (!result.changed) {
 					skipped += 1;
-					appendToolLog(`Skipped: ${botName} - no package change`);
-					setToolProgress(index + 1, bots.length, `Processed ${index + 1}/${bots.length}`);
+					appendToolLog(t('Skipped: {name} - no package change', { name: botName }));
+					setToolProgress(index + 1, bots.length, t('Processed {count}/{total}', {
+						count: index + 1,
+						total: bots.length,
+					}));
 					continue;
 				}
 				await activeRuntime.api.updateBotContent(fileId, result.content);
 				updated += 1;
-				appendToolLog(`Updated: ${botName} - ${changes.length} package(s)`);
+				appendToolLog(t('Updated: {name} - {count} package(s)', {
+					name: botName,
+					count: changes.length,
+				}));
 			} catch (error) {
 				failed += 1;
 				appendToolLog(
-					`Failed: ${botName} - ${
-						error instanceof Error ? error.message : 'update failed'
-					}`,
+					t('Failed: {name} - {message}', {
+						name: botName,
+						message: error instanceof Error ? error.message : t('update failed'),
+					}),
 					'error'
 				);
 			}
-			setToolProgress(index + 1, bots.length, `Processed ${index + 1}/${bots.length}`);
+			setToolProgress(index + 1, bots.length, t('Processed {count}/{total}', {
+				count: index + 1,
+				total: bots.length,
+			}));
 		}
-		const summary = `Update packages done. Updated ${updated}, skipped ${skipped}, failed ${failed}.`;
+		const summary = t(
+			'Update packages done. Updated {updated}, skipped {skipped}, failed {failed}.',
+			{ updated, skipped, failed }
+		);
 		const severity = failed ? 'warn' : 'info';
 		setToolStatus(summary, severity);
 		finishToolRun(summary, severity);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Update packages failed.';
+		const message = error instanceof Error ? error.message : t('Update packages failed.');
 		setToolStatus(message, 'error');
 		finishToolRun(message, 'error');
 	} finally {
@@ -1128,58 +1314,74 @@ async function exportSelectedBots(): Promise<void> {
 	const bots = getSelectedFiles().filter(isAutomationAnywhereTaskbot);
 	if (!bots.length) return;
 
-	setBusy(primaryActionButton, true, 'Exporting...');
+	setBusy(primaryActionButton, true, t('Exporting...'));
 	const exportName = `better-aa-export-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 	startToolRun(
-		'Export Bots',
+		t('Export Bots'),
 		5,
-		`Starting ZIP export for ${bots.length} bot(s). Do not close sidepanel.`
+		t('Starting ZIP export for {count} bot(s). Do not close sidepanel.', {
+			count: bots.length,
+		})
 	);
 	try {
 		const rootIds = new Set(bots.map(getAutomationAnywhereFileId));
-		setToolProgress(0, 5, 'Fetching dependency graph...');
-		appendToolLog('Fetching dependency graph...');
+		setToolProgress(0, 5, t('Fetching dependency graph...'));
+		appendToolLog(t('Fetching dependency graph...'));
 		const dependencyResponse = await activeRuntime.api.getBotDependencies([...rootIds]);
 		const dependencyItems = dependencyResponse.dependencies ?? [];
 		const exportItems = dedupeAutomationAnywhereFiles([...bots, ...dependencyItems]);
 		if (!exportItems.length) {
 			throw new Error(
-				`Dependency graph is empty. Response: ${stringifyForFeedback(dependencyResponse)}`
+				t('Dependency graph is empty. Response: {response}', {
+					response: stringifyForFeedback(dependencyResponse),
+				})
 			);
 		}
 
-		appendToolLog(`Dependency graph loaded: ${exportItems.length} file(s).`);
+		appendToolLog(t('Dependency graph loaded: {count} file(s).', {
+			count: exportItems.length,
+		}));
 		const taskbots = exportItems.filter(isExportTaskbot);
-		setToolProgress(1, 5, `Dependency graph loaded: ${exportItems.length} file(s).`);
-		appendToolLog(`Scanning ${taskbots.length} taskbot file(s) for metadata paths...`);
+		setToolProgress(1, 5, t('Dependency graph loaded: {count} file(s).', {
+			count: exportItems.length,
+		}));
+		appendToolLog(t('Scanning {count} taskbot file(s) for metadata paths...', {
+			count: taskbots.length,
+		}));
 		const metadataReferences = await scanMetadataReferences(activeRuntime, taskbots);
 		if (metadataReferences.length) {
-			appendToolLog(`Metadata references found: ${metadataReferences.length}.`);
+			appendToolLog(t('Metadata references found: {count}.', {
+				count: metadataReferences.length,
+			}));
 		}
-		setToolProgress(2, 5, `Metadata scan done: ${metadataReferences.length} reference(s).`);
+		setToolProgress(2, 5, t('Metadata scan done: {count} reference(s).', {
+			count: metadataReferences.length,
+		}));
 
 		appendToolLog(
-			`Downloading ${exportItems.length + metadataReferences.length} export file(s)...`
+			t('Downloading {count} export file(s)...', {
+				count: exportItems.length + metadataReferences.length,
+			})
 		);
 		const fileBlobs = await downloadExportFiles(activeRuntime, exportItems, rootIds);
 		const metadataBlobs = await downloadMetadataFiles(activeRuntime, metadataReferences);
-		setToolProgress(3, 5, 'Export file downloads done.');
-		appendToolLog('Creating export archive...');
+		setToolProgress(3, 5, t('Export file downloads done.'));
+		appendToolLog(t('Creating export archive...'));
 		const archive = await createExportArchive(
 			exportItems,
 			metadataReferences,
 			fileBlobs,
 			metadataBlobs
 		);
-		setToolProgress(4, 5, 'Export archive created.');
+		setToolProgress(4, 5, t('Export archive created.'));
 		const fileName = `${exportName}.zip`;
 		downloadBlob(archive, fileName);
-		appendToolLog(`Downloaded: ${fileName}`);
-		const summary = `Export downloaded: ${fileName}`;
+		appendToolLog(t('Downloaded: {fileName}', { fileName }));
+		const summary = t('Export downloaded: {fileName}', { fileName });
 		setToolStatus(summary);
 		finishToolRun(summary);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Export failed.';
+		const message = error instanceof Error ? error.message : t('Export failed.');
 		setToolStatus(message, 'error');
 		finishToolRun(message, 'error');
 	} finally {
@@ -1192,11 +1394,11 @@ async function downloadSelectedPackages(): Promise<void> {
 	const packages = getSelectedPackages();
 	if (!packages.length) return;
 
-	setBusy(primaryActionButton, true, 'Downloading...');
+	setBusy(primaryActionButton, true, t('Downloading...'));
 	startToolRun(
-		'Download Packages',
+		t('Download Packages'),
 		packages.length,
-		`Downloading ${packages.length} package(s)...`
+		t('Downloading {count} package(s)...', { count: packages.length })
 	);
 	try {
 		let downloaded = 0;
@@ -1209,8 +1411,11 @@ async function downloadSelectedPackages(): Promise<void> {
 			const downloadUrl = getAutomationAnywherePackageDownloadUrl(pkg);
 			if (!downloadUrl) {
 				skipped += 1;
-				appendToolLog(`Skipped: ${label} - missing pkgDownloadUrl`, 'warn');
-				setToolProgress(index + 1, packages.length, `Processed ${index + 1}/${packages.length}`);
+				appendToolLog(t('Skipped: {label} - missing pkgDownloadUrl', { label }), 'warn');
+				setToolProgress(index + 1, packages.length, t('Processed {count}/{total}', {
+					count: index + 1,
+					total: packages.length,
+				}));
 				if (index < packages.length - 1) await delay(300);
 				continue;
 			}
@@ -1219,26 +1424,33 @@ async function downloadSelectedPackages(): Promise<void> {
 				const fileName = getPackageJarFileName(pkg);
 				downloadUrlFile(downloadUrl, fileName);
 				downloaded += 1;
-				appendToolLog(`Downloaded: ${fileName}`);
+				appendToolLog(t('Downloaded: {fileName}', { fileName }));
 			} catch (error) {
 				failed += 1;
 				appendToolLog(
-					`Failed: ${label} - ${
-						error instanceof Error ? error.message : 'download failed'
-					}`,
+					t('Failed: {name} - {message}', {
+						name: label,
+						message: error instanceof Error ? error.message : t('download failed'),
+					}),
 					'error'
 				);
 			}
-			setToolProgress(index + 1, packages.length, `Processed ${index + 1}/${packages.length}`);
+			setToolProgress(index + 1, packages.length, t('Processed {count}/{total}', {
+				count: index + 1,
+				total: packages.length,
+			}));
 			if (index < packages.length - 1) await delay(300);
 		}
 
-		const summary = `Download packages done. Downloaded ${downloaded}, skipped ${skipped}, failed ${failed}.`;
+		const summary = t(
+			'Download packages done. Downloaded {downloaded}, skipped {skipped}, failed {failed}.',
+			{ downloaded, skipped, failed }
+		);
 		const severity = skipped || failed ? 'warn' : 'info';
 		setToolStatus(summary, severity);
 		finishToolRun(summary, severity);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Download packages failed.';
+		const message = error instanceof Error ? error.message : t('Download packages failed.');
 		setToolStatus(message, 'error');
 		finishToolRun(message, 'error');
 	} finally {
@@ -1254,7 +1466,7 @@ async function loadTaskbotJson(): Promise<void> {
 	if (!activeRuntime || !fileId || selectedTool !== 'taskbot-json') return;
 
 	setSelectedToolPanel(selectedTool);
-	taskbotJsonMeta.textContent = `File ${fileId}`;
+	taskbotJsonMeta.textContent = t('File {fileId}', { fileId });
 	taskbotJson.value = '';
 	taskbotJsonFileId = fileId;
 	try {
@@ -1264,13 +1476,13 @@ async function loadTaskbotJson(): Promise<void> {
 		}
 		taskbotJson.value = JSON.stringify(content, null, 2);
 		validateTaskbotJson();
-		setToolStatus('Taskbot JSON loaded.');
+		setToolStatus(t('Taskbot JSON loaded.'));
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool || taskbotJsonFileId !== fileId) {
 			return;
 		}
 		setToolStatus(
-			error instanceof Error ? error.message : 'Taskbot JSON load failed.',
+			error instanceof Error ? error.message : t('Taskbot JSON load failed.'),
 			'error'
 		);
 	}
@@ -1278,14 +1490,14 @@ async function loadTaskbotJson(): Promise<void> {
 
 async function copyTaskbotJson(): Promise<void> {
 	if (!taskbotJson.value.trim()) {
-		setToolStatus('Taskbot JSON is empty.', 'warn');
+		setToolStatus(t('Taskbot JSON is empty.'), 'warn');
 		return;
 	}
 	try {
 		await navigator.clipboard.writeText(taskbotJson.value);
-		setToolStatus('Taskbot JSON copied.');
+		setToolStatus(t('Taskbot JSON copied.'));
 	} catch {
-		setToolStatus('Clipboard write failed.', 'error');
+		setToolStatus(t('Clipboard write failed.'), 'error');
 	}
 }
 
@@ -1294,10 +1506,10 @@ function formatTaskbotJson(): void {
 		taskbotJson.value = options.prettyJson(taskbotJson.value);
 		JSON.parse(taskbotJson.value);
 		validateTaskbotJson();
-		setToolStatus('Taskbot JSON formatted.');
+		setToolStatus(t('Taskbot JSON formatted.'));
 	} catch (error) {
 		validateTaskbotJson();
-		setToolStatus(error instanceof Error ? error.message : 'Invalid JSON.', 'error');
+		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
 	}
 }
 
@@ -1321,7 +1533,7 @@ function validateTaskbotJson(): boolean {
 	} catch (error) {
 		taskbotJson.classList.add('is-invalid');
 		taskbotJson.setAttribute('aria-invalid', 'true');
-		taskbotJsonError.textContent = error instanceof Error ? error.message : 'Invalid JSON.';
+		taskbotJsonError.textContent = error instanceof Error ? error.message : t('Invalid JSON.');
 		taskbotJsonError.hidden = false;
 		return false;
 	}
@@ -1335,23 +1547,23 @@ async function saveTaskbotJson(): Promise<void> {
 	let parsed: unknown;
 	try {
 		if (!validateTaskbotJson()) {
-			setToolStatus(taskbotJsonError.textContent || 'Invalid JSON.', 'error');
+			setToolStatus(taskbotJsonError.textContent || t('Invalid JSON.'), 'error');
 			return;
 		}
 		parsed = JSON.parse(taskbotJson.value);
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : 'Invalid JSON.', 'error');
+		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
 		return;
 	}
 
-	if (!window.confirm('Update taskbot content in Control Room?')) return;
+	if (!window.confirm(t('Update taskbot content in Control Room?'))) return;
 	try {
 		await activeRuntime.api.updateBotContent(fileId, parsed);
 		const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
 		if (tab?.id) await browser.tabs.reload(tab.id);
-		setToolStatus('Taskbot JSON saved.');
+		setToolStatus(t('Taskbot JSON saved.'));
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : 'Taskbot JSON save failed.', 'error');
+		setToolStatus(error instanceof Error ? error.message : t('Taskbot JSON save failed.'), 'error');
 	}
 }
 
@@ -1399,11 +1611,19 @@ async function scanMetadataReferences(
 			if (result.status === 'fulfilled') {
 				references.push(...result.value);
 			} else {
-				appendToolLog(`Metadata scan skipped: ${getErrorMessage(result.reason)}`, 'warn');
+				appendToolLog(
+					t('Metadata scan skipped: {message}', {
+						message: getErrorMessage(result.reason),
+					}),
+					'warn'
+				);
 			}
 		}
 		appendToolLog(
-			`Metadata scan progress: ${Math.min(index + batch.length, taskbots.length)}/${taskbots.length}`
+			t('Metadata scan progress: {count}/{total}', {
+				count: Math.min(index + batch.length, taskbots.length),
+				total: taskbots.length,
+			})
 		);
 	}
 	return references;
@@ -1451,11 +1671,16 @@ async function downloadExportFiles(
 			const message = `${getAutomationAnywhereFileName(item)} - ${getErrorMessage(
 				result.reason
 			)}`;
-			if (rootIds.has(id)) throw new Error(`Selected bot download failed: ${message}`);
-			appendToolLog(`Dependency omitted: ${message}`, 'warn');
+			if (rootIds.has(id)) {
+				throw new Error(t('Selected bot download failed: {message}', { message }));
+			}
+			appendToolLog(t('Dependency omitted: {message}', { message }), 'warn');
 		}
 		appendToolLog(
-			`File download progress: ${Math.min(index + batch.length, items.length)}/${items.length}`
+			t('File download progress: {count}/{total}', {
+				count: Math.min(index + batch.length, items.length),
+				total: items.length,
+			})
 		);
 	}
 	return blobs;
@@ -1487,13 +1712,18 @@ async function downloadMetadataFiles(
 				blobs.set(result.value.key, result.value.blob);
 				continue;
 			}
-			appendToolLog(`Metadata omitted: ${getErrorMessage(result.reason)}`, 'warn');
+			appendToolLog(
+				t('Metadata omitted: {message}', {
+					message: getErrorMessage(result.reason),
+				}),
+				'warn'
+			);
 		}
 		appendToolLog(
-			`Metadata download progress: ${Math.min(
-				index + batch.length,
-				references.length
-			)}/${references.length}`
+			t('Metadata download progress: {count}/{total}', {
+				count: Math.min(index + batch.length, references.length),
+				total: references.length,
+			})
 		);
 	}
 	return blobs;
@@ -1545,7 +1775,7 @@ function addBlobToZip(zip: JSZip, path: string, blob: Blob): void {
 	let folder = zip;
 	for (const part of parts.slice(0, -1)) {
 		const next = folder.folder(part);
-		if (!next) throw new Error(`Failed to create ZIP folder: ${part}`);
+		if (!next) throw new Error(t('Failed to create ZIP folder: {folder}', { folder: part }));
 		folder = next;
 	}
 	folder.file(parts[parts.length - 1], blob);

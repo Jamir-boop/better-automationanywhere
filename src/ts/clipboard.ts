@@ -1,5 +1,6 @@
 import * as ui from './ui';
 import { debugError, debugInfo, debugWarn } from './debug';
+import { t } from './i18n';
 import {
 	universalClipboard,
 	universalClipboardSlot,
@@ -68,7 +69,7 @@ async function saveGlobalClipboardValueToDefaultSlot(
 			feedback: true,
 		});
 		if (source !== 'watcher') {
-			ui.showNotification('Copy failed', 'Automation Anywhere clipboard is empty.');
+			ui.showNotification(t('Copy failed'), t('Automation Anywhere clipboard is empty.'));
 		}
 		return null;
 	}
@@ -80,10 +81,10 @@ async function saveGlobalClipboardValueToDefaultSlot(
 			source,
 		}, { feedback: true });
 		ui.showNotification(
-			source === 'watcher' ? 'Universal clipboard updated' : 'Copied',
+			source === 'watcher' ? t('Universal clipboard updated') : t('Copied'),
 			source === 'watcher'
-				? 'Default slot saved from Automation Anywhere copy.'
-				: 'Saved current Automation Anywhere clipboard to default slot.'
+				? t('Default slot saved from Automation Anywhere copy.')
+				: t('Saved current Automation Anywhere clipboard to default slot.')
 		);
 		return serialized;
 	} catch (error) {
@@ -92,7 +93,7 @@ async function saveGlobalClipboardValueToDefaultSlot(
 			source,
 		}, { feedback: true });
 		if (source !== 'watcher') {
-			ui.showNotification('Copy failed', 'Could not read current clipboard JSON.');
+			ui.showNotification(t('Copy failed'), t('Could not read current clipboard JSON.'));
 		}
 		return null;
 	}
@@ -145,7 +146,7 @@ export async function copyToSlot(slot: number): Promise<string | null> {
 		}
 	) as HTMLElement | null;
 	if (!copyButton) {
-		ui.showNotification('Copy failed', 'Shared copy button not found.');
+		ui.showNotification(t('Copy failed'), t('Shared copy button not found.'));
 		return null;
 	}
 
@@ -162,8 +163,8 @@ export async function copyToSlot(slot: number): Promise<string | null> {
 			slot,
 		}, { feedback: true });
 		ui.showNotification(
-			'Copy failed',
-			`Clipboard JSON was not available in time for slot ${slot}.`
+			t('Copy failed'),
+			t('Clipboard JSON was not available in time for slot {slot}.', { slot })
 		);
 		return null;
 	}
@@ -174,14 +175,14 @@ export async function copyToSlot(slot: number): Promise<string | null> {
 		const serialized = JSON.stringify(clipboardData);
 		await universalClipboardSlot(slot).setValue(serialized);
 		void debugInfo('clipboard', 'Clipboard slot saved.', { slot }, { feedback: true });
-		ui.showNotification('Copied', `Saved current selection to slot ${slot}.`);
+		ui.showNotification(t('Copied'), t('Saved current selection to slot {slot}.', { slot }));
 		return serialized;
 	} catch (error) {
 		void debugError('clipboard', 'Failed to copy data to slot.', {
 			error,
 			slot,
 		}, { feedback: true });
-		ui.showNotification('Copy failed', `Could not save data to slot ${slot}.`);
+		ui.showNotification(t('Copy failed'), t('Could not save data to slot {slot}.', { slot }));
 		return null;
 	}
 }
@@ -190,7 +191,7 @@ export async function pasteFromSlot(slot: number): Promise<string | null> {
 	const clipboardData = await universalClipboardSlot(slot).getValue();
 	if (!clipboardData) {
 		void debugWarn('clipboard', 'Clipboard slot is empty.', { slot }, { feedback: true });
-		ui.showNotification('Nothing to paste', `Slot ${slot} is empty.`);
+		ui.showNotification(t('Nothing to paste'), t('Slot {slot} is empty.', { slot }));
 		return null;
 	}
 
@@ -210,14 +211,14 @@ export async function pasteFromSlot(slot: number): Promise<string | null> {
 		}
 	) as HTMLElement | null;
 	if (!pasteButton) {
-		ui.showNotification('Paste failed', 'Shared paste button not found.');
+		ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
 		throw new Error('Shared paste button not found.');
 	}
 
 	setTimeout(() => {
 		pasteButton.click();
 		void debugInfo('clipboard', 'Clipboard slot pasted.', { slot }, { feedback: true });
-		ui.showNotification('Pasted', `Inserted content from slot ${slot}.`);
+		ui.showNotification(t('Pasted'), t('Inserted content from slot {slot}.', { slot }));
 	}, 500);
 	return clipboardData;
 }
@@ -232,7 +233,7 @@ export async function universalPaste(): Promise<string | null> {
 		void debugWarn('clipboard', 'Universal clipboard is empty.', undefined, {
 			feedback: true,
 		});
-		ui.showNotification('Nothing to paste', 'Universal clipboard is empty.');
+		ui.showNotification(t('Nothing to paste'), t('Universal clipboard is empty.'));
 		return null;
 	}
 
@@ -253,14 +254,14 @@ export async function universalPaste(): Promise<string | null> {
 			}
 		) as HTMLElement | null;
 		if (!pasteButton) {
-			ui.showNotification('Paste failed', 'Shared paste button not found.');
+			ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
 			return;
 		}
 		pasteButton.click();
 		void debugInfo('clipboard', 'Universal clipboard pasted.', undefined, {
 			feedback: true,
 		});
-		ui.showNotification('Pasted', 'Inserted content from the universal clipboard.');
+		ui.showNotification(t('Pasted'), t('Inserted content from universal clipboard.'));
 	}, 1000);
 	return clipboardData;
 }
@@ -268,7 +269,7 @@ export async function universalPaste(): Promise<string | null> {
 export async function importActionJson(json: string): Promise<void> {
 	const input = json.trim();
 	if (!input) {
-		ui.showNotification('Import failed', 'Paste the action JSON first.');
+		ui.showNotification(t('Import failed'), t('Paste the action JSON first.'));
 		throw new Error('Action JSON is empty.');
 	}
 
@@ -276,7 +277,7 @@ export async function importActionJson(json: string): Promise<void> {
 		JSON.parse(input);
 	} catch (error) {
 		void debugWarn('json', 'Import JSON parse failed.', { error }, { feedback: true });
-		ui.showNotification('Import failed', 'Invalid JSON.');
+		ui.showNotification(t('Import failed'), t('Invalid JSON.'));
 		throw new Error('Invalid JSON.');
 	}
 
@@ -286,7 +287,7 @@ export async function importActionJson(json: string): Promise<void> {
 	});
 	await utils.sleep(200);
 	await universalPaste();
-	ui.showNotification('Import queued', 'JSON accepted. Pasting action now.');
+	ui.showNotification(t('Import queued'), t('JSON accepted. Pasting action now.'));
 }
 
 export function clearSensitiveFields(obj: unknown): void {

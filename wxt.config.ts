@@ -6,10 +6,18 @@ const webAccessibleResources = ['media/loading.gif', 'sounds/*'];
 
 export default defineConfig({
 	targetBrowsers: ['chrome', 'firefox'],
+	hooks: {
+		'build:manifestGenerated': (_wxt, manifest) => {
+			if (manifest.sidebar_action) {
+				manifest.sidebar_action.default_title = '__MSG_extensionName__';
+			}
+		},
+	},
 	manifest: ({ browser }) => ({
-		name: 'Better AA Developer Experience',
-		version: '1.1.1',
-		description: 'Better AA Developer Experience for Automation Anywhere.',
+		name: '__MSG_extensionName__',
+		version: '1.3.0',
+		description: '__MSG_extensionDescription__',
+		default_locale: 'en',
 		author: 'jamir-boop',
 		permissions: [
 			'storage',
@@ -36,14 +44,19 @@ export default defineConfig({
 					browser_specific_settings: {
 						gecko: {
 							id: 'better-automationanywhere-dx@jamir-boop',
+							data_collection_permissions: {
+								required: ['none'],
+							},
 						},
 					},
 					sidebar_action: {
-						default_title: 'Better AA Developer Experience',
+						default_title: '__MSG_extensionName__',
 						default_panel: 'sidepanel/index.html',
 					},
 				}),
-		action: {},
+		action: {
+			default_title: '__MSG_extensionShortName__',
+		},
 		commands: {
 			...(browser === 'firefox'
 				? {
@@ -58,14 +71,14 @@ export default defineConfig({
 							suggested_key: {
 								default: 'Alt+Shift+L',
 							},
-							description: 'Open extension sidebar',
+							description: '__MSG_openSidebarCommandDescription__',
 						},
 					}),
 			'toggle-styles': {
 				suggested_key: {
 					default: 'Ctrl+Shift+S',
 				},
-				description: 'Toggle all custom styles',
+				description: '__MSG_toggleStylesCommandDescription__',
 			},
 		},
 	}),

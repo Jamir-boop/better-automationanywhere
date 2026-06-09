@@ -1,6 +1,12 @@
 import './style.styl';
+import { getHelpTipId, renderHelpTip } from './help';
 import { initializeToolsPanel, renderToolsPanel } from './tools';
-import { COMMAND_HELP, renderHelpHtml } from '@/src/ts/help';
+import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
+import {
+	setActiveLanguagePreference,
+	t,
+	type LanguagePreference,
+} from '@/src/ts/i18n';
 import type {
 	BackgroundMessage,
 	ContentActionMessage,
@@ -14,20 +20,33 @@ import {
 } from '@/src/ts/automation-anywhere-json';
 import {
 	COMMAND_PALETTE_SHORTCUTS,
+	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
+	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_DEBUG_ENABLED,
+	DEFAULT_EXTENSION_LANGUAGE,
+	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
 	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
 	DEFAULT_STYLES_ENABLED,
+	EXTENSION_LANGUAGE_OPTIONS,
 	EXTENSION_VERSION,
 	OPEN_SIDEBAR_SHORTCUT_OPTIONS,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
+	blockTaskbotNodeLabelClicks,
+	commandPaletteEnabled,
 	commandPaletteShortcut,
 	debugEnabled,
+	extensionLanguage,
+	forceEnglishLocale,
+	getBlockTaskbotNodeLabelClicks,
+	getCommandPaletteEnabled,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
 	getDebugEnabled,
+	getExtensionLanguage,
+	getForceEnglishLocale,
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getShowSuggestions,
@@ -35,6 +54,7 @@ import {
 	getStyleFeatureValues,
 	getStyleValues,
 	getStylesEnabled,
+	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
 	openSidebarShortcut,
 	showSuggestions,
@@ -72,6 +92,26 @@ import {
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root.');
 
+const EXTENSION_LANGUAGE_CACHE_KEY = 'betterAaExtensionLanguage';
+
+function getCachedExtensionLanguage(): LanguagePreference {
+	try {
+		return normalizeExtensionLanguage(localStorage.getItem(EXTENSION_LANGUAGE_CACHE_KEY));
+	} catch {
+		return DEFAULT_EXTENSION_LANGUAGE;
+	}
+}
+
+function cacheExtensionLanguage(language: LanguagePreference): void {
+	try {
+		localStorage.setItem(EXTENSION_LANGUAGE_CACHE_KEY, language);
+	} catch {
+		// Storage cache is best-effort; browser extension storage remains authoritative.
+	}
+}
+
+setActiveLanguagePreference(getCachedExtensionLanguage());
+
 const extensionVersion = browser.runtime.getManifest().version || EXTENSION_VERSION;
 const defaultLoadingImageCss = `url("${browser.runtime.getURL('media/loading.gif' as any)}")`;
 const MAX_BACKGROUND_UPLOAD_BYTES = 3 * 1024 * 1024;
@@ -108,17 +148,25 @@ const STYLE_FEATURE_GROUPS = [
 }>;
 
 function getClipboardSlotLabel(slot: number): string {
-	return slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT ? 'Default' : `Slot ${slot}`;
+	return slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
+		? t('Default')
+		: t('Slot {slot}', { slot });
 }
 
 function renderClipboardSlotRow(slot: number): string {
 	const label = getClipboardSlotLabel(slot);
 	return `
-		<div class="slot-row is-empty" data-slot-row="${slot}" role="button" tabindex="0" aria-label="Load ${label}">
+		<div class="slot-row is-empty" data-slot-row="${slot}" role="button" tabindex="0" aria-label="${t('Load {label}', { label })}">
 			<span class="slot-label">${label}</span>
-			<span class="slot-state" data-slot-state="${slot}">Empty</span>
-			<button type="button" data-copy-slot="${slot}">Copy</button>
-			<button type="button" data-paste-slot="${slot}">Paste</button>
+			<span class="slot-state" data-slot-state="${slot}">${t('Empty')}</span>
+			<span class="help-wrapper">
+				<button class="help-anchor" type="button" data-copy-slot="${slot}" aria-describedby="${getHelpTipId(`slot-${slot}-copy`)}">${t('Copy')}</button>
+				${renderHelpTip(`slot-${slot}-copy`, t('Save current AA clipboard to this slot.'))}
+			</span>
+			<span class="help-wrapper">
+				<button class="help-anchor" type="button" data-paste-slot="${slot}" aria-describedby="${getHelpTipId(`slot-${slot}-paste`)}">${t('Paste')}</button>
+				${renderHelpTip(`slot-${slot}-paste`, t('Paste this slot through AA shared paste.'))}
+			</span>
 		</div>
 	`;
 }
@@ -126,10 +174,19 @@ function renderClipboardSlotRow(slot: number): string {
 function renderToolsConfigSection(): string {
 	return `
 		<section class="panel-section">
-			<h2>Userscript Config</h2>
+			<h2>${t('Extension Settings')}</h2>
 			<label class="select-row">
 				<span>
-					<strong>Command palette</strong>
+					<strong>${t('Extension language')}</strong>
+					<small>${t('Use browser language, English, or Spanish for this extension UI.')}</small>
+				</span>
+				<select id="extensionLanguage">
+					${EXTENSION_LANGUAGE_OPTIONS.map((option) => `<option value="${option.value}">${t(option.label)}</option>`).join('')}
+				</select>
+			</label>
+			<label class="select-row">
+				<span>
+					<strong>${t('Command palette')}</strong>
 					<small id="shortcutLabel"></small>
 				</span>
 				<select id="commandPaletteShortcut">
@@ -137,9 +194,16 @@ function renderToolsConfigSection(): string {
 					<option value="${COMMAND_PALETTE_SHORTCUTS.SLASH}">/</option>
 				</select>
 			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Show command palette')}</strong>
+					<small>${t('Enable the in-page command palette shortcut and popup.')}</small>
+				</span>
+				<input id="commandPaletteEnabled" type="checkbox">
+			</label>
 			<label class="select-row">
 				<span>
-					<strong>Sidebar shortcut</strong>
+					<strong>${t('Sidebar shortcut')}</strong>
 					<small id="openSidebarShortcutLabel"></small>
 				</span>
 				<select id="openSidebarShortcut" class="shortcut-select">
@@ -148,17 +212,31 @@ function renderToolsConfigSection(): string {
 			</label>
 			<label class="setting-row">
 				<span>
-					<strong>Sounds</strong>
-					<small>Run, error, and done tones</small>
+					<strong>${t('Sounds')}</strong>
+					<small>${t('Run, error, and done tones')}</small>
 				</span>
 				<input id="soundsEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
-					<strong>Show suggestions</strong>
-					<small>Short mouse-click tips for common shortcuts</small>
+					<strong>${t('Show suggestions')}</strong>
+					<small>${t('Short mouse-click tips for common shortcuts')}</small>
 				</span>
 				<input id="showSuggestions" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Block taskbot link clicks')}</strong>
+					<small>${t('Prevent left-click navigation on taskbot node links; middle-click still works.')}</small>
+				</span>
+				<input id="blockTaskbotNodeLabelClicks" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Force Automation Anywhere English')}</strong>
+					<small>${t('Set Automation Anywhere locale to en-US and reload when needed. Does not change this extension language.')}</small>
+				</span>
+				<input id="forceEnglishLocale" type="checkbox">
 			</label>
 		</section>
 	`;
@@ -166,15 +244,16 @@ function renderToolsConfigSection(): string {
 
 function renderUniversalClipboardSection(): string {
 	return `
-		<h2>Universal Clipboard</h2>
+		<h2>${t('Universal Clipboard')}</h2>
 		<div class="slots">
 			${UNIVERSAL_CLIPBOARD_SLOTS.map(renderClipboardSlotRow).join('')}
 		</div>
 
-		<h2>Action JSON</h2>
+		<h2>${t('Action JSON')}</h2>
+		<p class="inline-hint">${t('Advanced: imports raw Automation Anywhere clipboard JSON.')}</p>
 		<div class="json-field">
-			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="Universal copy loads selected action JSON here. Paste JSON here to import."></textarea>
-			<button id="clearJson" class="clear-json-button" type="button" aria-label="Clear JSON" title="Clear JSON" hidden>
+			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="${t('Universal copy loads selected action JSON here. Paste JSON here to import.')}"></textarea>
+			<button id="clearJson" class="clear-json-button help-anchor" type="button" aria-label="${t('Clear JSON')}" aria-describedby="${getHelpTipId('clear-json')}" hidden>
 				<svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="M3 6h18"></path>
 					<path d="M8 6V4h8v2"></path>
@@ -183,11 +262,18 @@ function renderUniversalClipboardSection(): string {
 					<path d="M14 11v6"></path>
 				</svg>
 			</button>
+			${renderHelpTip('clear-json', t('Clear the Action JSON field.'))}
 		</div>
 		<pre id="actionSummary" class="action-summary" hidden></pre>
 		<div class="button-grid">
-			<button id="importJson" type="button">Import JSON</button>
-			<button id="copyJsonText" type="button">Copy text</button>
+			<span class="help-wrapper">
+				<button id="importJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('import-json')}">${t('Import JSON')}</button>
+				${renderHelpTip('import-json', t('Import textarea JSON into AA clipboard.'))}
+			</span>
+			<span class="help-wrapper">
+				<button id="copyJsonText" class="help-anchor" type="button" aria-describedby="${getHelpTipId('copy-json')}">${t('Copy JSON')}</button>
+				${renderHelpTip('copy-json', t('Copy textarea JSON to system clipboard.'))}
+			</span>
 		</div>
 	`;
 }
@@ -196,8 +282,8 @@ function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): st
 	return `
 		<label class="setting-row userstyle-dependent">
 			<span>
-				<strong>${feature.label}</strong>
-				<small>${feature.description}</small>
+				<strong>${t(feature.label)}</strong>
+				<small>${t(feature.description)}</small>
 			</span>
 			<input id="styleFeature-${feature.key}" type="checkbox">
 		</label>
@@ -213,75 +299,92 @@ function renderStyleFeatureControls(): string {
 			.join('');
 		return `
 			<div class="style-feature-group">
-				<h3>${group.title}</h3>
+				<h3>${t(group.title)}</h3>
 				${controls}
 			</div>
 		`;
 	}).join('');
 }
 
-function renderStyleValueControls(): string {
-	return STYLE_VALUE_FIELDS.map((field) => {
-		if (field.key === 'userBg') {
-			return `
-				<div class="text-row userstyle-dependent">
-					<span>
-						<strong>${field.label}</strong>
-						<small>${field.description}</small>
+function renderStyleValueControl(field: (typeof STYLE_VALUE_FIELDS)[number]): string {
+	if (field.key === 'userBg') {
+		return `
+			<div class="text-row userstyle-dependent">
+				<span>
+					<strong>${t(field.label)}</strong>
+					<small>${t(field.description)}</small>
+				</span>
+				<input id="styleValue-${field.key}" type="hidden">
+				<div class="upload-row">
+					<input id="backgroundUpload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif">
+					<span class="help-wrapper">
+						<button id="clearBackgroundUpload" class="help-anchor" type="button" aria-describedby="${getHelpTipId('loading-default')}">${t('Use default')}</button>
+						${renderHelpTip('loading-default', t('Use bundled loading animation image.'))}
 					</span>
-					<input id="styleValue-${field.key}" type="hidden">
-					<div class="upload-row">
-						<input id="backgroundUpload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif">
-						<button id="clearBackgroundUpload" type="button">Use default</button>
-					</div>
-					<div id="backgroundPreview" class="background-preview" aria-label="Background preview"></div>
 				</div>
-			`;
-		}
+				<div id="backgroundPreview" class="background-preview" aria-label="${t('Loading animation preview')}"></div>
+			</div>
+		`;
+	}
 
-		if (field.type === 'select' && 'options' in field) {
-			return `
-				<label class="select-row userstyle-dependent">
-					<span>
-						<strong>${field.label}</strong>
-						<small>${field.description}</small>
-					</span>
-					<select id="styleValue-${field.key}">
-						${field.options.map((option) => `<option value="${option}">${option}</option>`).join('')}
-					</select>
-				</label>
-			`;
-		}
+	if (field.type === 'select' && 'options' in field) {
+		return `
+			<label class="select-row userstyle-dependent">
+				<span>
+					<strong>${t(field.label)}</strong>
+					<small>${t(field.description)}</small>
+				</span>
+				<select id="styleValue-${field.key}">
+					${field.options.map((option) => `<option value="${option}">${t(option)}</option>`).join('')}
+				</select>
+			</label>
+		`;
+	}
 
-		if (field.type === 'color') {
-			return `
-				<label class="color-row userstyle-dependent">
-					<span>
-						<strong>${field.label}</strong>
-						<small>${field.description}</small>
-					</span>
-					<span class="color-controls">
-						<input id="styleValue-${field.key}" type="color" aria-label="${field.label}">
-						<input id="styleOpacity-${field.key}" type="range" min="0" max="1" step="0.01" aria-label="${field.label} opacity">
-						<output id="styleOpacityValue-${field.key}"></output>
-					</span>
-				</label>
-			`;
-		}
+	if (field.type === 'color') {
+		return `
+			<label class="color-row userstyle-dependent">
+				<span>
+					<strong>${t(field.label)}</strong>
+					<small>${t(field.description)}</small>
+				</span>
+				<span class="color-controls">
+					<input id="styleValue-${field.key}" type="color" aria-label="${t(field.label)}">
+					<input id="styleOpacity-${field.key}" type="range" min="0" max="1" step="0.01" aria-label="${t('{label} opacity', { label: t(field.label) })}">
+					<output id="styleOpacityValue-${field.key}"></output>
+				</span>
+			</label>
+		`;
+	}
 
-		return '';
-	}).join('');
+	return '';
+}
+
+function renderLoadingAnimationControls(): string {
+	return STYLE_VALUE_FIELDS.filter((field) =>
+		field.key === 'userBg' || field.key === 'userBgSize'
+	)
+		.map(renderStyleValueControl)
+		.join('');
+}
+
+function renderBackgroundColorControls(): string {
+	return STYLE_VALUE_FIELDS.filter((field) =>
+		BACKGROUND_COLOR_KEYS.includes(field.key as (typeof BACKGROUND_COLOR_KEYS)[number])
+	)
+		.map(renderStyleValueControl)
+		.join('');
 }
 
 app.innerHTML = `
 	<header class="panel-header">
 		<div>
-			<h1>Better AA Developer Experience</h1>
+			<h1>${t('Better AA Developer Experience')}</h1>
 		</div>
 		<div class="header-controls">
 			<span class="version-chip">${extensionVersion}</span>
 			<label class="debug-toggle">
-				<span>Debug Mode</span>
+				<span>${t('Debug Mode')}</span>
 				<input id="debugEnabled" type="checkbox">
 			</label>
 		</div>
@@ -289,22 +392,32 @@ app.innerHTML = `
 
 	<section id="debugLogSection" class="panel-section feedback-section is-collapsed">
 		<div class="section-heading-row">
-			<h2>Debug Log</h2>
+			<h2>${t('Debug Log')}</h2>
 			<span class="feedback-actions">
-				<button id="toggleDebugLog" class="debug-log-toggle" type="button" aria-expanded="false" aria-label="Expand debug log" title="Expand debug log"></button>
-				<button id="copyFeedback" type="button">Copy details</button>
-				<button id="clearFeedback" type="button">Clear</button>
+				<span class="help-wrapper">
+					<button id="toggleDebugLog" class="debug-log-toggle help-anchor" type="button" aria-expanded="false" aria-label="${t('Expand debug log')}" aria-describedby="${getHelpTipId('debug-toggle')}"></button>
+					${renderHelpTip('debug-toggle', t('Show or hide recent debug entries.'))}
+				</span>
+				<span class="help-wrapper">
+					<button id="copyFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-copy')}">${t('Copy')}</button>
+					${renderHelpTip('debug-copy', t('Copy support log for troubleshooting.'))}
+				</span>
+				<span class="help-wrapper">
+					<button id="clearFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-clear')}">${t('Clear')}</button>
+					${renderHelpTip('debug-clear', t('Clear local debug log entries.'))}
+				</span>
 			</span>
 		</div>
+		<p class="inline-hint">${t('Debug Mode stores local support logs. Nothing is sent automatically.')}</p>
 		<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
 	</section>
 
 	<p id="status" role="status"></p>
 
-	<nav class="tab-list" role="tablist" aria-label="Sidebar sections">
-		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">Tools</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">Userstyle</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">Settings</button>
+	<nav class="tab-list" role="tablist" aria-label="${t('Sidebar sections')}">
+		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">${t('Tools')}</button>
+		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">${t('UI Improvements')}</button>
+		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">${t('Settings')}</button>
 	</nav>
 
 	<main>
@@ -315,13 +428,16 @@ app.innerHTML = `
 		<section class="tab-panel" role="tabpanel" data-panel="userstyle" hidden>
 			<section class="panel-section">
 				<div class="section-heading-row">
-					<h2>Userstyle</h2>
-					<button id="restoreUserstyleDefaults" type="button" hidden>Restore to Default</button>
+					<h2>${t('UI Improvements')}</h2>
+					<span class="help-wrapper">
+						<button id="restoreUserstyleDefaults" class="help-anchor" type="button" aria-describedby="${getHelpTipId('ui-restore-defaults')}" hidden>${t('Restore to Default')}</button>
+						${renderHelpTip('ui-restore-defaults', t('Reset all UI Improvements options.'))}
+					</span>
 				</div>
 				<label class="setting-row">
 					<span>
-						<strong>Injected styles</strong>
-						<small>Enable all custom style rules</small>
+						<strong>${t('Injected styles')}</strong>
+						<small>${t('Enable all custom style rules')}</small>
 					</span>
 					<input id="stylesEnabled" type="checkbox">
 				</label>
@@ -329,39 +445,50 @@ app.innerHTML = `
 			</section>
 
 			<section class="panel-section">
+				<h2>${t('Loading Animation')}</h2>
+				${renderLoadingAnimationControls()}
+			</section>
+
+			<section class="panel-section">
 				<div class="section-heading-row">
-					<h2>Background Customization</h2>
-					<button id="resetGradientColors" type="button">Reset Colors</button>
+					<h2>${t('Background Customization')}</h2>
+					<span class="help-wrapper">
+						<button id="resetGradientColors" class="help-anchor" type="button" aria-describedby="${getHelpTipId('reset-gradient-colors')}">${t('Reset Colors')}</button>
+						${renderHelpTip('reset-gradient-colors', t('Restore background gradient defaults.'))}
+					</span>
 				</div>
-				${renderStyleValueControls()}
+				${renderBackgroundColorControls()}
 			</section>
 		</section>
 
 		<section class="tab-panel" role="tabpanel" data-panel="settings" hidden>
 			${renderToolsConfigSection()}
 			<section class="panel-section">
-				<h2>Configuration shortcuts</h2>
+				<h2>${t('Configuration shortcuts')}</h2>
 				<div class="info-row">
-					<span>Sidebar shortcut</span>
+					<span>${t('Sidebar shortcut')}</span>
 					<strong id="sidebarShortcutValue">Alt + Shift + L</strong>
 				</div>
 				<div class="info-row">
-					<span>Command palette shortcut</span>
+					<span>${t('Command palette shortcut')}</span>
 					<strong id="settingsCommandPaletteShortcut">Alt + P</strong>
 				</div>
 			</section>
 			<section class="panel-section info-panel">
-				<h2>About</h2>
+				<h2>${t('About')}</h2>
 				<div class="info-row">
-					<span>Version</span>
+					<span>${t('Version')}</span>
 					<strong>${extensionVersion}</strong>
 				</div>
 				<div id="aboutHelp" class="help-content"></div>
-				<a class="github-link" href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank" rel="noreferrer" aria-label="GitHub repository" title="GitHub repository">
-					<svg aria-hidden="true" viewBox="0 0 24 24">
-						<path d="M12 .5C5.65.5.75 5.65.75 12.02c0 5.1 3.29 9.42 7.86 10.94.58.1.79-.25.79-.56v-2.14c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18.92-.26 1.91-.38 2.9-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.56A11.54 11.54 0 0 0 23.25 12C23.25 5.65 18.35.5 12 .5Z"></path>
-					</svg>
-				</a>
+				<span class="help-wrapper">
+					<a class="github-link help-anchor" href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank" rel="noreferrer" aria-label="${t('GitHub repository')}" aria-describedby="${getHelpTipId('github-link')}">
+						<svg aria-hidden="true" viewBox="0 0 24 24">
+							<path d="M12 .5C5.65.5.75 5.65.75 12.02c0 5.1 3.29 9.42 7.86 10.94.58.1.79-.25.79-.56v-2.14c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18.92-.26 1.91-.38 2.9-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.56A11.54 11.54 0 0 0 23.25 12C23.25 5.65 18.35.5 12 .5Z"></path>
+						</svg>
+					</a>
+					${renderHelpTip('github-link', t('Open project repository.'))}
+				</span>
 			</section>
 		</section>
 	</main>
@@ -372,6 +499,16 @@ const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const showSuggestionsInput =
 	document.querySelector<HTMLInputElement>('#showSuggestions')!;
+const commandPaletteEnabledInput = document.querySelector<HTMLInputElement>(
+	'#commandPaletteEnabled'
+)!;
+const blockTaskbotNodeLabelClicksInput = document.querySelector<HTMLInputElement>(
+	'#blockTaskbotNodeLabelClicks'
+)!;
+const forceEnglishLocaleInput =
+	document.querySelector<HTMLInputElement>('#forceEnglishLocale')!;
+const extensionLanguageSelect =
+	document.querySelector<HTMLSelectElement>('#extensionLanguage')!;
 const debugInput = document.querySelector<HTMLInputElement>('#debugEnabled')!;
 const shortcutSelect = document.querySelector<HTMLSelectElement>(
 	'#commandPaletteShortcut'
@@ -437,10 +574,9 @@ function setStatus(
 function updateDebugLogState(): void {
 	debugLogSection.classList.toggle('is-collapsed', debugLogCollapsed);
 	feedbackList.dataset.collapsed = String(debugLogCollapsed);
-	toggleDebugLogButton.title = debugLogCollapsed ? 'Expand debug log' : 'Collapse debug log';
 	toggleDebugLogButton.setAttribute(
 		'aria-label',
-		debugLogCollapsed ? 'Expand debug log' : 'Collapse debug log'
+		debugLogCollapsed ? t('Expand debug log') : t('Collapse debug log')
 	);
 	toggleDebugLogButton.setAttribute('aria-expanded', String(!debugLogCollapsed));
 }
@@ -451,7 +587,7 @@ function renderFeedbackHistory(events: DebugEvent[] = []): void {
 	if (!events.length) {
 		const empty = document.createElement('p');
 		empty.className = 'feedback-empty';
-		empty.textContent = 'No debug log.';
+		empty.textContent = t('No debug log.');
 		feedbackList.appendChild(empty);
 		return;
 	}
@@ -463,7 +599,7 @@ function renderFeedbackHistory(events: DebugEvent[] = []): void {
 
 		const meta = document.createElement('small');
 		meta.textContent = `${new Date(event.timestamp).toLocaleTimeString()} - ${event.level.toUpperCase()} - ${event.source}${
-			event.details ? ' - DETAILS IN COPY' : ''
+			event.details ? ` - ${t('DETAILS IN COPY')}` : ''
 		}`;
 
 		const message = document.createElement('span');
@@ -482,25 +618,25 @@ async function refreshFeedbackHistory(): Promise<void> {
 
 function formatFeedbackForAi(events: DebugEvent[]): string {
 	if (!events.length) {
-		return '# Better AA Developer Experience Debug Log\n\nStored entries: 0\n\nNo debug log.';
+		return `${t('# Better AA Developer Experience Debug Log')}\n\n${t('Stored entries: {count}', { count: 0 })}\n\n${t('No debug log.')}`;
 	}
 
 	return [
-		'# Better AA Developer Experience Debug Log',
+		t('# Better AA Developer Experience Debug Log'),
 		'',
-		`Stored entries: ${events.length}`,
+		t('Stored entries: {count}', { count: events.length }),
 		'',
 		...events.flatMap((event, index) => {
 			const lines = [
-				`## Entry ${index + 1}`,
-				`Timestamp: ${event.timestamp}`,
-				`Level: ${event.level}`,
-				`Source: ${event.source}`,
-				`Message: ${event.message}`,
+				`## ${t('Entry {count}', { count: index + 1 })}`,
+				t('Timestamp: {value}', { value: event.timestamp }),
+				t('Level: {value}', { value: event.level }),
+				t('Source: {value}', { value: event.source }),
+				t('Message: {value}', { value: event.message }),
 			];
 
 			if (event.details) {
-				lines.push('Details JSON:');
+				lines.push(t('Details JSON:'));
 				lines.push(JSON.stringify(event.details, null, 2));
 			}
 
@@ -531,7 +667,7 @@ async function sendActiveTabMessage(
 	message: ContentActionMessage
 ): Promise<ContentActionResponse> {
 	const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-	if (!tab?.id) return { ok: false, error: 'No active tab.' };
+	if (!tab?.id) return { ok: false, error: t('No active tab.') };
 
 	try {
 		const response = (await browser.tabs.sendMessage(
@@ -540,20 +676,20 @@ async function sendActiveTabMessage(
 		)) as ContentActionResponse | undefined;
 		return response ?? { ok: true };
 	} catch {
-		return { ok: false, error: 'Open an Automation Anywhere tab first.' };
+		return { ok: false, error: t('Open an Automation Anywhere tab first.') };
 	}
 }
 
 function updateShortcutLabel(shortcut: CommandPaletteShortcut): void {
 	const label = getCommandPaletteShortcutLabel(shortcut);
-	shortcutLabel.textContent = `Current: ${label}`;
+	shortcutLabel.textContent = t('Current: {shortcut}', { shortcut: label });
 	currentExtensionShortcuts.commandPalette = label;
 	updateSettingsShortcutLabels();
 }
 
 function updateOpenSidebarShortcutLabel(shortcut: OpenSidebarShortcut): void {
 	const label = getOpenSidebarShortcutLabel(shortcut);
-	openSidebarShortcutLabel.textContent = `Current: ${label}`;
+	openSidebarShortcutLabel.textContent = t('Current: {shortcut}', { shortcut: label });
 	currentExtensionShortcuts.openSidebar = label;
 	updateSettingsShortcutLabels();
 }
@@ -586,7 +722,7 @@ async function refreshExtensionShortcuts(): Promise<void> {
 
 function renderStaticAboutHelp(shortcut: CommandPaletteShortcut): void {
 	aboutHelp.innerHTML = renderHelpHtml({
-		commands: Object.values(COMMAND_HELP),
+		commands: Object.values(getCommandHelp()),
 		shortcutLabel: getCommandPaletteShortcutLabel(shortcut),
 		sidebarShortcutLabel: currentExtensionShortcuts.openSidebar,
 	});
@@ -662,7 +798,7 @@ function getActionSummaryText(json: string): string {
 	try {
 		const parsed = JSON.parse(input);
 		if (!isAutomationAnywhereJson(parsed)) {
-			return 'JSON is not Automation Anywhere clipboard JSON.';
+			return t('JSON is not Automation Anywhere clipboard JSON.');
 		}
 		try {
 			return formatAutomationAnywhereSummary(
@@ -672,10 +808,10 @@ function getActionSummaryText(json: string): string {
 			void debugError('aa-json', 'AA JSON summarization failed.', { error }, {
 				feedback: true,
 			});
-			return 'Automation Anywhere summary failed.';
+			return t('Automation Anywhere summary failed.');
 		}
 	} catch {
-		return 'Invalid JSON.';
+		return t('Invalid JSON.');
 	}
 }
 
@@ -696,12 +832,12 @@ function setActionJsonValue(json: string): void {
 }
 
 function getSlotStateText(json: string | null | undefined): string {
-	if (!json?.trim()) return 'Empty';
+	if (!json?.trim()) return t('Empty');
 	try {
 		const parsed = JSON.parse(json);
 		if (isAutomationAnywhereJson(parsed)) {
 			const summary = summarizeAutomationAnywhereJson(parsed);
-			const noun = summary.actionCount === 1 ? 'action' : 'actions';
+			const noun = summary.actionCount === 1 ? t('action') : t('actions');
 			const packageNames = [
 				...new Set(
 					summary.packages
@@ -714,7 +850,7 @@ function getSlotStateText(json: string | null | undefined): string {
 		}
 		return 'JSON';
 	} catch {
-		return 'Invalid JSON';
+		return t('Invalid JSON');
 	}
 }
 
@@ -725,9 +861,11 @@ function updateSlotState(slot: number, json: string | null | undefined): void {
 
 	const stateText = getSlotStateText(json);
 	state.textContent = stateText;
-	row.classList.toggle('is-empty', stateText === 'Empty');
-	row.classList.toggle('is-populated', stateText !== 'Empty');
-	row.classList.toggle('is-invalid', stateText === 'Invalid JSON');
+	const isEmpty = !json?.trim();
+	const isInvalid = stateText === t('Invalid JSON');
+	row.classList.toggle('is-empty', isEmpty);
+	row.classList.toggle('is-populated', !isEmpty);
+	row.classList.toggle('is-invalid', isInvalid);
 }
 
 async function refreshSlotState(slot: number): Promise<void> {
@@ -743,11 +881,11 @@ async function loadSlotIntoActionJson(slot: number): Promise<void> {
 	const label = getClipboardSlotLabel(slot);
 	if (!json?.trim()) {
 		setActionJsonValue('');
-		setStatus(`${label} is empty.`, 'warn', 'clipboard');
+		setStatus(t('{label} is empty.', { label }), 'warn', 'clipboard');
 		return;
 	}
 	setActionJsonValue(prettyJson(json));
-	setStatus(`${label} JSON loaded.`, 'info', 'clipboard');
+	setStatus(t('{label} JSON loaded.', { label }), 'info', 'clipboard');
 }
 
 function getStyleFeatureInput(key: StyleFeatureKey): HTMLInputElement {
@@ -929,10 +1067,10 @@ function validateBackgroundFile(file: File): string | null {
 		!ALLOWED_BACKGROUND_MIME_TYPES.has(file.type) &&
 		!ALLOWED_BACKGROUND_EXTENSIONS.has(extension)
 	) {
-		return 'Unsupported background file. Use png, jpg, jpeg, webp, or gif.';
+		return t('Unsupported loading animation image. Use png, jpg, jpeg, webp, or gif.');
 	}
 	if (file.size > MAX_BACKGROUND_UPLOAD_BYTES) {
-		return 'Background file is too large. Maximum size is 3 MiB.';
+		return t('Loading animation image is too large. Maximum size is 3 MiB.');
 	}
 	return null;
 }
@@ -945,10 +1083,10 @@ function readFileAsDataUrl(file: File): Promise<string> {
 				resolve(reader.result);
 				return;
 			}
-			reject(new Error('File could not be read as a data URL.'));
+			reject(new Error(t('File could not be read as a data URL.')));
 		});
 		reader.addEventListener('error', () => {
-			reject(new Error('Background file read failed.'));
+			reject(new Error(t('Loading animation image read failed.')));
 		});
 		reader.readAsDataURL(file);
 	});
@@ -972,6 +1110,10 @@ async function loadState(): Promise<void> {
 		styles,
 		sounds,
 		suggestions,
+		paletteEnabled,
+		blockTaskbotClicks,
+		forceEnglish,
+		language,
 		debug,
 		shortcut,
 		sidebarShortcut,
@@ -981,6 +1123,10 @@ async function loadState(): Promise<void> {
 		getStylesEnabled(),
 		getSoundsEnabled(),
 		getShowSuggestions(),
+		getCommandPaletteEnabled(),
+		getBlockTaskbotNodeLabelClicks(),
+		getForceEnglishLocale(),
+		getExtensionLanguage(),
 		getDebugEnabled(),
 		getCommandPaletteShortcut(),
 		getOpenSidebarShortcut(),
@@ -988,9 +1134,21 @@ async function loadState(): Promise<void> {
 		getStyleValues(),
 	]);
 
+	const cachedLanguage = getCachedExtensionLanguage();
+	cacheExtensionLanguage(language);
+	if (language !== cachedLanguage) {
+		setActiveLanguagePreference(language);
+		window.location.reload();
+		return;
+	}
+
 	stylesInput.checked = styles;
 	soundsInput.checked = sounds;
 	showSuggestionsInput.checked = suggestions;
+	commandPaletteEnabledInput.checked = paletteEnabled;
+	blockTaskbotNodeLabelClicksInput.checked = blockTaskbotClicks;
+	forceEnglishLocaleInput.checked = forceEnglish;
+	extensionLanguageSelect.value = language;
 	debugInput.checked = debug;
 	currentDebugEnabled = debug;
 	shortcutSelect.value = shortcut;
@@ -1016,6 +1174,9 @@ async function loadState(): Promise<void> {
 		styles,
 		sounds,
 		suggestions,
+		paletteEnabled,
+		blockTaskbotClicks,
+		forceEnglish,
 		debug,
 	});
 }
@@ -1048,10 +1209,70 @@ showSuggestionsInput.addEventListener('change', () => {
 		enabled: showSuggestionsInput.checked,
 	});
 	setStatus(
-		showSuggestionsInput.checked ? 'Suggestions enabled.' : 'Suggestions disabled.',
+		showSuggestionsInput.checked
+			? t('Suggestions enabled.')
+			: t('Suggestions disabled.'),
 		'info',
 		'suggestions'
 	);
+});
+
+commandPaletteEnabledInput.addEventListener('change', () => {
+	void sendBackgroundMessage({
+		type: 'SET_COMMAND_PALETTE_ENABLED',
+		enabled: commandPaletteEnabledInput.checked,
+	});
+	setStatus(
+		commandPaletteEnabledInput.checked
+			? t('Command palette enabled.')
+			: t('Command palette disabled.'),
+		'info',
+		'settings'
+	);
+});
+
+blockTaskbotNodeLabelClicksInput.addEventListener('change', () => {
+	void sendBackgroundMessage({
+		type: 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS',
+		enabled: blockTaskbotNodeLabelClicksInput.checked,
+	});
+	setStatus(
+		blockTaskbotNodeLabelClicksInput.checked
+			? t('Taskbot link click blocking enabled.')
+			: t('Taskbot link click blocking disabled.'),
+		'info',
+		'settings'
+	);
+});
+
+forceEnglishLocaleInput.addEventListener('change', () => {
+	void sendBackgroundMessage({
+		type: 'SET_FORCE_ENGLISH_LOCALE',
+		enabled: forceEnglishLocaleInput.checked,
+	});
+	setStatus(
+		forceEnglishLocaleInput.checked
+			? t('English locale enforcement enabled.')
+			: t('English locale enforcement disabled.'),
+		'info',
+		'settings'
+	);
+});
+
+extensionLanguageSelect.addEventListener('change', () => {
+	const language = normalizeExtensionLanguage(
+		extensionLanguageSelect.value
+	) as LanguagePreference;
+	extensionLanguageSelect.value = language;
+	setActiveLanguagePreference(language);
+	cacheExtensionLanguage(language);
+	void sendBackgroundMessage({
+		type: 'SET_EXTENSION_LANGUAGE',
+		language,
+	}).then(() => {
+		setStatus(t('Extension language saved.'), 'info', 'settings');
+		setTimeout(() => window.location.reload(), 250);
+	});
 });
 
 debugInput.addEventListener('change', () => {
@@ -1061,7 +1282,11 @@ debugInput.addEventListener('change', () => {
 		enabled: debugInput.checked,
 	});
 	void refreshFeedbackHistory();
-	setStatus(debugInput.checked ? 'Debug mode enabled.' : 'Debug mode disabled.', 'info', 'debug');
+	setStatus(
+		debugInput.checked ? t('Debug mode enabled.') : t('Debug mode disabled.'),
+		'info',
+		'debug'
+	);
 });
 
 shortcutSelect.addEventListener('change', () => {
@@ -1091,7 +1316,7 @@ openSidebarShortcutSelect.addEventListener('change', () => {
 			renderStaticAboutHelp(currentShortcut);
 		});
 	});
-	setStatus('Sidebar shortcut saved.', 'info', 'settings');
+	setStatus(t('Sidebar shortcut saved.'), 'info', 'settings');
 });
 
 STYLE_FEATURES.forEach((feature) => {
@@ -1141,45 +1366,49 @@ backgroundUpload.addEventListener('change', async () => {
 	const validationError = validateBackgroundFile(file);
 	if (validationError) {
 		backgroundUpload.value = '';
-		void debugWarn('background', 'Background upload validation failed.', {
+		void debugWarn('loadingAnimation', 'Loading animation upload validation failed.', {
 			fileName: file.name,
 			fileSize: file.size,
 			fileType: file.type,
 			reason: validationError,
 		});
-		setStatus(validationError, 'error', 'background');
+		setStatus(validationError, 'error', 'loadingAnimation');
 		return;
 	}
 
 	try {
 		const dataUrl = await readFileAsDataUrl(file);
 		if (!dataUrl.startsWith('data:image/')) {
-			void debugWarn('background', 'Background upload did not produce an image data URL.', {
+			void debugWarn('loadingAnimation', 'Loading animation upload did not produce an image data URL.', {
 				fileName: file.name,
 				fileSize: file.size,
 				fileType: file.type,
 			}, { feedback: true });
-			setStatus('Background file could not be used as an image.', 'error', 'background');
+			setStatus(
+				t('Loading animation file could not be used as an image.'),
+				'error',
+				'loadingAnimation'
+			);
 			return;
 		}
 		await setStyleValueAndNotify('userBg', `url("${dataUrl}")`);
-		void debugInfo('background', 'Background uploaded.', {
+		void debugInfo('loadingAnimation', 'Loading animation uploaded.', {
 			fileName: file.name,
 			fileSize: file.size,
 			fileType: file.type,
 		});
-		setStatus('Background uploaded.', 'info', 'background');
+		setStatus(t('Loading animation uploaded.'), 'info', 'loadingAnimation');
 	} catch (error) {
-		void debugError('background', 'Background upload failed.', {
+		void debugError('loadingAnimation', 'Loading animation upload failed.', {
 			error,
 			fileName: file.name,
 			fileSize: file.size,
 			fileType: file.type,
 		}, { feedback: true });
 		setStatus(
-			error instanceof Error ? error.message : 'Background upload failed.',
+			error instanceof Error ? error.message : t('Loading animation upload failed.'),
 			'error',
-			'background'
+			'loadingAnimation'
 		);
 	} finally {
 		backgroundUpload.value = '';
@@ -1188,7 +1417,7 @@ backgroundUpload.addEventListener('change', async () => {
 
 clearBackgroundUploadButton.addEventListener('click', () => {
 	void setStyleValueAndNotify('userBg', '').then(() => {
-		setStatus('Default background restored.', 'info', 'background');
+		setStatus(t('Default loading animation restored.'), 'info', 'loadingAnimation');
 	});
 });
 
@@ -1209,7 +1438,7 @@ resetGradientColorsButton.addEventListener('click', async () => {
 			})
 		)
 	);
-	setStatus('Gradient colors restored.', 'info', 'userstyle');
+	setStatus(t('Gradient colors restored.'), 'info', 'userstyle');
 });
 
 restoreUserstyleDefaultsButton.addEventListener('click', async () => {
@@ -1242,10 +1471,10 @@ restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 			})
 		),
 	]);
-	void debugInfo('userstyle', 'Userstyle defaults restored.', {
+	void debugInfo('userstyle', 'Visual improvements restored.', {
 		stylesEnabled: DEFAULT_STYLES_ENABLED,
 	});
-	setStatus('Userstyle defaults restored.', 'info', 'userstyle');
+	setStatus(t('Visual improvements restored.'), 'info', 'userstyle');
 });
 
 async function copyClipboardSlot(slot: number): Promise<void> {
@@ -1260,7 +1489,11 @@ async function copyClipboardSlot(slot: number): Promise<void> {
 	}
 	if (response.json) setActionJsonValue(prettyJson(response.json));
 	await refreshSlotState(slot);
-	setStatus(response.message ?? `${getClipboardSlotLabel(slot)} copied.`, 'info', 'clipboard');
+	setStatus(
+		response.message ?? t('{label} copied.', { label: getClipboardSlotLabel(slot) }),
+		'info',
+		'clipboard'
+	);
 }
 
 async function pasteClipboardSlot(slot: number): Promise<void> {
@@ -1273,7 +1506,7 @@ async function pasteClipboardSlot(slot: number): Promise<void> {
 	}
 	await refreshSlotState(slot);
 	setStatus(
-		response.ok ? response.message ?? 'Paste queued.' : response.error,
+		response.ok ? response.message ?? t('Paste queued.') : response.error,
 		response.ok ? 'info' : 'error',
 		'clipboard'
 	);
@@ -1306,10 +1539,10 @@ document.querySelectorAll<HTMLElement>('[data-slot-row]').forEach((row) => {
 
 clearFeedbackButton.addEventListener('click', () => {
 	void clearFeedback().then(() => {
-		status.textContent = 'Debug log cleared.';
+		status.textContent = t('Debug log cleared.');
 		status.dataset.severity = 'info';
 		setTimeout(() => {
-			if (status.textContent === 'Debug log cleared.') status.textContent = '';
+			if (status.textContent === t('Debug log cleared.')) status.textContent = '';
 		}, 3000);
 	});
 });
@@ -1323,24 +1556,24 @@ copyFeedbackButton.addEventListener('click', () => {
 	void getFeedbackHistory()
 		.then((events) => navigator.clipboard.writeText(formatFeedbackForAi(events)))
 		.then(() => {
-			setStatus('Debug log copied for AI.', 'info', 'debug');
+			setStatus(t('Debug log copied for AI.'), 'info', 'debug');
 		})
 		.catch(() => {
-			setStatus('Debug log copy failed.', 'error', 'debug');
+			setStatus(t('Debug log copy failed.'), 'error', 'debug');
 		});
 });
 
 document.querySelector<HTMLButtonElement>('#importJson')!.addEventListener('click', async () => {
 	const json = actionJson.value.trim();
 	if (!json) {
-		setStatus('JSON textarea is empty.', 'warn', 'json');
+		setStatus(t('JSON textarea is empty.'), 'warn', 'json');
 		return;
 	}
 	try {
 		JSON.parse(json);
 	} catch (error) {
 		void debugWarn('json', 'Action JSON parse failed.', { error }, { feedback: true });
-		setStatus('Invalid JSON.', 'error', 'json');
+		setStatus(t('Invalid JSON.'), 'error', 'json');
 		return;
 	}
 	const response = await sendActiveTabMessage({ type: 'IMPORT_ACTION_JSON', json });
@@ -1348,7 +1581,7 @@ document.querySelector<HTMLButtonElement>('#importJson')!.addEventListener('clic
 		await refreshSlotState(DEFAULT_UNIVERSAL_CLIPBOARD_SLOT);
 	}
 	setStatus(
-		response.ok ? response.message ?? 'Import queued.' : response.error,
+		response.ok ? response.message ?? t('Import queued.') : response.error,
 		response.ok ? 'info' : 'error',
 		'json'
 	);
@@ -1356,14 +1589,14 @@ document.querySelector<HTMLButtonElement>('#importJson')!.addEventListener('clic
 
 document.querySelector<HTMLButtonElement>('#copyJsonText')!.addEventListener('click', async () => {
 	if (!actionJson.value.trim()) {
-		setStatus('JSON textarea is empty.', 'warn', 'json');
+		setStatus(t('JSON textarea is empty.'), 'warn', 'json');
 		return;
 	}
 	try {
 		await navigator.clipboard.writeText(actionJson.value);
-		setStatus('JSON copied to clipboard.', 'info', 'json');
+		setStatus(t('JSON copied to clipboard.'), 'info', 'json');
 	} catch {
-		setStatus('Clipboard write failed.', 'error', 'json');
+		setStatus(t('Clipboard write failed.'), 'error', 'json');
 	}
 });
 
@@ -1371,7 +1604,7 @@ actionJson.addEventListener('input', updateActionJsonState);
 
 clearJsonButton.addEventListener('click', () => {
 	setActionJsonValue('');
-	setStatus('JSON cleared.', 'info', 'json');
+	setStatus(t('JSON cleared.'), 'info', 'json');
 });
 
 stylesEnabled.watch((value) => {
@@ -1383,6 +1616,21 @@ soundsEnabled.watch((value) => {
 });
 showSuggestions.watch((value) => {
 	showSuggestionsInput.checked = value ?? DEFAULT_SHOW_SUGGESTIONS;
+});
+commandPaletteEnabled.watch((value) => {
+	commandPaletteEnabledInput.checked = value ?? DEFAULT_COMMAND_PALETTE_ENABLED;
+});
+blockTaskbotNodeLabelClicks.watch((value) => {
+	blockTaskbotNodeLabelClicksInput.checked =
+		value ?? DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS;
+});
+forceEnglishLocale.watch((value) => {
+	forceEnglishLocaleInput.checked = value ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+});
+extensionLanguage.watch((value) => {
+	const language = normalizeExtensionLanguage(value);
+	extensionLanguageSelect.value = language;
+	cacheExtensionLanguage(language);
 });
 debugEnabled.watch((value) => {
 	currentDebugEnabled = value ?? DEFAULT_DEBUG_ENABLED;

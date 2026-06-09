@@ -1,8 +1,10 @@
 import { storage } from '#imports';
+import type { LanguagePreference } from './i18n';
+export type { LanguagePreference } from './i18n';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.1.1';
+export const EXTENSION_VERSION = '1.3.0';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',
@@ -27,6 +29,15 @@ export const runButton = storage.defineItem<boolean>('local:runButton');
 export const soundsEnabled = storage.defineItem<boolean>('local:soundsEnabled');
 export const showSuggestions = storage.defineItem<boolean>('local:showSuggestions');
 export const debugEnabled = storage.defineItem<boolean>('local:debugEnabled');
+export const commandPaletteEnabled = storage.defineItem<boolean>(
+	'local:commandPaletteEnabled'
+);
+export const blockTaskbotNodeLabelClicks = storage.defineItem<boolean>(
+	'local:blockTaskbotNodeLabelClicks'
+);
+export const forceEnglishLocale = storage.defineItem<boolean>('local:forceEnglishLocale');
+export const extensionLanguage =
+	storage.defineItem<LanguagePreference>('local:extensionLanguage');
 export const commandPaletteShortcut = storage.defineItem<CommandPaletteShortcut>(
 	'local:commandPaletteShortcut'
 );
@@ -39,6 +50,10 @@ export const DEFAULT_RUN_BUTTON = false;
 export const DEFAULT_SOUNDS_ENABLED = false;
 export const DEFAULT_SHOW_SUGGESTIONS = true;
 export const DEFAULT_DEBUG_ENABLED = false;
+export const DEFAULT_COMMAND_PALETTE_ENABLED = true;
+export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = true;
+export const DEFAULT_FORCE_ENGLISH_LOCALE = true;
+export const DEFAULT_EXTENSION_LANGUAGE: LanguagePreference = 'auto';
 export const DEFAULT_COMMAND_PALETTE_SHORTCUT = COMMAND_PALETTE_SHORTCUTS.ALT_P;
 export const DEFAULT_OPEN_SIDEBAR_SHORTCUT = OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L;
 
@@ -56,6 +71,15 @@ export const OPEN_SIDEBAR_SHORTCUT_OPTIONS = Object.values(
 	value,
 	label: OPEN_SIDEBAR_SHORTCUT_LABELS[value],
 }));
+
+export const EXTENSION_LANGUAGE_OPTIONS: Array<{
+	value: LanguagePreference;
+	label: string;
+}> = [
+	{ value: 'auto', label: 'Auto (browser)' },
+	{ value: 'en', label: 'English' },
+	{ value: 'es', label: 'Spanish' },
+];
 
 export const STYLE_FEATURES = [
 	{
@@ -134,8 +158,8 @@ export const styleFeatureItems = STYLE_FEATURES.reduce(
 export const STYLE_VALUE_FIELDS = [
 	{
 		key: 'userBg',
-		label: 'Background image',
-		description: 'Upload png, jpg, jpeg, webp, or gif. Empty uses bundled default.',
+		label: 'Loading animation image',
+		description: 'Upload replacement png, jpg, jpeg, webp, or gif. Empty uses bundled default.',
 		cssVar: '--better-aa-user-bg',
 		defaultValue: '',
 		type: 'text',
@@ -143,7 +167,7 @@ export const STYLE_VALUE_FIELDS = [
 	{
 		key: 'userBgSize',
 		label: 'Loading image size',
-		description: 'Background-size for replacement loading image.',
+		description: 'Sizing mode for replacement loading animation image.',
 		cssVar: '--better-aa-user-bg-size',
 		defaultValue: 'contain',
 		type: 'select',
@@ -205,6 +229,29 @@ export async function getShowSuggestions(): Promise<boolean> {
 
 export async function getDebugEnabled(): Promise<boolean> {
 	return (await debugEnabled.getValue()) ?? DEFAULT_DEBUG_ENABLED;
+}
+
+export async function getCommandPaletteEnabled(): Promise<boolean> {
+	return (await commandPaletteEnabled.getValue()) ?? DEFAULT_COMMAND_PALETTE_ENABLED;
+}
+
+export async function getBlockTaskbotNodeLabelClicks(): Promise<boolean> {
+	return (
+		(await blockTaskbotNodeLabelClicks.getValue()) ??
+		DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS
+	);
+}
+
+export async function getForceEnglishLocale(): Promise<boolean> {
+	return (await forceEnglishLocale.getValue()) ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+}
+
+export function normalizeExtensionLanguage(value: unknown): LanguagePreference {
+	return value === 'en' || value === 'es' ? value : DEFAULT_EXTENSION_LANGUAGE;
+}
+
+export async function getExtensionLanguage(): Promise<LanguagePreference> {
+	return normalizeExtensionLanguage(await extensionLanguage.getValue());
 }
 
 export function normalizeCommandPaletteShortcut(

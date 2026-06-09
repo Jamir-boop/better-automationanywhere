@@ -10,6 +10,7 @@ import {
 import {
 	AUTOMATION_ANYWHERE_MATCHES,
 	isAutomationAnywhereUrl,
+	isTaskEditorUrl,
 } from '../src/ts/automation-anywhere';
 import {
 	exportActionToClipboard,
@@ -17,10 +18,26 @@ import {
 	importActionFromJson,
 } from '../src/ts/commands';
 import { debugError, debugInfo } from '../src/ts/debug';
-import { callInitializeRepeatedly } from '../src/ts/initialize';
+import { setActiveLanguagePreference, t } from '../src/ts/i18n';
+import {
+	callInitializeRepeatedly,
+	setCustomPaletteButtonsEnabled,
+	setForceEnglishLocaleEnabled,
+} from '../src/ts/initialize';
 import type { ContentActionResponse, RuntimeMessage } from '../src/ts/messages';
 import {
+	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
+	DEFAULT_COMMAND_PALETTE_ENABLED,
+	DEFAULT_FORCE_ENGLISH_LOCALE,
+	blockTaskbotNodeLabelClicks,
+	commandPaletteEnabled,
+	extensionLanguage,
+	forceEnglishLocale,
+	getBlockTaskbotNodeLabelClicks,
+	getCommandPaletteEnabled,
 	getCommandPaletteShortcut,
+	getExtensionLanguage,
+	getForceEnglishLocale,
 	getOpenSidebarShortcut,
 	getShowSuggestions,
 	getSoundsEnabled,
@@ -40,7 +57,10 @@ import {
 } from '../src/ts/settings';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
+import { updateCommandPaletteLanguage } from '../src/ts/palette';
 import {
+	setActiveBlockTaskbotNodeLabelClicks,
+	setActiveCommandPaletteEnabled,
 	setActiveCommandPaletteShortcut,
 	setActiveOpenSidebarShortcut,
 } from '../src/ts/utils';
@@ -61,7 +81,6 @@ const OPEN_SIDEBAR_BUTTON_ID = 'better-aa-open-sidebar-button';
 const FOLDERS_ROUTE_CLASS = 'better-aa-route-folders';
 const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
 const FOLDERS_ROUTE_RE = /.*automationanywhere\.digital.*?folders.*$/i;
-const TASKBOT_ROUTE_RE = /.*automationanywhere\.digital.*private\/files\/task\/.*/i;
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -73,12 +92,21 @@ function applyBundledAssetVariables(): void {
 function applyRouteClasses(): void {
 	const href = location.href;
 	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, FOLDERS_ROUTE_RE.test(href));
-	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, TASKBOT_ROUTE_RE.test(href));
+	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, isTaskEditorUrl(href));
 }
 
 function watchRouteChanges(): void {
+	let lastRouteUrl = location.href;
 	const update = () => {
-		requestAnimationFrame(applyRouteClasses);
+		requestAnimationFrame(() => {
+			applyRouteClasses();
+			if (location.href === lastRouteUrl) return;
+			lastRouteUrl = location.href;
+			void browser.runtime.sendMessage({
+				type: 'AA_ROUTE_CHANGED',
+				url: lastRouteUrl,
+			});
+		});
 	};
 	const wrapHistoryMethod = (method: 'pushState' | 'replaceState') => {
 		const original = history[method];
@@ -95,17 +123,18 @@ function watchRouteChanges(): void {
 }
 
 async function applyStyleClasses(): Promise<void> {
-	const [stylesEnabled, styleFeatures] = await Promise.all([
+	const [enabled, styleFeatures] = await Promise.all([
 		getStylesEnabled(),
 		getStyleFeatureValues(),
 	]);
-	document.documentElement.classList.toggle(STYLE_CLASS, stylesEnabled);
+	document.documentElement.classList.toggle(STYLE_CLASS, enabled);
 	for (const feature of STYLE_FEATURES) {
 		document.documentElement.classList.toggle(
 			feature.className,
 			styleFeatures[feature.key]
 		);
 	}
+	setCustomPaletteButtonsEnabled(enabled && styleFeatures.customPaletteButtons);
 }
 
 function setStyleValue(key: string, value: string): void {
@@ -131,10 +160,14 @@ async function applyStyleValues(): Promise<void> {
 
 async function applyInitialSettings(): Promise<void> {
 	try {
+		setActiveLanguagePreference(await getExtensionLanguage());
 		await applyStyleClasses();
 		await applyStyleValues();
 		setSoundsEnabled(await getSoundsEnabled());
 		setSuggestionsEnabled(await getShowSuggestions());
+		setActiveCommandPaletteEnabled(await getCommandPaletteEnabled());
+		setActiveBlockTaskbotNodeLabelClicks(await getBlockTaskbotNodeLabelClicks());
+		setForceEnglishLocaleEnabled(await getForceEnglishLocale());
 		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
 		setActiveOpenSidebarShortcut(await getOpenSidebarShortcut());
 	} catch (error) {
@@ -143,6 +176,14 @@ async function applyInitialSettings(): Promise<void> {
 		});
 		document.documentElement.classList.add(STYLE_CLASS);
 	}
+}
+
+function updateOpenSidebarButtonLabel(): void {
+	const button = document.getElementById(OPEN_SIDEBAR_BUTTON_ID);
+	if (!button) return;
+	button.textContent = t('Better AA');
+	button.title = t('Open Better AA sidebar');
+	button.setAttribute('aria-label', t('Open Better AA sidebar'));
 }
 
 function runOnReady(callback: () => void): void {
@@ -172,9 +213,9 @@ function insertOpenSidebarButton(): void {
 	const button = document.createElement('button');
 	button.id = OPEN_SIDEBAR_BUTTON_ID;
 	button.type = 'button';
-	button.textContent = 'Better AA Developer Experience';
-	button.title = 'Open Better AA Developer Experience sidebar';
-	button.setAttribute('aria-label', 'Open Better AA Developer Experience sidebar');
+	button.textContent = t('Better AA');
+	button.title = t('Open Better AA sidebar');
+	button.setAttribute('aria-label', t('Open Better AA sidebar'));
 	button.addEventListener('click', () => {
 		button.style.transform = 'scale(0.95)';
 		setTimeout(() => {
@@ -260,6 +301,7 @@ async function handleRuntimeMessage(
 		}
 		if (message.type === 'TOGGLE_STYLES') {
 			document.documentElement.classList.toggle(STYLE_CLASS, message.enabled ?? false);
+			await applyStyleClasses();
 			return;
 		}
 		if (message.type === 'SET_RUN_BUTTON_STYLE') {
@@ -277,6 +319,25 @@ async function handleRuntimeMessage(
 		if (message.type === 'SET_DEBUG_ENABLED') {
 			return;
 		}
+		if (message.type === 'SET_COMMAND_PALETTE_ENABLED') {
+			setActiveCommandPaletteEnabled(message.enabled);
+			return;
+		}
+		if (message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS') {
+			setActiveBlockTaskbotNodeLabelClicks(message.enabled);
+			return;
+		}
+		if (message.type === 'SET_FORCE_ENGLISH_LOCALE') {
+			setForceEnglishLocaleEnabled(message.enabled);
+			return;
+		}
+		if (message.type === 'SET_EXTENSION_LANGUAGE') {
+			setActiveLanguagePreference(message.language);
+			updateOpenSidebarButtonLabel();
+			updateCommandPaletteLanguage();
+			callInitializeRepeatedly(1, 1);
+			return;
+		}
 		if (message.type === 'SET_COMMAND_PALETTE_SHORTCUT') {
 			setActiveCommandPaletteShortcut(message.shortcut);
 			return;
@@ -290,6 +351,7 @@ async function handleRuntimeMessage(
 			if (feature) {
 				document.documentElement.classList.toggle(feature.className, message.enabled);
 			}
+			await applyStyleClasses();
 			return;
 		}
 		if (message.type === 'SET_STYLE_VALUE') {
@@ -299,46 +361,46 @@ async function handleRuntimeMessage(
 		if (message.type === 'COPY_TO_SLOT') {
 			const json = await copyToSlot(message.slot);
 			return json
-				? { ok: true, message: `Copied slot ${message.slot}.`, json }
-				: { ok: false, error: `Could not copy slot ${message.slot}.` };
+				? { ok: true, message: t('Copied slot {slot}.', { slot: message.slot }), json }
+				: { ok: false, error: t('Could not copy slot {slot}.', { slot: message.slot }) };
 		}
 		if (message.type === 'PASTE_FROM_SLOT') {
 			const json = await pasteFromSlot(message.slot);
 			return json
-				? { ok: true, message: `Pasted slot ${message.slot}.`, json }
-				: { ok: false, error: `Slot ${message.slot} is empty.` };
+				? { ok: true, message: t('Pasted slot {slot}.', { slot: message.slot }), json }
+				: { ok: false, error: t('Slot {slot} is empty.', { slot: message.slot }) };
 		}
 		if (message.type === 'UNIVERSAL_COPY') {
 			const json = await universalCopy();
 			return json
 				? { ok: true, json }
-				: { ok: false, error: 'Copy failed.' };
+				: { ok: false, error: t('Copy failed.') };
 		}
 		if (message.type === 'UNIVERSAL_PASTE') {
 			const json = await universalPaste();
 			return json
-				? { ok: true, message: 'Paste queued.', json }
-				: { ok: false, error: 'Universal clipboard is empty.' };
+				? { ok: true, message: t('Paste queued.'), json }
+				: { ok: false, error: t('Universal clipboard is empty.') };
 		}
 		if (message.type === 'EXPORT_ACTION') {
 			await exportActionToClipboard();
-			return { ok: true, message: 'Export queued.' };
+			return { ok: true, message: t('Export queued.') };
 		}
 		if (message.type === 'IMPORT_ACTION') {
 			importActionFromJson();
-			return { ok: true, message: 'Sidebar import field opened.' };
+			return { ok: true, message: t('Sidebar import field opened.') };
 		}
 		if (message.type === 'GET_HELP_HTML') {
 			return { ok: true, html: getHelpHtml() };
 		}
 		if (message.type === 'IMPORT_ACTION_JSON') {
 			await importActionJson(message.json);
-			return { ok: true, message: 'Import queued.' };
+			return { ok: true, message: t('Import queued.') };
 		}
 	} catch (error) {
 		return {
 			ok: false,
-			error: error instanceof Error ? error.message : 'Action failed.',
+			error: error instanceof Error ? error.message : t('Action failed.'),
 		};
 	}
 }
@@ -369,6 +431,23 @@ export default defineContentScript({
 		});
 		showSuggestions.watch((value) => {
 			setSuggestionsEnabled(value ?? true);
+		});
+		commandPaletteEnabled.watch((value) => {
+			setActiveCommandPaletteEnabled(value ?? DEFAULT_COMMAND_PALETTE_ENABLED);
+		});
+		blockTaskbotNodeLabelClicks.watch((value) => {
+			setActiveBlockTaskbotNodeLabelClicks(
+				value ?? DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS
+			);
+		});
+		forceEnglishLocale.watch((value) => {
+			setForceEnglishLocaleEnabled(value ?? DEFAULT_FORCE_ENGLISH_LOCALE);
+		});
+		extensionLanguage.watch((value) => {
+			setActiveLanguagePreference(value);
+			updateOpenSidebarButtonLabel();
+			updateCommandPaletteLanguage();
+			callInitializeRepeatedly(1, 1);
 		});
 		openSidebarShortcut.watch((value) => {
 			setActiveOpenSidebarShortcut(normalizeOpenSidebarShortcut(value));

@@ -159,7 +159,8 @@ normalFontSize = .75rem
 	.main-layout__authentication__wrapper
 		customGradientBackground()
 
-@-moz-document regexp(".*automationanywhere\\.digital.*private\\/files\\/task\\/.*")
+// Keep aligned with AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE in src/ts/automation-anywhere.ts.
+@-moz-document regexp(".*automationanywhere\\.digital.*\\/(bots\\/repository\\/)?(private|public)\\/(folders\\/[^\\/?#]+\\/)?files\\/(task|taskbot)\\/.*")
 
 	// Close button change the white bg to the same of run button
 	button[name="close"]

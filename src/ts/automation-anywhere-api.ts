@@ -3,6 +3,7 @@ import type {
 	AutomationAnywhereApiResponse,
 	ContentActionResponse,
 } from './messages';
+import { AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE } from './automation-anywhere';
 
 export const AUTOMATION_ANYWHERE_TASKBOT_TYPE = 'application/vnd.aa.taskbot';
 export const AUTOMATION_ANYWHERE_DIRECTORY_TYPES = new Set([
@@ -123,7 +124,20 @@ export function parseAutomationAnywherePageContext(
 		};
 	}
 
-	const privateFolder = route.match(/\/bots\/repository\/private\/folders\/([^/?#]+)/i);
+	const taskbot = route.match(AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE);
+	if (taskbot) {
+		return {
+			url,
+			baseUrl: parsed.origin,
+			hostname: parsed.hostname,
+			pageType: taskbot[1].toLowerCase() === 'public' ? 'public-taskbot' : 'private-taskbot',
+			fileId: decodeRouteId(taskbot[2]),
+		};
+	}
+
+	const privateFolder = route.match(
+		/\/bots\/repository\/private\/folders\/([^/?#]+)(?:[/?#]|$)/i
+	);
 	if (privateFolder) {
 		return {
 			url,
@@ -134,7 +148,9 @@ export function parseAutomationAnywherePageContext(
 		};
 	}
 
-	const publicFolder = route.match(/\/bots\/repository\/public\/folders\/([^/?#]+)/i);
+	const publicFolder = route.match(
+		/\/bots\/repository\/public\/folders\/([^/?#]+)(?:[/?#]|$)/i
+	);
 	if (publicFolder) {
 		return {
 			url,
@@ -142,32 +158,6 @@ export function parseAutomationAnywherePageContext(
 			hostname: parsed.hostname,
 			pageType: 'public-folder',
 			folderId: decodeRouteId(publicFolder[1]),
-		};
-	}
-
-	const privateTaskbot = route.match(
-		/\/bots\/repository\/private\/files\/task\/([^/?#]+)\/edit/i
-	);
-	if (privateTaskbot) {
-		return {
-			url,
-			baseUrl: parsed.origin,
-			hostname: parsed.hostname,
-			pageType: 'private-taskbot',
-			fileId: decodeRouteId(privateTaskbot[1]),
-		};
-	}
-
-	const publicTaskbot = route.match(
-		/\/bots\/repository\/public\/files\/task\/([^/?#]+)\/view/i
-	);
-	if (publicTaskbot) {
-		return {
-			url,
-			baseUrl: parsed.origin,
-			hostname: parsed.hostname,
-			pageType: 'public-taskbot',
-			fileId: decodeRouteId(publicTaskbot[1]),
 		};
 	}
 
