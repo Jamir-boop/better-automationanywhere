@@ -236,7 +236,6 @@ main
 	transition: opacity .12s ease, transform .12s ease
 
 .help-wrapper:hover .help-tooltip,
-.help-wrapper:focus-within .help-tooltip,
 .help-anchor:hover + .help-tooltip,
 .help-anchor:focus-visible + .help-tooltip
 	opacity: 1
@@ -877,6 +876,59 @@ button
 
 	button[hidden]
 		display: none
+
+.tools-export-format
+	display: grid
+	grid-template-columns: minmax(0, 1fr)
+	gap: 6px
+	padding: 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+
+	&[hidden]
+		display: none
+
+	.help-wrapper
+		display: block
+		width: 100%
+
+	.help-tooltip
+		right: auto
+		left: 0
+		max-width: s('min(280px, calc(100vw - 40px))')
+
+	.help-wrapper:hover .help-tooltip,
+	.tools-export-format-option:has(input:focus-visible) + .help-tooltip
+		opacity: 1
+		transform: translateY(0)
+
+.tools-export-format-label
+	color: var(--accent)
+	font-size: .74rem
+	font-weight: 700
+	text-transform: uppercase
+
+.tools-export-format-option
+	display: flex
+	align-items: center
+	gap: 8px
+	width: 100%
+	color: var(--text)
+	font-size: .74rem
+	cursor: pointer
+
+	input
+		width: 16px
+		height: 16px
+		accent-color: var(--accent)
+
+	&.is-disabled
+		color: var(--text-muted)
+		cursor: not-allowed
+
+		input
+			cursor: not-allowed
 
 .tools-export-package-info
 	display: flex
