@@ -264,7 +264,13 @@ function renderUniversalClipboardSection(): string {
 			</button>
 			${renderHelpTip('clear-json', t('Clear the Action JSON field.'))}
 		</div>
-		<pre id="actionSummary" class="action-summary" hidden></pre>
+		<div id="actionSummarySection" class="action-summary-section" hidden>
+			<div class="section-heading-row collapsible-section-heading action-summary-heading">
+				<h3>${t('Action summary')}</h3>
+				<button id="toggleActionSummary" class="collapsible-toggle" type="button" aria-expanded="false" aria-controls="actionSummary" aria-label="${t('Expand action summary')}"></button>
+			</div>
+			<pre id="actionSummary" class="action-summary" hidden></pre>
+		</div>
 		<div class="button-grid">
 			<span class="help-wrapper">
 				<button id="importJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('import-json')}">${t('Import JSON')}</button>
@@ -463,17 +469,6 @@ app.innerHTML = `
 
 		<section class="tab-panel" role="tabpanel" data-panel="settings" hidden>
 			${renderToolsConfigSection()}
-			<section class="panel-section">
-				<h2>${t('Configuration shortcuts')}</h2>
-				<div class="info-row">
-					<span>${t('Sidebar shortcut')}</span>
-					<strong id="sidebarShortcutValue">Alt + Shift + L</strong>
-				</div>
-				<div class="info-row">
-					<span>${t('Command palette shortcut')}</span>
-					<strong id="settingsCommandPaletteShortcut">Alt + P</strong>
-				</div>
-			</section>
 			<section class="panel-section info-panel">
 				<h2>${t('About')}</h2>
 				<div class="info-row">
@@ -520,11 +515,13 @@ const shortcutLabel = document.querySelector<HTMLElement>('#shortcutLabel')!;
 const openSidebarShortcutLabel = document.querySelector<HTMLElement>(
 	'#openSidebarShortcutLabel'
 )!;
-const sidebarShortcutValue = document.querySelector<HTMLElement>('#sidebarShortcutValue')!;
-const settingsCommandPaletteShortcut = document.querySelector<HTMLElement>(
-	'#settingsCommandPaletteShortcut'
-)!;
 const status = document.querySelector<HTMLElement>('#status')!;
+const actionSummarySection = document.querySelector<HTMLElement>(
+	'#actionSummarySection'
+)!;
+const toggleActionSummaryButton = document.querySelector<HTMLButtonElement>(
+	'#toggleActionSummary'
+)!;
 const actionJson = document.querySelector<HTMLTextAreaElement>('#actionJson')!;
 const actionSummary = document.querySelector<HTMLElement>('#actionSummary')!;
 const clearJsonButton = document.querySelector<HTMLButtonElement>('#clearJson')!;
@@ -551,6 +548,7 @@ const backgroundPreview =
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
 let debugLogCollapsed = true;
+let actionSummaryCollapsed = true;
 let currentExtensionShortcuts: ExtensionShortcuts = {
 	openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
 	commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
@@ -579,6 +577,16 @@ function updateDebugLogState(): void {
 		debugLogCollapsed ? t('Expand debug log') : t('Collapse debug log')
 	);
 	toggleDebugLogButton.setAttribute('aria-expanded', String(!debugLogCollapsed));
+}
+
+function setActionSummaryCollapsed(collapsed: boolean): void {
+	actionSummaryCollapsed = collapsed;
+	actionSummary.hidden = collapsed || actionSummarySection.hidden;
+	toggleActionSummaryButton.setAttribute('aria-expanded', String(!collapsed));
+	toggleActionSummaryButton.setAttribute(
+		'aria-label',
+		collapsed ? t('Expand action summary') : t('Collapse action summary')
+	);
 }
 
 function renderFeedbackHistory(events: DebugEvent[] = []): void {
@@ -684,19 +692,12 @@ function updateShortcutLabel(shortcut: CommandPaletteShortcut): void {
 	const label = getCommandPaletteShortcutLabel(shortcut);
 	shortcutLabel.textContent = t('Current: {shortcut}', { shortcut: label });
 	currentExtensionShortcuts.commandPalette = label;
-	updateSettingsShortcutLabels();
 }
 
 function updateOpenSidebarShortcutLabel(shortcut: OpenSidebarShortcut): void {
 	const label = getOpenSidebarShortcutLabel(shortcut);
 	openSidebarShortcutLabel.textContent = t('Current: {shortcut}', { shortcut: label });
 	currentExtensionShortcuts.openSidebar = label;
-	updateSettingsShortcutLabels();
-}
-
-function updateSettingsShortcutLabels(): void {
-	sidebarShortcutValue.textContent = currentExtensionShortcuts.openSidebar;
-	settingsCommandPaletteShortcut.textContent = currentExtensionShortcuts.commandPalette;
 }
 
 async function refreshExtensionShortcuts(): Promise<void> {
@@ -717,7 +718,6 @@ async function refreshExtensionShortcuts(): Promise<void> {
 			commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
 		};
 	}
-	updateSettingsShortcutLabels();
 }
 
 function renderStaticAboutHelp(shortcut: CommandPaletteShortcut): void {
@@ -823,7 +823,9 @@ function updateActionJsonState(): void {
 	updateClearJsonButton();
 	const summaryText = getActionSummaryText(actionJson.value);
 	actionSummary.textContent = summaryText;
-	actionSummary.hidden = !summaryText;
+	actionSummarySection.hidden = !summaryText;
+	if (!summaryText) actionSummaryCollapsed = true;
+	setActionSummaryCollapsed(actionSummaryCollapsed);
 }
 
 function setActionJsonValue(json: string): void {
@@ -1551,6 +1553,11 @@ toggleDebugLogButton.addEventListener('click', () => {
 	debugLogCollapsed = !debugLogCollapsed;
 	void refreshFeedbackHistory();
 });
+
+toggleActionSummaryButton.addEventListener('click', () => {
+	setActionSummaryCollapsed(!actionSummaryCollapsed);
+});
+setActionSummaryCollapsed(true);
 
 copyFeedbackButton.addEventListener('click', () => {
 	void getFeedbackHistory()

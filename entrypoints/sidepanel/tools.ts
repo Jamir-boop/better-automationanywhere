@@ -90,6 +90,16 @@ interface ExportManifest {
 	globalValues: [];
 }
 
+interface ExportPackageReference {
+	name: string;
+	version: string;
+}
+
+interface ExportTaskbotScan {
+	metadataReferences: ExportMetadataReference[];
+	packages: ExportPackageReference[];
+}
+
 interface ToolRunState {
 	title: string;
 	total: number;
@@ -159,15 +169,21 @@ let toolsProgressLabel: HTMLElement;
 let toolsProgressPercent: HTMLElement;
 let toolsProgressBar: HTMLElement;
 let toolsProgressFill: HTMLElement;
+let toolsExportPackageInfo: HTMLElement;
+let toolsPackageListContent: HTMLElement;
+let toolsCopyPackageList: HTMLButtonElement;
 let toolsFinishModal: HTMLElement;
 let toolsFinishTitle: HTMLElement;
 let toolsFinishSummary: HTMLElement;
 let toolsFinishLog: HTMLElement;
 let toolsFinishClose: HTMLButtonElement;
 let taskbotSection: HTMLElement;
+let taskbotJsonContent: HTMLElement;
+let taskbotJsonToggle: HTMLButtonElement;
 let taskbotJson: HTMLTextAreaElement;
 let taskbotJsonMeta: HTMLElement;
 let taskbotJsonError: HTMLElement;
+let exportPackageListText = '';
 
 export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): string {
 	return `
@@ -223,6 +239,16 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						${renderHelpTip('tools-paste-action', t('Paste into this folder. Duplicates are skipped.'))}
 					</span>
 				</div>
+				<div id="toolsExportPackageInfo" class="tools-export-package-info" hidden>
+					<div class="tools-export-package-header">
+						<strong class="package-list-label">${t('Packages used:')}</strong>
+						<span class="help-wrapper">
+							<button id="toolsCopyPackageList" class="help-anchor" type="button" aria-describedby="${getHelpTipId('tools-copy-package-list')}">${t('Copy')}</button>
+							${renderHelpTip('tools-copy-package-list', t('Copy package list to clipboard.'))}
+						</span>
+					</div>
+					<div id="toolsPackageListContent" class="package-list-content"></div>
+				</div>
 				<div id="toolsProgress" class="tools-progress" hidden aria-live="polite">
 					<div class="tools-progress-meta">
 						<span id="toolsProgressLabel">${t('Idle')}</span>
@@ -243,29 +269,34 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 			</section>
 
 			<section id="taskbotJsonSection" class="panel-section" hidden>
-				<div class="section-heading-row">
-					<h2>${t('Taskbot JSON')}</h2>
-					<span id="taskbotJsonMeta" class="tools-count"></span>
-				</div>
-				<p class="inline-hint">${t('Advanced: saves raw bot content back to Control Room.')}</p>
-				<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false" aria-describedby="taskbotJsonError"></textarea>
-				<p id="taskbotJsonError" class="json-inline-error" hidden></p>
-				<div class="button-grid">
-					<span class="help-wrapper">
-						<button id="taskbotLoadJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-load-json')}">${t('Load from Control Room')}</button>
-						${renderHelpTip('taskbot-load-json', t('Load current taskbot content JSON.'))}
-					</span>
-					<span class="help-wrapper">
-						<button id="taskbotCopyJson" type="button">${t('Copy to clipboard')}</button>
-					</span>
-					<span class="help-wrapper">
-						<button id="taskbotFormatJson" type="button">${t('Format')}</button>
+				<div class="section-heading-row collapsible-section-heading">
+					<h2 id="taskbotJsonTitle">${t('Taskbot JSON')}</h2>
+					<span class="section-heading-actions">
+						<span id="taskbotJsonMeta" class="tools-count"></span>
+						<button id="taskbotJsonToggle" class="collapsible-toggle" type="button" aria-expanded="false" aria-controls="taskbotJsonContent" aria-label="${t('Expand Taskbot JSON')}"></button>
 					</span>
 				</div>
-				<span class="help-wrapper">
-					<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
-					${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
-				</span>
+				<div id="taskbotJsonContent" class="collapsible-section-content" hidden>
+					<p class="inline-hint">${t('Advanced: saves raw bot content back to Control Room.')}</p>
+					<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false" aria-describedby="taskbotJsonError"></textarea>
+					<p id="taskbotJsonError" class="json-inline-error" hidden></p>
+					<div class="button-grid">
+						<span class="help-wrapper">
+							<button id="taskbotLoadJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-load-json')}">${t('Load from Control Room')}</button>
+							${renderHelpTip('taskbot-load-json', t('Load current taskbot content JSON.'))}
+						</span>
+						<span class="help-wrapper">
+							<button id="taskbotCopyJson" type="button">${t('Copy to clipboard')}</button>
+						</span>
+						<span class="help-wrapper">
+							<button id="taskbotFormatJson" type="button">${t('Format')}</button>
+						</span>
+					</div>
+					<span class="help-wrapper">
+						<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
+						${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
+					</span>
+				</div>
 			</section>
 
 		</section>
@@ -297,12 +328,17 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	toolsProgressPercent = getRequiredElement('#toolsProgressPercent');
 	toolsProgressBar = getRequiredElement('#toolsProgressBar');
 	toolsProgressFill = getRequiredElement('#toolsProgressFill');
+	toolsExportPackageInfo = getRequiredElement('#toolsExportPackageInfo');
+	toolsPackageListContent = getRequiredElement('#toolsPackageListContent');
+	toolsCopyPackageList = getRequiredElement<HTMLButtonElement>('#toolsCopyPackageList');
 	toolsFinishModal = getRequiredElement('#toolsFinishModal');
 	toolsFinishTitle = getRequiredElement('#toolsFinishTitle');
 	toolsFinishSummary = getRequiredElement('#toolsFinishSummary');
 	toolsFinishLog = getRequiredElement('#toolsFinishLog');
 	toolsFinishClose = getRequiredElement<HTMLButtonElement>('#toolsFinishClose');
 	taskbotSection = getRequiredElement('#taskbotJsonSection');
+	taskbotJsonContent = getRequiredElement('#taskbotJsonContent');
+	taskbotJsonToggle = getRequiredElement<HTMLButtonElement>('#taskbotJsonToggle');
 	taskbotJson = getRequiredElement<HTMLTextAreaElement>('#taskbotJson');
 	taskbotJsonMeta = getRequiredElement('#taskbotJsonMeta');
 	taskbotJsonError = getRequiredElement('#taskbotJsonError');
@@ -321,9 +357,15 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	loadMoreButton.addEventListener('click', () => {
 		void loadListPage(false);
 	});
+	toolsCopyPackageList.addEventListener('click', () => {
+		void copyExportPackageList();
+	});
 	toolsFinishClose.addEventListener('click', hideToolFinishModal);
 	toolsFinishModal.addEventListener('click', (event) => {
 		if (event.target === toolsFinishModal) hideToolFinishModal();
+	});
+	taskbotJsonToggle.addEventListener('click', () => {
+		setTaskbotJsonCollapsed(!taskbotJsonContent.hidden);
 	});
 	getRequiredElement<HTMLButtonElement>('#taskbotLoadJson').addEventListener('click', () => {
 		void loadTaskbotJson();
@@ -340,6 +382,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	getRequiredElement<HTMLButtonElement>('#taskbotSaveJson').addEventListener('click', () => {
 		void saveTaskbotJson();
 	});
+	setTaskbotJsonCollapsed(true);
 	browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 		if (message.type !== 'AA_ROUTE_CHANGED') return;
 		if (sender.tab?.active === false) return;
@@ -391,6 +434,80 @@ function updateCopiedFilesStatus(): void {
 		label,
 	});
 	toolsClipboardStatus.hidden = false;
+}
+
+function clearExportPackageInfo(): void {
+	exportPackageListText = '';
+	toolsPackageListContent.textContent = '';
+	toolsExportPackageInfo.hidden = true;
+}
+
+function normalizePackageReference(
+	pkg: ExportPackageReference
+): ExportPackageReference | null {
+	const name = pkg.name.trim();
+	const version = pkg.version.trim();
+	return name && version ? { name, version } : null;
+}
+
+function getPackageReferenceKey(pkg: ExportPackageReference): string {
+	return `${pkg.name}\u0000${pkg.version}`;
+}
+
+function sortPackageReferences(
+	packages: ExportPackageReference[]
+): ExportPackageReference[] {
+	return [...packages].sort((left, right) => {
+		const leftKey = getPackageReferenceKey(left).toLowerCase();
+		const rightKey = getPackageReferenceKey(right).toLowerCase();
+		if (leftKey < rightKey) return -1;
+		if (leftKey > rightKey) return 1;
+		return 0;
+	});
+}
+
+function addPackageReferences(
+	packagesByKey: Map<string, ExportPackageReference>,
+	packages: ExportPackageReference[]
+): void {
+	for (const pkg of packages) {
+		const normalized = normalizePackageReference(pkg);
+		if (!normalized) continue;
+		packagesByKey.set(getPackageReferenceKey(normalized), normalized);
+	}
+}
+
+function formatPackageReference(pkg: ExportPackageReference): string {
+	return `${pkg.name} ${pkg.version}`;
+}
+
+function showExportPackageInfo(packages: ExportPackageReference[]): void {
+	const sortedPackages = sortPackageReferences(packages);
+	exportPackageListText = sortedPackages.map(formatPackageReference).join(', ');
+	toolsPackageListContent.textContent = exportPackageListText || t('No packages found.');
+	toolsExportPackageInfo.hidden = false;
+}
+
+async function copyExportPackageList(): Promise<void> {
+	if (!exportPackageListText) {
+		setToolStatus(t('No packages found.'), 'warn');
+		return;
+	}
+	try {
+		await navigator.clipboard.writeText(exportPackageListText);
+		setToolStatus(t('Package list copied.'));
+	} catch {
+		setToolStatus(t('Clipboard write failed.'), 'error');
+	}
+}
+
+function setTaskbotJsonCollapsed(collapsed: boolean): void {
+	taskbotJsonContent.hidden = collapsed;
+	taskbotJsonToggle.setAttribute('aria-expanded', String(!collapsed));
+	taskbotJsonToggle.setAttribute(
+		'aria-label',
+		collapsed ? t('Expand Taskbot JSON') : t('Collapse Taskbot JSON')
+	);
 }
 
 function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void {
@@ -528,6 +645,7 @@ function setSelectedToolPanel(tool: ToolId | null): void {
 
 async function refreshToolsContext(): Promise<void> {
 	actionsContainer.textContent = '';
+	clearExportPackageInfo();
 	setSelectedToolPanel(null);
 	taskbotJson.value = '';
 	validateTaskbotJson();
@@ -693,7 +811,9 @@ function getToolInlineHint(tool: ToolId | null): string {
 	if (tool === 'update-packages') {
 		return t('Updates selected taskbots using package defaults from this Control Room.');
 	}
-	if (tool === 'export-bots') return t('Exports selected taskbots and dependencies where available.');
+	if (tool === 'export-bots') {
+		return t('Exports selected taskbots and shows packages used after download.');
+	}
 	if (tool === 'download-packages') return t('Downloads selected packages from the Packages page.');
 	return '';
 }
@@ -722,12 +842,14 @@ function renderActionButtons(): void {
 
 async function selectTool(tool: ToolId): Promise<void> {
 	currentTool = tool;
+	clearExportPackageInfo();
 	renderActionButtons();
 	setSelectedToolPanel(tool);
 
 	if (tool === 'universal-clipboard') return;
 
 	if (tool === 'taskbot-json') {
+		setTaskbotJsonCollapsed(true);
 		await loadTaskbotJson();
 		return;
 	}
@@ -1314,6 +1436,7 @@ async function exportSelectedBots(): Promise<void> {
 	const bots = getSelectedFiles().filter(isAutomationAnywhereTaskbot);
 	if (!bots.length) return;
 
+	clearExportPackageInfo();
 	setBusy(primaryActionButton, true, t('Exporting...'));
 	const exportName = `better-aa-export-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 	startToolRun(
@@ -1348,12 +1471,16 @@ async function exportSelectedBots(): Promise<void> {
 		appendToolLog(t('Scanning {count} taskbot file(s) for metadata paths...', {
 			count: taskbots.length,
 		}));
-		const metadataReferences = await scanMetadataReferences(activeRuntime, taskbots);
+		const taskbotScan = await scanTaskbotExportContent(activeRuntime, taskbots);
+		const metadataReferences = taskbotScan.metadataReferences;
 		if (metadataReferences.length) {
 			appendToolLog(t('Metadata references found: {count}.', {
 				count: metadataReferences.length,
 			}));
 		}
+		appendToolLog(t('Package references found: {count}.', {
+			count: taskbotScan.packages.length,
+		}));
 		setToolProgress(2, 5, t('Metadata scan done: {count} reference(s).', {
 			count: metadataReferences.length,
 		}));
@@ -1377,6 +1504,7 @@ async function exportSelectedBots(): Promise<void> {
 		const fileName = `${exportName}.zip`;
 		downloadBlob(archive, fileName);
 		appendToolLog(t('Downloaded: {fileName}', { fileName }));
+		showExportPackageInfo(taskbotScan.packages);
 		const summary = t('Export downloaded: {fileName}', { fileName });
 		setToolStatus(summary);
 		finishToolRun(summary);
@@ -1587,29 +1715,50 @@ function isExportTaskbot(file: AutomationAnywhereFile): boolean {
 	);
 }
 
-async function scanMetadataReferences(
+async function scanTaskbotExportContent(
 	activeRuntime: ToolsRuntime,
 	taskbots: AutomationAnywhereFile[]
-): Promise<ExportMetadataReference[]> {
-	const references: ExportMetadataReference[] = [];
+): Promise<ExportTaskbotScan> {
+	const metadataReferences: ExportMetadataReference[] = [];
+	const packagesByKey = new Map<string, ExportPackageReference>();
 	for (let index = 0; index < taskbots.length; index += EXPORT_BATCH_SIZE) {
 		const batch = taskbots.slice(index, index + EXPORT_BATCH_SIZE);
 		const results = await Promise.allSettled(
 			batch.map(async (bot) => {
 				const content = await activeRuntime.api.getBotContent(getAutomationAnywhereFileId(bot));
+				let packages: ExportPackageReference[] = [];
+				let packageError: string | null = null;
+				try {
+					packages = extractAutomationAnywherePackages(content);
+				} catch (error) {
+					packageError = getErrorMessage(error);
+				}
 				const paths = collectMetadataPaths(content);
-				return paths.map((metadataPath) => ({
-					fileId: getAutomationAnywhereFileId(bot),
-					botPath: getAutomationAnywherePath(bot),
-					metadataPath,
-					fileName: getPathFileName(metadataPath),
-				}));
+				return {
+					metadataReferences: paths.map((metadataPath) => ({
+						fileId: getAutomationAnywhereFileId(bot),
+						botPath: getAutomationAnywherePath(bot),
+						metadataPath,
+						fileName: getPathFileName(metadataPath),
+					})),
+					packages,
+					packageError,
+				};
 			})
 		);
 
 		for (const result of results) {
 			if (result.status === 'fulfilled') {
-				references.push(...result.value);
+				metadataReferences.push(...result.value.metadataReferences);
+				addPackageReferences(packagesByKey, result.value.packages);
+				if (result.value.packageError) {
+					appendToolLog(
+						t('Package scan skipped: {message}', {
+							message: result.value.packageError,
+						}),
+						'warn'
+					);
+				}
 			} else {
 				appendToolLog(
 					t('Metadata scan skipped: {message}', {
@@ -1626,7 +1775,10 @@ async function scanMetadataReferences(
 			})
 		);
 	}
-	return references;
+	return {
+		metadataReferences,
+		packages: sortPackageReferences([...packagesByKey.values()]),
+	};
 }
 
 function collectMetadataPaths(value: unknown, paths = new Set<string>()): string[] {

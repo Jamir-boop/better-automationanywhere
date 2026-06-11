@@ -155,6 +155,46 @@ main
 		flex: 0 0 auto
 		font-size: .72rem
 
+.section-heading-actions
+	display: inline-flex
+	align-items: center
+	gap: 8px
+	flex: 0 0 auto
+	min-width: 0
+
+.collapsible-section-heading
+	button
+		flex: 0 0 auto
+
+.collapsible-toggle
+	position: relative
+	display: inline-flex
+	align-items: center
+	justify-content: center
+	width: 28px
+	height: 28px
+	padding: 0
+	font-size: 0
+	line-height: 0
+
+	&::before
+		content: '+'
+		color: currentColor
+		font-size: 1rem
+		font-weight: 800
+		line-height: 1
+
+	&[aria-expanded='true']::before
+		content: '-'
+
+.collapsible-section-content
+	display: flex
+	flex-direction: column
+	gap: 8px
+
+	&[hidden]
+		display: none
+
 .inline-hint
 	margin: -2px 0 0
 	color: var(--text-muted)
@@ -511,6 +551,23 @@ button
 	&[hidden]
 		display: none
 
+.action-summary-section
+	display: flex
+	flex-direction: column
+	gap: 6px
+
+	&[hidden]
+		display: none
+
+.action-summary-heading
+	padding-top: 2px
+
+	h3
+		margin: 0
+		color: var(--text-muted)
+		font-size: .74rem
+		text-transform: uppercase
+
 .feedback-section
 	gap: 6px
 	padding: 8px
@@ -820,6 +877,36 @@ button
 
 	button[hidden]
 		display: none
+
+.tools-export-package-info
+	display: flex
+	flex-direction: column
+	gap: 6px
+	padding: 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+
+	&[hidden]
+		display: none
+
+.tools-export-package-header
+	display: flex
+	align-items: center
+	justify-content: space-between
+	gap: 8px
+
+.package-list-label
+	color: var(--accent)
+	font-size: .74rem
+	text-transform: uppercase
+
+.package-list-content
+	color: var(--text)
+	font-family: Cascadia Code NF, Consolas, monospace
+	font-size: .7rem
+	line-height: 1.35
+	overflow-wrap: anywhere
 
 .tools-progress
 	display: flex

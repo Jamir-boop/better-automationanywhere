@@ -36,6 +36,9 @@ const ES: Record<string, string> = {
 		'Establece Automation Anywhere en en-US y recarga cuando haga falta. No cambia el idioma de esta extension.',
 	'Universal Clipboard': 'Portapapeles universal',
 	'Action JSON': 'JSON de accion',
+	'Action summary': 'Resumen de accion',
+	'Expand action summary': 'Expandir resumen de accion',
+	'Collapse action summary': 'Contraer resumen de accion',
 	'Advanced: imports raw Automation Anywhere clipboard JSON.':
 		'Avanzado: importa JSON sin procesar del portapapeles de Automation Anywhere.',
 	'Universal copy loads selected action JSON here. Paste JSON here to import.':
@@ -127,8 +130,6 @@ const ES: Record<string, string> = {
 		'Lectura de imagen de animacion de carga fallo.',
 	'Gradient colors restored.': 'Colores de gradiente restaurados.',
 	'Visual improvements restored.': 'Mejoras UI restauradas.',
-	'Configuration shortcuts': 'Atajos de configuracion',
-	'Command palette shortcut': 'Atajo de paleta de comandos',
 	About: 'Acerca de',
 	Version: 'Version',
 	'GitHub repository': 'Repositorio GitHub',
@@ -320,10 +321,16 @@ const ES: Record<string, string> = {
 	'Paste copied files': 'Pegar archivos copiados',
 	'Paste into this folder. Duplicates are skipped.':
 		'Pega en esta carpeta. Se omiten duplicados.',
+	'Packages used:': 'Paquetes usados:',
+	'Copy package list to clipboard.':
+		'Copia la lista de paquetes al portapapeles.',
+	'Package list copied.': 'Lista de paquetes copiada.',
 	Idle: 'Inactivo',
 	'Tool finished': 'Herramienta terminada',
 	Close: 'Cerrar',
 	'Taskbot JSON': 'JSON de taskbot',
+	'Expand Taskbot JSON': 'Expandir JSON de taskbot',
+	'Collapse Taskbot JSON': 'Contraer JSON de taskbot',
 	'Copy Files': 'Copiar archivos',
 	'Update Packages': 'Actualizar paquetes',
 	'Export Bots': 'Exportar bots',
@@ -351,6 +358,8 @@ const ES: Record<string, string> = {
 		'Actualiza taskbots seleccionados usando valores predeterminados de paquetes de este Control Room.',
 	'Exports selected taskbots and dependencies where available.':
 		'Exporta taskbots seleccionados y dependencias disponibles.',
+	'Exports selected taskbots and shows packages used after download.':
+		'Exporta taskbots seleccionados y muestra los paquetes usados despues de descargar.',
 	'Downloads selected packages from the Packages page.':
 		'Descarga paquetes seleccionados desde la pagina Paquetes.',
 	'Loading...': 'Cargando...',
@@ -412,6 +421,8 @@ const ES: Record<string, string> = {
 		'Escaneando {count} archivo(s) taskbot por rutas de metadata...',
 	'Metadata references found: {count}.':
 		'Referencias de metadata encontradas: {count}.',
+	'Package references found: {count}.':
+		'Referencias de paquetes encontradas: {count}.',
 	'Metadata scan done: {count} reference(s).':
 		'Escaneo de metadata terminado: {count} referencia(s).',
 	'Downloading {count} export file(s)...':
@@ -444,6 +455,8 @@ const ES: Record<string, string> = {
 		'Grafo de dependencias vacio. Respuesta: {response}',
 	'Metadata scan skipped: {message}':
 		'Escaneo de metadata omitido: {message}',
+	'Package scan skipped: {message}':
+		'Escaneo de paquetes omitido: {message}',
 	'Metadata scan progress: {count}/{total}':
 		'Progreso de escaneo de metadata: {count}/{total}',
 	'Selected bot download failed: {message}':
