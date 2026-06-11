@@ -211,33 +211,37 @@ main
 	position: relative
 
 .help-tooltip
-	position: absolute
-	top: calc(100% + 6px)
-	right: 0
+	position: fixed
+	top: 0
+	left: 0
+	right: auto
 	z-index: 1200
 	width: max-content
-	max-width: 240px
-	padding: 6px 8px
+	max-width: 280px
+	padding: 7px 9px
 	color: var(--text)
 	background: var(--surface-0)
 	border: 1px solid var(--border-strong)
 	border-radius: 6px
-	box-shadow: 0 10px 26px rgba(0, 0, 0, .48)
+	box-shadow: 0 12px 30px rgba(0, 0, 0, .56)
 	font-size: .68rem
 	font-weight: 400
-	line-height: 1.25
+	line-height: 1.32
 	text-align: left
 	text-transform: none
 	white-space: normal
 	overflow-wrap: anywhere
+	visibility: hidden
 	opacity: 0
 	pointer-events: none
-	transform: translateY(-2px)
+	transform: translateY(-3px)
 	transition: opacity .12s ease, transform .12s ease
 
-.help-wrapper:hover .help-tooltip,
-.help-anchor:hover + .help-tooltip,
-.help-anchor:focus-visible + .help-tooltip
+.help-tooltip[data-placement='top']
+	transform: translateY(3px)
+
+.help-tooltip.is-visible
+	visibility: visible
 	opacity: 1
 	transform: translateY(0)
 
@@ -892,16 +896,6 @@ button
 	.help-wrapper
 		display: block
 		width: 100%
-
-	.help-tooltip
-		right: auto
-		left: 0
-		max-width: s('min(280px, calc(100vw - 40px))')
-
-	.help-wrapper:hover .help-tooltip,
-	.tools-export-format-option:has(input:focus-visible) + .help-tooltip
-		opacity: 1
-		transform: translateY(0)
 
 .tools-export-format-label
 	color: var(--accent)

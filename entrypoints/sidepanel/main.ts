@@ -1,5 +1,5 @@
 import './style.styl';
-import { getHelpTipId, renderHelpTip } from './help';
+import { getHelpTipId, initializeHelpTooltips, renderHelpTip } from './help';
 import { initializeToolsPanel, renderToolsPanel } from './tools';
 import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
 import {
@@ -489,6 +489,8 @@ app.innerHTML = `
 	</main>
 
 `;
+
+initializeHelpTooltips();
 
 const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
