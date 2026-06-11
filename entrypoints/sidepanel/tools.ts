@@ -1,6 +1,5 @@
 import {
 	AutomationAnywhereApi,
-	AUTOMATION_ANYWHERE_TASKBOT_TYPE,
 	applyPackageVersionsToContent,
 	automationAnywhereBlobResponseToBlob,
 	extractAutomationAnywherePackages,
@@ -24,7 +23,6 @@ import type {
 	RuntimeMessage,
 	ToolCapabilities,
 } from '@/src/ts/messages';
-import JSZip from 'jszip';
 type FeedbackSeverity = 'info' | 'warn' | 'error';
 type ToolId =
 	| 'universal-clipboard'
@@ -62,42 +60,9 @@ interface RenderToolsPanelOptions {
 	universalClipboardHtml?: string;
 }
 
-interface ExportMetadataReference {
-	fileId: string;
-	botPath: string;
-	metadataPath: string;
-	fileName: string;
-}
-
-interface ExportManifestEntry {
-	path: string;
-	newPath: null;
-	contentType: string;
-	metadataForFile: string | null;
-	manualDependencies: string[] | null;
-	scannedDependencies: string[] | null;
-	manualDependenciesNewPaths: string[];
-	scannedDependenciesNewPaths: string[];
-	description: string;
-	author: string;
-	tags: string[];
-	excluded: boolean;
-}
-
-interface ExportManifest {
-	files: ExportManifestEntry[];
-	packages: [];
-	globalValues: [];
-}
-
 interface ExportPackageReference {
 	name: string;
 	version: string;
-}
-
-interface ExportTaskbotScan {
-	metadataReferences: ExportMetadataReference[];
-	packages: ExportPackageReference[];
 }
 
 interface ToolRunState {
@@ -109,28 +74,8 @@ interface ToolRunState {
 }
 
 const PAGE_LENGTH = 200;
-const EXPORT_BATCH_SIZE = 20;
-const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
 const EMPTY_TOOL_CAPABILITIES: ToolCapabilities = {
 	universalClipboard: false,
-};
-const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
-	bmp: 'image/bmp',
-	csv: 'text/csv',
-	doc: 'application/msword',
-	docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-	gif: 'image/gif',
-	jpeg: 'image/jpeg',
-	jpg: 'image/jpeg',
-	json: 'application/json',
-	pdf: 'application/pdf',
-	png: 'image/png',
-	svg: 'image/svg+xml',
-	txt: 'text/plain',
-	xls: 'application/vnd.ms-excel',
-	xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-	xml: 'text/xml',
-	zip: 'application/zip',
 };
 
 let options: InitializeToolsOptions;
@@ -791,7 +736,7 @@ function getToolActionHelp(tool: ToolId): string {
 	if (tool === 'universal-clipboard') return t('Use saved AA clipboard slots.');
 	if (tool === 'copy-files') return t('Copy file references inside this extension.');
 	if (tool === 'update-packages') return t('Apply default package versions to selected bots.');
-	if (tool === 'export-bots') return t('Export selected taskbots from this folder.');
+	if (tool === 'export-bots') return t('Export selected files from this folder.');
 	if (tool === 'download-packages') return t('Download packages from this page.');
 	return t('Load and edit raw taskbot JSON.');
 }
@@ -799,7 +744,7 @@ function getToolActionHelp(tool: ToolId): string {
 function getPrimaryActionHelp(tool: ToolId | null): string {
 	if (tool === 'copy-files') return t('Store selected file references inside extension.');
 	if (tool === 'update-packages') return t('Update selected bots using default package versions.');
-	if (tool === 'export-bots') return t('Export selected bots into a ZIP file.');
+	if (tool === 'export-bots') return t('Export selected files in their original format.');
 	if (tool === 'download-packages') return t('Download selected package JAR files.');
 	return t('Run selected tool action.');
 }
@@ -812,7 +757,7 @@ function getToolInlineHint(tool: ToolId | null): string {
 		return t('Updates selected taskbots using package defaults from this Control Room.');
 	}
 	if (tool === 'export-bots') {
-		return t('Exports selected taskbots and shows packages used after download.');
+		return t('Downloads selected files one at a time.');
 	}
 	if (tool === 'download-packages') return t('Downloads selected packages from the Packages page.');
 	return '';
@@ -893,8 +838,8 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 			folderId,
 			offset: loadedOffset,
 			length: PAGE_LENGTH,
-			taskbotsOnly: selectedTool === 'update-packages' || selectedTool === 'export-bots',
-			filesOnly: selectedTool === 'copy-files',
+			taskbotsOnly: selectedTool === 'update-packages',
+			filesOnly: selectedTool === 'copy-files' || selectedTool === 'export-bots',
 		});
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		const rawList = response.list ?? [];
@@ -981,8 +926,10 @@ function filterItemsForTool(
 	items: AutomationAnywhereFile[],
 	tool: ToolId
 ): AutomationAnywhereFile[] {
-	if (tool === 'copy-files') return items.filter((item) => !isAutomationAnywhereFolder(item));
-	if (tool === 'update-packages' || tool === 'export-bots') {
+	if (tool === 'copy-files' || tool === 'export-bots') {
+		return items.filter((item) => !isAutomationAnywhereFolder(item));
+	}
+	if (tool === 'update-packages') {
 		return items.filter(isAutomationAnywhereTaskbot);
 	}
 	return items;
@@ -1141,7 +1088,7 @@ function updateActionBar(): void {
 	primaryActionButton.disabled = count === 0;
 	if (currentTool === 'copy-files') primaryActionButton.textContent = t('Copy {count} file(s)', { count });
 	if (currentTool === 'update-packages') primaryActionButton.textContent = t('Update {count} bot(s)', { count });
-	if (currentTool === 'export-bots') primaryActionButton.textContent = t('Export {count} bot(s)', { count });
+	if (currentTool === 'export-bots') primaryActionButton.textContent = t('Export {count} file(s)', { count });
 	if (currentTool === 'download-packages') {
 		primaryActionButton.textContent = t('Download {count} package(s)', { count });
 	}
@@ -1433,81 +1380,55 @@ async function updateSelectedPackages(): Promise<void> {
 async function exportSelectedBots(): Promise<void> {
 	const activeRuntime = runtime;
 	if (!activeRuntime) return;
-	const bots = getSelectedFiles().filter(isAutomationAnywhereTaskbot);
-	if (!bots.length) return;
+	const files = getSelectedFiles();
+	if (!files.length) return;
 
 	clearExportPackageInfo();
 	setBusy(primaryActionButton, true, t('Exporting...'));
-	const exportName = `better-aa-export-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 	startToolRun(
 		t('Export Bots'),
-		5,
-		t('Starting ZIP export for {count} bot(s). Do not close sidepanel.', {
-			count: bots.length,
+		files.length,
+		t('Exporting {count} file(s). Do not close sidepanel.', {
+			count: files.length,
 		})
 	);
 	try {
-		const rootIds = new Set(bots.map(getAutomationAnywhereFileId));
-		setToolProgress(0, 5, t('Fetching dependency graph...'));
-		appendToolLog(t('Fetching dependency graph...'));
-		const dependencyResponse = await activeRuntime.api.getBotDependencies([...rootIds]);
-		const dependencyItems = dependencyResponse.dependencies ?? [];
-		const exportItems = dedupeAutomationAnywhereFiles([...bots, ...dependencyItems]);
-		if (!exportItems.length) {
-			throw new Error(
-				t('Dependency graph is empty. Response: {response}', {
-					response: stringifyForFeedback(dependencyResponse),
-				})
-			);
-		}
-
-		appendToolLog(t('Dependency graph loaded: {count} file(s).', {
-			count: exportItems.length,
-		}));
-		const taskbots = exportItems.filter(isExportTaskbot);
-		setToolProgress(1, 5, t('Dependency graph loaded: {count} file(s).', {
-			count: exportItems.length,
-		}));
-		appendToolLog(t('Scanning {count} taskbot file(s) for metadata paths...', {
-			count: taskbots.length,
-		}));
-		const taskbotScan = await scanTaskbotExportContent(activeRuntime, taskbots);
-		const metadataReferences = taskbotScan.metadataReferences;
-		if (metadataReferences.length) {
-			appendToolLog(t('Metadata references found: {count}.', {
-				count: metadataReferences.length,
+		let exported = 0;
+		let failed = 0;
+		for (let index = 0; index < files.length; index += 1) {
+			const file = files[index];
+			const fileId = getAutomationAnywhereFileId(file);
+			const fileName = getAutomationAnywhereFileName(file);
+			setToolProgress(index, files.length, t('Exporting: {name}', { name: fileName }));
+			try {
+				const response = await activeRuntime.api.downloadFileContent(fileId);
+				const blob = automationAnywhereBlobResponseToBlob(response);
+				downloadBlob(blob, fileName);
+				exported += 1;
+				appendToolLog(t('Downloaded: {fileName}', { fileName }));
+			} catch (error) {
+				failed += 1;
+				appendToolLog(
+					t('Failed: {name} - {message}', {
+						name: fileName,
+						message: getErrorMessage(error),
+					}),
+					'error'
+				);
+			}
+			setToolProgress(index + 1, files.length, t('Processed {count}/{total}', {
+				count: index + 1,
+				total: files.length,
 			}));
+			if (index < files.length - 1) await delay(300);
 		}
-		appendToolLog(t('Package references found: {count}.', {
-			count: taskbotScan.packages.length,
-		}));
-		setToolProgress(2, 5, t('Metadata scan done: {count} reference(s).', {
-			count: metadataReferences.length,
-		}));
-
-		appendToolLog(
-			t('Downloading {count} export file(s)...', {
-				count: exportItems.length + metadataReferences.length,
-			})
-		);
-		const fileBlobs = await downloadExportFiles(activeRuntime, exportItems, rootIds);
-		const metadataBlobs = await downloadMetadataFiles(activeRuntime, metadataReferences);
-		setToolProgress(3, 5, t('Export file downloads done.'));
-		appendToolLog(t('Creating export archive...'));
-		const archive = await createExportArchive(
-			exportItems,
-			metadataReferences,
-			fileBlobs,
-			metadataBlobs
-		);
-		setToolProgress(4, 5, t('Export archive created.'));
-		const fileName = `${exportName}.zip`;
-		downloadBlob(archive, fileName);
-		appendToolLog(t('Downloaded: {fileName}', { fileName }));
-		showExportPackageInfo(taskbotScan.packages);
-		const summary = t('Export downloaded: {fileName}', { fileName });
-		setToolStatus(summary);
-		finishToolRun(summary);
+		const summary = t('Export files done. Exported {exported}, failed {failed}.', {
+			exported,
+			failed,
+		});
+		const severity = failed ? 'warn' : 'info';
+		setToolStatus(summary, severity);
+		finishToolRun(summary, severity);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : t('Export failed.');
 		setToolStatus(message, 'error');
@@ -1695,342 +1616,10 @@ async function saveTaskbotJson(): Promise<void> {
 	}
 }
 
-function dedupeAutomationAnywhereFiles(
-	items: AutomationAnywhereFile[]
-): AutomationAnywhereFile[] {
-	const byId = new Map<string, AutomationAnywhereFile>();
-	for (const item of items) {
-		const id = getAutomationAnywhereFileId(item);
-		if (!id) continue;
-		byId.set(id, { ...byId.get(id), ...item });
-	}
-	return [...byId.values()];
-}
-
-function isExportTaskbot(file: AutomationAnywhereFile): boolean {
-	const type = getAutomationAnywhereFileType(file);
-	return (
-		type === AUTOMATION_ANYWHERE_TASKBOT_TYPE ||
-		type === AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE
-	);
-}
-
-async function scanTaskbotExportContent(
-	activeRuntime: ToolsRuntime,
-	taskbots: AutomationAnywhereFile[]
-): Promise<ExportTaskbotScan> {
-	const metadataReferences: ExportMetadataReference[] = [];
-	const packagesByKey = new Map<string, ExportPackageReference>();
-	for (let index = 0; index < taskbots.length; index += EXPORT_BATCH_SIZE) {
-		const batch = taskbots.slice(index, index + EXPORT_BATCH_SIZE);
-		const results = await Promise.allSettled(
-			batch.map(async (bot) => {
-				const content = await activeRuntime.api.getBotContent(getAutomationAnywhereFileId(bot));
-				let packages: ExportPackageReference[] = [];
-				let packageError: string | null = null;
-				try {
-					packages = extractAutomationAnywherePackages(content);
-				} catch (error) {
-					packageError = getErrorMessage(error);
-				}
-				const paths = collectMetadataPaths(content);
-				return {
-					metadataReferences: paths.map((metadataPath) => ({
-						fileId: getAutomationAnywhereFileId(bot),
-						botPath: getAutomationAnywherePath(bot),
-						metadataPath,
-						fileName: getPathFileName(metadataPath),
-					})),
-					packages,
-					packageError,
-				};
-			})
-		);
-
-		for (const result of results) {
-			if (result.status === 'fulfilled') {
-				metadataReferences.push(...result.value.metadataReferences);
-				addPackageReferences(packagesByKey, result.value.packages);
-				if (result.value.packageError) {
-					appendToolLog(
-						t('Package scan skipped: {message}', {
-							message: result.value.packageError,
-						}),
-						'warn'
-					);
-				}
-			} else {
-				appendToolLog(
-					t('Metadata scan skipped: {message}', {
-						message: getErrorMessage(result.reason),
-					}),
-					'warn'
-				);
-			}
-		}
-		appendToolLog(
-			t('Metadata scan progress: {count}/{total}', {
-				count: Math.min(index + batch.length, taskbots.length),
-				total: taskbots.length,
-			})
-		);
-	}
-	return {
-		metadataReferences,
-		packages: sortPackageReferences([...packagesByKey.values()]),
-	};
-}
-
-function collectMetadataPaths(value: unknown, paths = new Set<string>()): string[] {
-	if (!value || typeof value !== 'object') return [...paths];
-	if (Array.isArray(value)) {
-		for (const item of value) collectMetadataPaths(item, paths);
-		return [...paths];
-	}
-
-	for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-		if (key.endsWith('MetadataPath') && typeof item === 'string' && item) {
-			paths.add(item);
-		}
-		if (item && typeof item === 'object') collectMetadataPaths(item, paths);
-	}
-	return [...paths];
-}
-
-async function downloadExportFiles(
-	activeRuntime: ToolsRuntime,
-	items: AutomationAnywhereFile[],
-	rootIds: Set<string>
-): Promise<Map<string, Blob>> {
-	const blobs = new Map<string, Blob>();
-	for (let index = 0; index < items.length; index += EXPORT_BATCH_SIZE) {
-		const batch = items.slice(index, index + EXPORT_BATCH_SIZE);
-		const results = await Promise.allSettled(
-			batch.map(async (item) => {
-				const id = getAutomationAnywhereFileId(item);
-				const response = await activeRuntime.api.downloadFileContent(id);
-				return { id, item, blob: automationAnywhereBlobResponseToBlob(response) };
-			})
-		);
-
-		for (const result of results) {
-			if (result.status === 'fulfilled') {
-				blobs.set(result.value.id, result.value.blob);
-				continue;
-			}
-			const item = batch[results.indexOf(result)];
-			const id = getAutomationAnywhereFileId(item);
-			const message = `${getAutomationAnywhereFileName(item)} - ${getErrorMessage(
-				result.reason
-			)}`;
-			if (rootIds.has(id)) {
-				throw new Error(t('Selected bot download failed: {message}', { message }));
-			}
-			appendToolLog(t('Dependency omitted: {message}', { message }), 'warn');
-		}
-		appendToolLog(
-			t('File download progress: {count}/{total}', {
-				count: Math.min(index + batch.length, items.length),
-				total: items.length,
-			})
-		);
-	}
-	return blobs;
-}
-
-async function downloadMetadataFiles(
-	activeRuntime: ToolsRuntime,
-	references: ExportMetadataReference[]
-): Promise<Map<string, Blob>> {
-	const blobs = new Map<string, Blob>();
-	for (let index = 0; index < references.length; index += EXPORT_BATCH_SIZE) {
-		const batch = references.slice(index, index + EXPORT_BATCH_SIZE);
-		const results = await Promise.allSettled(
-			batch.map(async (reference) => {
-				const response = await activeRuntime.api.downloadMetadataContent(
-					reference.fileId,
-					reference.metadataPath
-				);
-				return {
-					key: getMetadataKey(reference),
-					reference,
-					blob: automationAnywhereBlobResponseToBlob(response),
-				};
-			})
-		);
-
-		for (const result of results) {
-			if (result.status === 'fulfilled') {
-				blobs.set(result.value.key, result.value.blob);
-				continue;
-			}
-			appendToolLog(
-				t('Metadata omitted: {message}', {
-					message: getErrorMessage(result.reason),
-				}),
-				'warn'
-			);
-		}
-		appendToolLog(
-			t('Metadata download progress: {count}/{total}', {
-				count: Math.min(index + batch.length, references.length),
-				total: references.length,
-			})
-		);
-	}
-	return blobs;
-}
-
-async function createExportArchive(
-	items: AutomationAnywhereFile[],
-	metadataReferences: ExportMetadataReference[],
-	fileBlobs: Map<string, Blob>,
-	metadataBlobs: Map<string, Blob>
-): Promise<Blob> {
-	const zip = new JSZip();
-	const fileEntries: ExportManifestEntry[] = [];
-	const metadataEntries: ExportManifestEntry[] = [];
-	const scannedDependencies = buildScannedDependencyPaths(items);
-
-	for (const item of items) {
-		const id = getAutomationAnywhereFileId(item);
-		const blob = fileBlobs.get(id);
-		if (!blob) continue;
-		const path = getAutomationAnywherePath(item);
-		addBlobToZip(zip, path, blob);
-		fileEntries.push(createDependencyManifestEntry(item, scannedDependencies.get(id) ?? []));
-	}
-
-	for (const reference of metadataReferences) {
-		const blob = metadataBlobs.get(getMetadataKey(reference));
-		if (!blob) continue;
-		addBlobToZip(zip, getMetadataZipPath(reference), blob);
-		metadataEntries.push(createMetadataManifestEntry(reference));
-	}
-
-	const manifest: ExportManifest = {
-		files: [...fileEntries, ...metadataEntries],
-		packages: [],
-		globalValues: [],
-	};
-	zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-	return zip.generateAsync({
-		type: 'blob',
-		compression: 'DEFLATE',
-		compressionOptions: { level: 6 },
-	});
-}
-
-function addBlobToZip(zip: JSZip, path: string, blob: Blob): void {
-	const parts = splitAutomationPath(path);
-	if (!parts.length) return;
-	let folder = zip;
-	for (const part of parts.slice(0, -1)) {
-		const next = folder.folder(part);
-		if (!next) throw new Error(t('Failed to create ZIP folder: {folder}', { folder: part }));
-		folder = next;
-	}
-	folder.file(parts[parts.length - 1], blob);
-}
-
-function buildScannedDependencyPaths(
-	items: AutomationAnywhereFile[]
-): Map<string, string[]> {
-	const pathsById = new Map(
-		items.map((item) => [getAutomationAnywhereFileId(item), getAutomationAnywherePath(item)])
-	);
-	const dependencies = new Map<string, string[]>();
-	for (const item of items) {
-		const parentId = getOptionalString(item.requiredByFileId);
-		if (!parentId || parentId === '0' || !pathsById.has(parentId)) continue;
-		if (!dependencies.has(parentId)) dependencies.set(parentId, []);
-		dependencies.get(parentId)?.push(getAutomationAnywherePath(item));
-	}
-	return dependencies;
-}
-
-function createDependencyManifestEntry(
-	item: AutomationAnywhereFile,
-	scannedDependencies: string[]
-): ExportManifestEntry {
-	return {
-		path: getAutomationAnywherePath(item),
-		newPath: null,
-		contentType: getFileContentType(item),
-		metadataForFile: null,
-		manualDependencies: [],
-		scannedDependencies,
-		manualDependenciesNewPaths: [],
-		scannedDependenciesNewPaths: [],
-		description: '',
-		author: '',
-		tags: getFileTags(item),
-		excluded: false,
-	};
-}
-
-function createMetadataManifestEntry(reference: ExportMetadataReference): ExportManifestEntry {
-	return {
-		path: `${reference.botPath}\\${reference.fileName}`,
-		newPath: null,
-		contentType: getContentTypeFromPath(reference.fileName),
-		metadataForFile: reference.botPath,
-		manualDependencies: null,
-		scannedDependencies: null,
-		manualDependenciesNewPaths: [],
-		scannedDependenciesNewPaths: [],
-		description: '',
-		author: '',
-		tags: [],
-		excluded: false,
-	};
-}
-
-function getFileContentType(item: AutomationAnywhereFile): string {
-	return (
-		getAutomationAnywhereFileType(item) ||
-		getContentTypeFromPath(getAutomationAnywherePath(item)) ||
-		'application/octet-stream'
-	);
-}
-
-function getContentTypeFromPath(path: string): string {
-	const extension = path.toLowerCase().split('.').pop() ?? '';
-	return CONTENT_TYPE_BY_EXTENSION[extension] ?? 'application/octet-stream';
-}
-
-function getAutomationAnywherePath(item: AutomationAnywhereFile): string {
-	const path = getOptionalString(item.path);
-	if (path) return path;
-	return getAutomationAnywhereFileName(item);
-}
-
-function splitAutomationPath(path: string): string[] {
-	return path.split(/[\\/]+/).filter(Boolean);
-}
-
-function getPathFileName(path: string): string {
-	return splitAutomationPath(path).pop() || path;
-}
-
-function getMetadataZipPath(reference: ExportMetadataReference): string {
-	const botPath = splitAutomationPath(reference.botPath);
-	const botFileName = botPath.pop() || reference.botPath;
-	return [...botPath, `${botFileName}Metadata`, reference.fileName].join('\\');
-}
-
 function getOptionalString(value: unknown): string | null {
 	if (typeof value === 'string' && value) return value;
 	if (typeof value === 'number') return String(value);
 	return null;
-}
-
-function getFileTags(item: AutomationAnywhereFile): string[] {
-	return Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === 'string') : [];
-}
-
-function getMetadataKey(reference: ExportMetadataReference): string {
-	return `${reference.fileId}\u0000${reference.metadataPath}`;
 }
 
 function getErrorMessage(error: unknown): string {

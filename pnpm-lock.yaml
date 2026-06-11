@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      jszip:
-        specifier: ^3.10.1
-        version: 3.10.1
       modern-normalize:
         specifier: ^3.0.1
         version: 3.0.1

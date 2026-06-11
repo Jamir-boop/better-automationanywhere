@@ -340,26 +340,24 @@ const ES: Record<string, string> = {
 		'Copia referencias de archivos dentro de esta extension.',
 	'Apply default package versions to selected bots.':
 		'Aplica versiones predeterminadas de paquetes a los bots seleccionados.',
-	'Export selected taskbots from this folder.':
-		'Exporta taskbots seleccionados desde esta carpeta.',
+	'Export selected files from this folder.':
+		'Exporta archivos seleccionados desde esta carpeta.',
 	'Download packages from this page.': 'Descarga paquetes desde esta pagina.',
 	'Load and edit raw taskbot JSON.': 'Carga y edita JSON de taskbot sin procesar.',
 	'Store selected file references inside extension.':
 		'Guarda referencias de archivos seleccionados dentro de la extension.',
 	'Update selected bots using default package versions.':
 		'Actualiza bots seleccionados usando versiones predeterminadas de paquetes.',
-	'Export selected bots into a ZIP file.':
-		'Exporta bots seleccionados en un archivo ZIP.',
+	'Export selected files in their original format.':
+		'Exporta archivos seleccionados en su formato original.',
 	'Download selected package JAR files.':
 		'Descarga archivos JAR de paquetes seleccionados.',
 	'Stores file references inside extension. Open another folder on same host to paste.':
 		'Guarda referencias de archivos dentro de la extension. Abre otra carpeta del mismo host para pegar.',
 	'Updates selected taskbots using package defaults from this Control Room.':
 		'Actualiza taskbots seleccionados usando valores predeterminados de paquetes de este Control Room.',
-	'Exports selected taskbots and dependencies where available.':
-		'Exporta taskbots seleccionados y dependencias disponibles.',
-	'Exports selected taskbots and shows packages used after download.':
-		'Exporta taskbots seleccionados y muestra los paquetes usados despues de descargar.',
+	'Downloads selected files one at a time.':
+		'Descarga archivos seleccionados uno por uno.',
 	'Downloads selected packages from the Packages page.':
 		'Descarga paquetes seleccionados desde la pagina Paquetes.',
 	'Loading...': 'Cargando...',
@@ -380,7 +378,7 @@ const ES: Record<string, string> = {
 	'No files found.': 'No se encontraron archivos.',
 	'Copy {count} file(s)': 'Copiar {count} archivo(s)',
 	'Update {count} bot(s)': 'Actualizar {count} bot(s)',
-	'Export {count} bot(s)': 'Exportar {count} bot(s)',
+	'Export {count} file(s)': 'Exportar {count} archivo(s)',
 	'Download {count} package(s)': 'Descargar {count} paquete(s)',
 	'Paste {count} copied file(s)': 'Pegar {count} archivo(s) copiado(s)',
 	'{count} file(s) in clipboard. Open target folder to paste.':
@@ -412,26 +410,12 @@ const ES: Record<string, string> = {
 		'Actualizacion de paquetes terminada. Actualizados {updated}, omitidos {skipped}, fallidos {failed}.',
 	'Update packages failed.': 'Actualizacion de paquetes fallo.',
 	'Exporting...': 'Exportando...',
-	'Starting ZIP export for {count} bot(s). Do not close sidepanel.':
-		'Iniciando exportacion ZIP para {count} bot(s). No cierres el panel.',
-	'Fetching dependency graph...': 'Obteniendo grafo de dependencias...',
-	'Dependency graph loaded: {count} file(s).':
-		'Grafo de dependencias cargado: {count} archivo(s).',
-	'Scanning {count} taskbot file(s) for metadata paths...':
-		'Escaneando {count} archivo(s) taskbot por rutas de metadata...',
-	'Metadata references found: {count}.':
-		'Referencias de metadata encontradas: {count}.',
-	'Package references found: {count}.':
-		'Referencias de paquetes encontradas: {count}.',
-	'Metadata scan done: {count} reference(s).':
-		'Escaneo de metadata terminado: {count} referencia(s).',
-	'Downloading {count} export file(s)...':
-		'Descargando {count} archivo(s) de exportacion...',
-	'Export file downloads done.': 'Descarga de archivos de exportacion terminada.',
-	'Creating export archive...': 'Creando archivo de exportacion...',
-	'Export archive created.': 'Archivo de exportacion creado.',
+	'Exporting {count} file(s). Do not close sidepanel.':
+		'Exportando {count} archivo(s). No cierres el panel.',
+	'Exporting: {name}': 'Exportando: {name}',
 	'Downloaded: {fileName}': 'Descargado: {fileName}',
-	'Export downloaded: {fileName}': 'Exportacion descargada: {fileName}',
+	'Export files done. Exported {exported}, failed {failed}.':
+		'Exportacion de archivos terminada. Exportados {exported}, fallidos {failed}.',
 	'Downloading...': 'Descargando...',
 	'Downloading {count} package(s)...':
 		'Descargando {count} paquete(s)...',
@@ -451,24 +435,6 @@ const ES: Record<string, string> = {
 		'Actualizar contenido del taskbot en Control Room?',
 	'Taskbot JSON saved.': 'JSON de taskbot guardado.',
 	'Taskbot JSON save failed.': 'Guardado de JSON de taskbot fallo.',
-	'Dependency graph is empty. Response: {response}':
-		'Grafo de dependencias vacio. Respuesta: {response}',
-	'Metadata scan skipped: {message}':
-		'Escaneo de metadata omitido: {message}',
-	'Package scan skipped: {message}':
-		'Escaneo de paquetes omitido: {message}',
-	'Metadata scan progress: {count}/{total}':
-		'Progreso de escaneo de metadata: {count}/{total}',
-	'Selected bot download failed: {message}':
-		'Descarga del bot seleccionado fallo: {message}',
-	'Dependency omitted: {message}': 'Dependencia omitida: {message}',
-	'File download progress: {count}/{total}':
-		'Progreso de descarga de archivos: {count}/{total}',
-	'Metadata omitted: {message}': 'Metadata omitida: {message}',
-	'Metadata download progress: {count}/{total}':
-		'Progreso de descarga de metadata: {count}/{total}',
-	'Failed to create ZIP folder: {folder}':
-		'No se pudo crear carpeta ZIP: {folder}',
 	'Advanced: saves raw bot content back to Control Room.':
 		'Avanzado: guarda contenido del bot sin procesar en Control Room.',
 	'Load from Control Room': 'Cargar desde Control Room',
