@@ -102,6 +102,9 @@ normalFontSize = .75rem
 		all: unset !important
 		font-weight: 500 !important
 
+	[data-path="CodeInput"]
+		font-weight: 400 !important
+
 	code,
 	.taskbot-canvas-list-node__title--disabled .taskbotnodelabel,
 	.code-input,

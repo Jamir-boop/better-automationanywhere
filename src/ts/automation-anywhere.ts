@@ -11,10 +11,17 @@ export const AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE =
 export const AUTOMATION_ANYWHERE_TASK_EDITOR_URL_RE =
 	/.*automationanywhere\.digital.*\/(?:bots\/repository\/)?(private|public)\/(?:folders\/[^/?#]+\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
 
+export const AUTOMATION_ANYWHERE_TEXT_FILE_URL_RE =
+	/.*automationanywhere\.digital.*\/(?:bots\/repository\/)?(private|public)\/(?:folders\/[^/?#]+\/)?files\/text\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
+
 export function isAutomationAnywhereUrl(url: unknown): url is string {
 	return typeof url === 'string' && AUTOMATION_ANYWHERE_URL_RE.test(url);
 }
 
 export function isTaskEditorUrl(url: string): boolean {
 	return AUTOMATION_ANYWHERE_TASK_EDITOR_URL_RE.test(url);
+}
+
+export function isTextFileUrl(url: string): boolean {
+	return AUTOMATION_ANYWHERE_TEXT_FILE_URL_RE.test(url);
 }

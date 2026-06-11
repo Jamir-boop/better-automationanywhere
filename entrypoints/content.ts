@@ -11,6 +11,7 @@ import {
 	AUTOMATION_ANYWHERE_MATCHES,
 	isAutomationAnywhereUrl,
 	isTaskEditorUrl,
+	isTextFileUrl,
 } from '../src/ts/automation-anywhere';
 import {
 	exportActionToClipboard,
@@ -80,6 +81,7 @@ const TASK_EDITOR_CAPABILITY_SELECTORS = [
 const OPEN_SIDEBAR_BUTTON_ID = 'better-aa-open-sidebar-button';
 const FOLDERS_ROUTE_CLASS = 'better-aa-route-folders';
 const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
+const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
 const FOLDERS_ROUTE_RE = /.*automationanywhere\.digital.*?folders.*$/i;
 
 function applyBundledAssetVariables(): void {
@@ -93,6 +95,7 @@ function applyRouteClasses(): void {
 	const href = location.href;
 	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, FOLDERS_ROUTE_RE.test(href));
 	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, isTaskEditorUrl(href));
+	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
 }
 
 function watchRouteChanges(): void {
