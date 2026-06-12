@@ -18,6 +18,12 @@ import {
 	type AutomationAnywherePackage,
 } from '@/src/ts/automation-anywhere-api';
 import { getHelpTipId, renderHelpTip, setHelpTip } from './help';
+import {
+	clearAutomationAnywhereJsonDetails,
+	downloadJsonTextFile,
+	getJsonDownloadText,
+	renderAutomationAnywhereJsonDetails,
+} from './json-info';
 import { t } from '@/src/ts/i18n';
 import type {
 	ContentActionResponse,
@@ -197,6 +203,7 @@ let taskbotJsonToggle: HTMLButtonElement;
 let taskbotJson: HTMLTextAreaElement;
 let taskbotJsonMeta: HTMLElement;
 let taskbotJsonError: HTMLElement;
+let taskbotPackageList: HTMLElement;
 let exportPackageListText = '';
 let exportFormat: ExportFormat = 'zip';
 let exportBotsLegacyMode = false;
@@ -313,6 +320,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 					<p class="inline-hint">${t('Advanced: saves raw bot content back to Control Room.')}</p>
 					<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false" aria-describedby="taskbotJsonError"></textarea>
 					<p id="taskbotJsonError" class="json-inline-error" hidden></p>
+					<div id="taskbotPackageList" class="taskbot-package-list" hidden></div>
 					<div class="button-grid">
 						<span class="help-wrapper">
 							<button id="taskbotLoadJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-load-json')}">${t('Load from Control Room')}</button>
@@ -324,11 +332,15 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						<span class="help-wrapper">
 							<button id="taskbotFormatJson" type="button">${t('Format')}</button>
 						</span>
+						<span class="help-wrapper">
+							<button id="taskbotExportJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-export-json')}">${t('Export JSON')}</button>
+							${renderHelpTip('taskbot-export-json', t('Download textarea JSON as a .json file.'))}
+						</span>
+						<span class="help-wrapper button-grid-full">
+							<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
+							${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
+						</span>
 					</div>
-					<span class="help-wrapper">
-						<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
-						${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
-					</span>
 				</div>
 			</section>
 
@@ -378,6 +390,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	taskbotJson = getRequiredElement<HTMLTextAreaElement>('#taskbotJson');
 	taskbotJsonMeta = getRequiredElement('#taskbotJsonMeta');
 	taskbotJsonError = getRequiredElement('#taskbotJsonError');
+	taskbotPackageList = getRequiredElement('#taskbotPackageList');
 
 	refreshButton.addEventListener('click', () => {
 		void refreshToolsContext();
@@ -414,8 +427,12 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	getRequiredElement<HTMLButtonElement>('#taskbotFormatJson').addEventListener('click', () => {
 		formatTaskbotJson();
 	});
+	getRequiredElement<HTMLButtonElement>('#taskbotExportJson').addEventListener('click', () => {
+		exportTaskbotJsonFile();
+	});
 	taskbotJson.addEventListener('input', () => {
 		validateTaskbotJson();
+		updateTaskbotPackageList();
 	});
 	getRequiredElement<HTMLButtonElement>('#taskbotSaveJson').addEventListener('click', () => {
 		void saveTaskbotJson();
@@ -569,6 +586,21 @@ function showExportPackageInfo(packages: ExportPackageReference[]): void {
 	exportPackageListText = sortedPackages.map(formatPackageReference).join(', ');
 	toolsPackageListContent.textContent = exportPackageListText || t('No packages found.');
 	toolsExportPackageInfo.hidden = false;
+}
+
+function updateTaskbotPackageList(): void {
+	const value = taskbotJson.value.trim();
+	if (!value) {
+		clearAutomationAnywhereJsonDetails(taskbotPackageList);
+		return;
+	}
+
+	try {
+		const parsed = JSON.parse(value);
+		renderAutomationAnywhereJsonDetails(taskbotPackageList, parsed);
+	} catch {
+		clearAutomationAnywhereJsonDetails(taskbotPackageList);
+	}
 }
 
 async function copyExportPackageList(): Promise<void> {
@@ -733,6 +765,7 @@ async function refreshToolsContext(): Promise<void> {
 	setSelectedToolPanel(null);
 	taskbotJson.value = '';
 	validateTaskbotJson();
+	updateTaskbotPackageList();
 	taskbotJsonFileId = null;
 	updateCopiedFilesStatus();
 	updateAvailabilityDot(false);
@@ -940,7 +973,7 @@ async function selectTool(tool: ToolId): Promise<void> {
 	if (tool === 'universal-clipboard') return;
 
 	if (tool === 'taskbot-json') {
-		setTaskbotJsonCollapsed(true);
+		setTaskbotJsonCollapsed(false);
 		await loadTaskbotJson();
 		return;
 	}
@@ -1773,6 +1806,7 @@ async function loadTaskbotJson(): Promise<void> {
 	setSelectedToolPanel(selectedTool);
 	taskbotJsonMeta.textContent = t('File {fileId}', { fileId });
 	taskbotJson.value = '';
+	updateTaskbotPackageList();
 	taskbotJsonFileId = fileId;
 	try {
 		const content = await activeRuntime.api.getBotContent(fileId);
@@ -1781,6 +1815,7 @@ async function loadTaskbotJson(): Promise<void> {
 		}
 		taskbotJson.value = JSON.stringify(content, null, 2);
 		validateTaskbotJson();
+		updateTaskbotPackageList();
 		setToolStatus(t('Taskbot JSON loaded.'));
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool || taskbotJsonFileId !== fileId) {
@@ -1790,6 +1825,7 @@ async function loadTaskbotJson(): Promise<void> {
 			error instanceof Error ? error.message : t('Taskbot JSON load failed.'),
 			'error'
 		);
+		updateTaskbotPackageList();
 	}
 }
 
@@ -1811,7 +1847,25 @@ function formatTaskbotJson(): void {
 		taskbotJson.value = options.prettyJson(taskbotJson.value);
 		JSON.parse(taskbotJson.value);
 		validateTaskbotJson();
+		updateTaskbotPackageList();
 		setToolStatus(t('Taskbot JSON formatted.'));
+	} catch (error) {
+		validateTaskbotJson();
+		updateTaskbotPackageList();
+		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
+	}
+}
+
+function exportTaskbotJsonFile(): void {
+	const json = taskbotJson.value.trim();
+	if (!json) {
+		setToolStatus(t('Taskbot JSON is empty.'), 'warn');
+		return;
+	}
+	try {
+		const fileId = taskbotJsonFileId ?? 'json';
+		downloadJsonTextFile(getJsonDownloadText(json), `taskbot-${fileId}.json`);
+		setToolStatus(t('JSON exported.'));
 	} catch (error) {
 		validateTaskbotJson();
 		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');

@@ -51,6 +51,9 @@ const ES: Record<string, string> = {
 	'Copy JSON': 'Copiar JSON',
 	'Copy textarea JSON to system clipboard.':
 		'Copia el JSON del campo al portapapeles del sistema.',
+	'Export JSON': 'Exportar JSON',
+	'Download textarea JSON as a .json file.':
+		'Descarga el JSON del campo como archivo .json.',
 	Default: 'Predeterminado',
 	'Slot {slot}': 'Espacio {slot}',
 	'Load {label}': 'Cargar {label}',
@@ -91,6 +94,8 @@ const ES: Record<string, string> = {
 	'Widen folder table columns.': 'Ensancha columnas de la tabla de carpetas.',
 	'Slim sidebar': 'Barra lateral delgada',
 	'Collapse Pathfinder until hover.': 'Contrae Pathfinder hasta pasar el cursor.',
+	'Disabled because Better AA Slim sidebar is enabled.':
+		'Desactivado porque la barra lateral delgada de Better AA esta activada.',
 	'Custom background': 'Fondo personalizado',
 	'Apply custom TaskBot background gradient.':
 		'Aplica un gradiente de fondo personalizado al TaskBot.',
@@ -170,6 +175,7 @@ const ES: Record<string, string> = {
 	'Source: {value}': 'Fuente: {value}',
 	'Message: {value}': 'Mensaje: {value}',
 	'Details JSON:': 'Detalles JSON:',
+	'JSON details': 'Detalles JSON',
 	'No active tab.': 'No hay pestana activa.',
 	'Open an Automation Anywhere tab first.':
 		'Abre primero una pestana de Automation Anywhere.',
@@ -192,6 +198,7 @@ const ES: Record<string, string> = {
 	actions: 'acciones',
 	'Import queued.': 'Importacion en cola.',
 	'JSON copied to clipboard.': 'JSON copiado al portapapeles.',
+	'JSON exported.': 'JSON exportado.',
 	'Clipboard write failed.': 'Escritura al portapapeles fallo.',
 	'JSON cleared.': 'JSON limpiado.',
 	'Paste queued.': 'Pegado en cola.',
@@ -206,6 +213,7 @@ const ES: Record<string, string> = {
 	'For correct functioning of this extension, the language will be set to English (en-US). The page will reload.':
 		'Para que esta extension funcione correctamente, el idioma de Automation Anywhere se cambiara a ingles (en-US). La pagina se recargara.',
 	'Close notification': 'Cerrar notificacion',
+	Packages: 'Paquetes',
 	Variables: 'Variables',
 	Actions: 'Acciones',
 	Triggers: 'Disparadores',
@@ -386,6 +394,8 @@ const ES: Record<string, string> = {
 		'{selected} seleccionados / {loaded} cargados',
 	'No matches.': 'Sin coincidencias.',
 	'No packages found.': 'No se encontraron paquetes.',
+	'No actions found.': 'No se encontraron acciones.',
+	'No variables found.': 'No se encontraron variables.',
 	'No files found.': 'No se encontraron archivos.',
 	'Copy {count} file(s)': 'Copiar {count} archivo(s)',
 	'Update {count} bot(s)': 'Actualizar {count} bot(s)',

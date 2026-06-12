@@ -24,6 +24,7 @@ import {
 	callInitializeRepeatedly,
 	setCustomPaletteButtonsEnabled,
 	setForceEnglishLocaleEnabled,
+	setPathFinderSlimSidebarEnabled,
 } from '../src/ts/initialize';
 import type { ContentActionResponse, RuntimeMessage } from '../src/ts/messages';
 import {
@@ -138,6 +139,7 @@ async function applyStyleClasses(): Promise<void> {
 		);
 	}
 	setCustomPaletteButtonsEnabled(enabled && styleFeatures.customPaletteButtons);
+	setPathFinderSlimSidebarEnabled(enabled && styleFeatures.pathFinder);
 }
 
 function setStyleValue(key: string, value: string): void {

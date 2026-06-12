@@ -32,6 +32,14 @@ body
 	color: var(--text)
 	background: var(--bg)
 
+::selection
+	color: #000000 !important
+	background: var(--accent) !important
+
+::-moz-selection
+	color: #000000 !important
+	background: var(--accent) !important
+
 [hidden]
 	display: none !important
 
@@ -444,6 +452,9 @@ textarea
 	grid-template-columns: 1fr 1fr
 	gap: 8px
 
+.button-grid-full
+	grid-column: 1 / -1
+
 button
 	color: var(--text)
 	background: var(--surface-0)
@@ -538,38 +549,76 @@ button
 .slot-row.is-invalid .slot-state
 	color: #FF8A8A !important
 
-.action-summary
+.action-package-list,
+.taskbot-package-list
+	display: flex
+	flex-direction: column
+	gap: 10px
 	margin: 0
 	padding: 8px
 	color: var(--text)
 	background: var(--surface-0)
 	border: 1px solid var(--border)
 	border-radius: 6px
-	font-family: Cascadia Code NF, Consolas, monospace
 	font-size: .72rem
+	line-height: 1.35
+	overflow-wrap: anywhere
+	user-select: text
+	cursor: text
+
+	&[hidden]
+		display: none
+
+.json-info-tabs
+	display: flex
+	align-items: center
+	gap: 12px
+	flex-wrap: wrap
+	padding-bottom: 6px
+	border-bottom: 1px solid var(--border)
+
+.json-info-tab
+	display: inline-flex
+	align-items: center
+	gap: 5px
+	min-height: 24px
+	padding: 0 0 4px
+	color: var(--text-muted)
+	background: transparent
+	border: 0
+	border-bottom: 2px solid transparent
+	border-radius: 0
+	font-size: .68rem
+	text-transform: uppercase
+	cursor: pointer
+
+	&:hover
+		color: var(--text)
+		background: transparent
+		border-color: var(--border-strong)
+
+	&:focus
+		outline: 2px solid var(--accent-outline)
+		outline-offset: 2px
+
+	&.is-active
+		color: var(--text)
+		border-color: var(--accent)
+
+.json-info-tab-count
+	color: var(--accent)
+	font-size: .78rem
+	font-weight: 700
+	text-transform: none
+
+.json-info-list
+	font-family: Cascadia Code NF, Consolas, monospace
+	font-size: .7rem
 	line-height: 1.35
 	white-space: pre-wrap
 	overflow-wrap: anywhere
-
-	&[hidden]
-		display: none
-
-.action-summary-section
-	display: flex
-	flex-direction: column
-	gap: 6px
-
-	&[hidden]
-		display: none
-
-.action-summary-heading
-	padding-top: 2px
-
-	h3
-		margin: 0
-		color: var(--text-muted)
-		font-size: .74rem
-		text-transform: uppercase
+	user-select: text
+	cursor: text
 
 .feedback-section
 	gap: 6px

@@ -21,6 +21,11 @@ export interface AutomationAnywhereJsonSummary {
 	actionsByPackage: AutomationAnywhereActionsByPackageSummary[];
 }
 
+export interface AutomationAnywhereJsonStats {
+	actionCount: number;
+	variableCount: number;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -59,6 +64,14 @@ export function flattenNodes(nodes: unknown): JsonRecord[] {
 	}
 
 	return result;
+}
+
+export function getAutomationAnywhereJsonStats(value: unknown): AutomationAnywhereJsonStats {
+	if (!isRecord(value)) return { actionCount: 0, variableCount: 0 };
+	return {
+		actionCount: Array.isArray(value.nodes) ? flattenNodes(value.nodes).length : 0,
+		variableCount: Array.isArray(value.variables) ? value.variables.length : 0,
+	};
 }
 
 export function summarizeAutomationAnywhereJson(

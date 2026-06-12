@@ -4,7 +4,7 @@ export type { LanguagePreference } from './i18n';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.3.7';
+export const EXTENSION_VERSION = '1.5.0';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',

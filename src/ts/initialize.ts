@@ -5,6 +5,7 @@ import * as utils from './utils';
 
 let initialized = false;
 let forceEnglishLocaleEnabled = true;
+let pathFinderSlimSidebarEnabled = false;
 
 export function setCustomPaletteButtonsEnabled(enabled: boolean): void {
 	ui.setCustomEditorPaletteButtonsEnabled(enabled);
@@ -17,9 +18,16 @@ export function setForceEnglishLocaleEnabled(enabled: boolean): void {
 	}
 }
 
+export function setPathFinderSlimSidebarEnabled(enabled: boolean): void {
+	pathFinderSlimSidebarEnabled = enabled;
+	if (initialized) {
+		ui.syncPathFinderSlimSidebar(enabled);
+	}
+}
+
 function injectUi(): void {
 	ui.syncCustomEditorPaletteButtons();
-	ui.removeInlineWidth();
+	ui.syncPathFinderSlimSidebar(pathFinderSlimSidebarEnabled);
 	refreshSounds();
 }
 

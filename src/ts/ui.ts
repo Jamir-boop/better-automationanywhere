@@ -4,8 +4,22 @@ import { t } from './i18n';
 import { escapeHtml } from './utils';
 
 const NOTIFICATION_MIN_DURATION_MS = 8000;
+const PATHFINDER_EXPANDER_SELECTOR =
+	'button[data-path="Pathfinder.expander"], button.pathfinder-tray-expander';
+const PATHFINDER_COLLAPSE_BUTTON_SELECTOR =
+	'button[data-path="Pathfinder.expander"][aria-expanded="true"], button.pathfinder-tray-expander[aria-expanded="true"], button[aria-label="Collapse"]';
+const DISABLED_PATHFINDER_EXPANDER_ATTR = 'data-better-aa-disabled-expander';
+const ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR =
+	'data-better-aa-original-title';
+const ORIGINAL_PATHFINDER_EXPANDER_ARIA_LABEL_ATTR =
+	'data-better-aa-original-aria-label';
+const PATHFINDER_EXPANDER_DISABLED_MESSAGE =
+	'Disabled because Better AA Slim sidebar is enabled.';
 
 let customEditorPaletteButtonsEnabled = true;
+let pathFinderSlimSidebarEnabled = false;
+let pathFinderExpanderGuardInstalled = false;
+let allowPathFinderExpanderClick = false;
 
 export function setCustomEditorPaletteButtonsEnabled(enabled: boolean): void {
 	customEditorPaletteButtonsEnabled = enabled;
@@ -23,6 +37,111 @@ export function syncCustomEditorPaletteButtons(): void {
 export function removeCustomEditorPaletteButtons(): void {
 	document.getElementById('customActionVariableButtons')?.remove();
 	document.getElementById('customActionVariableButtons-style')?.remove();
+}
+
+function getPathFinderExpander(
+	target: EventTarget | null
+): HTMLButtonElement | null {
+	if (!(target instanceof Element)) return null;
+	const button = target.closest<HTMLButtonElement>(PATHFINDER_EXPANDER_SELECTOR);
+	return button instanceof HTMLButtonElement ? button : null;
+}
+
+function disablePathFinderExpander(button: HTMLButtonElement): void {
+	if (!button.hasAttribute(DISABLED_PATHFINDER_EXPANDER_ATTR)) {
+		button.setAttribute(
+			ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR,
+			button.getAttribute('title') ?? ''
+		);
+		button.setAttribute(
+			ORIGINAL_PATHFINDER_EXPANDER_ARIA_LABEL_ATTR,
+			button.getAttribute('aria-label') ?? ''
+		);
+	}
+	const message = t(PATHFINDER_EXPANDER_DISABLED_MESSAGE);
+	button.setAttribute(DISABLED_PATHFINDER_EXPANDER_ATTR, 'true');
+	button.setAttribute('aria-disabled', 'true');
+	button.setAttribute('title', message);
+	button.setAttribute('aria-label', message);
+}
+
+function restorePathFinderExpander(button: HTMLButtonElement): void {
+	if (!button.hasAttribute(DISABLED_PATHFINDER_EXPANDER_ATTR)) return;
+	const originalTitle = button.getAttribute(ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR);
+	const originalAriaLabel = button.getAttribute(
+		ORIGINAL_PATHFINDER_EXPANDER_ARIA_LABEL_ATTR
+	);
+	if (originalTitle) {
+		button.setAttribute('title', originalTitle);
+	} else {
+		button.removeAttribute('title');
+	}
+	if (originalAriaLabel) {
+		button.setAttribute('aria-label', originalAriaLabel);
+	} else {
+		button.removeAttribute('aria-label');
+	}
+	button.removeAttribute('aria-disabled');
+	button.removeAttribute(DISABLED_PATHFINDER_EXPANDER_ATTR);
+	button.removeAttribute(ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR);
+	button.removeAttribute(ORIGINAL_PATHFINDER_EXPANDER_ARIA_LABEL_ATTR);
+}
+
+function syncPathFinderExpanderDisabledState(disabled: boolean): void {
+	document.querySelectorAll<HTMLButtonElement>(PATHFINDER_EXPANDER_SELECTOR).forEach(
+		(button) => {
+			if (disabled) {
+				disablePathFinderExpander(button);
+				return;
+			}
+			restorePathFinderExpander(button);
+		}
+	);
+}
+
+function isActivationKey(event: KeyboardEvent): boolean {
+	return event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar';
+}
+
+function blockPathFinderExpanderEvent(event: Event): void {
+	if (!pathFinderSlimSidebarEnabled || allowPathFinderExpanderClick) return;
+	if (event instanceof KeyboardEvent && !isActivationKey(event)) return;
+	const button = getPathFinderExpander(event.target);
+	if (!button) return;
+	disablePathFinderExpander(button);
+	event.preventDefault();
+	event.stopImmediatePropagation();
+	removeInlineWidth();
+}
+
+function refreshPathFinderExpanderState(event: Event): void {
+	if (!pathFinderSlimSidebarEnabled) return;
+	const button = getPathFinderExpander(event.target);
+	if (button) disablePathFinderExpander(button);
+}
+
+function installPathFinderExpanderGuard(): void {
+	if (pathFinderExpanderGuardInstalled) return;
+	document.addEventListener('pointerover', refreshPathFinderExpanderState, true);
+	document.addEventListener('focusin', refreshPathFinderExpanderState, true);
+	document.addEventListener('pointerdown', blockPathFinderExpanderEvent, true);
+	document.addEventListener('mousedown', blockPathFinderExpanderEvent, true);
+	document.addEventListener('click', blockPathFinderExpanderEvent, true);
+	document.addEventListener('keydown', blockPathFinderExpanderEvent, true);
+	document.addEventListener('keyup', blockPathFinderExpanderEvent, true);
+	pathFinderExpanderGuardInstalled = true;
+}
+
+export function syncPathFinderSlimSidebar(enabled: boolean): void {
+	pathFinderSlimSidebarEnabled = enabled;
+	installPathFinderExpanderGuard();
+	if (!enabled) {
+		syncPathFinderExpanderDisabledState(false);
+		return;
+	}
+	removeInlineWidth();
+	syncPathFinderExpanderDisabledState(true);
+	setTimeout(() => syncPathFinderExpanderDisabledState(true), 600);
 }
 
 export function updateCustomEditorPaletteButtonLabels(): void {
@@ -123,15 +242,22 @@ export function removeInlineWidth(): void {
 		nav?.style.removeProperty('width');
 		return;
 	}
-	const collapseButton = document.querySelector<HTMLElement>('button[aria-label="Collapse"]');
+	const collapseButton = document.querySelector<HTMLElement>(
+		PATHFINDER_COLLAPSE_BUTTON_SELECTOR
+	);
 	if (collapseButton) {
-		collapseButton.click();
+		allowPathFinderExpanderClick = true;
+		try {
+			collapseButton.click();
+		} finally {
+			allowPathFinderExpanderClick = false;
+		}
 		setTimeout(() => {
 			nav?.style.removeProperty('width');
 		}, 500);
 	} else {
 		void debugWarn('selector', 'Collapse button not found.', {
-			selector: 'button[aria-label="Collapse"]',
+			selector: PATHFINDER_COLLAPSE_BUTTON_SELECTOR,
 		}, { feedback: true });
 	}
 }

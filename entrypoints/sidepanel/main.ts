@@ -1,5 +1,11 @@
 import './style.styl';
 import { getHelpTipId, initializeHelpTooltips, renderHelpTip } from './help';
+import {
+	clearAutomationAnywhereJsonDetails,
+	downloadJsonTextFile,
+	getJsonDownloadText,
+	renderAutomationAnywhereJsonDetails,
+} from './json-info';
 import { initializeToolsPanel, renderToolsPanel } from './tools';
 import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
 import {
@@ -16,7 +22,6 @@ import type {
 import {
 	isAutomationAnywhereJson,
 	summarizeAutomationAnywhereJson,
-	type AutomationAnywhereJsonSummary,
 } from '@/src/ts/automation-anywhere-json';
 import {
 	COMMAND_PALETTE_SHORTCUTS,
@@ -264,13 +269,7 @@ function renderUniversalClipboardSection(): string {
 			</button>
 			${renderHelpTip('clear-json', t('Clear the Action JSON field.'))}
 		</div>
-		<div id="actionSummarySection" class="action-summary-section" hidden>
-			<div class="section-heading-row collapsible-section-heading action-summary-heading">
-				<h3>${t('Action summary')}</h3>
-				<button id="toggleActionSummary" class="collapsible-toggle" type="button" aria-expanded="false" aria-controls="actionSummary" aria-label="${t('Expand action summary')}"></button>
-			</div>
-			<pre id="actionSummary" class="action-summary" hidden></pre>
-		</div>
+		<div id="actionPackageList" class="action-package-list" hidden></div>
 		<div class="button-grid">
 			<span class="help-wrapper">
 				<button id="importJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('import-json')}">${t('Import JSON')}</button>
@@ -279,6 +278,10 @@ function renderUniversalClipboardSection(): string {
 			<span class="help-wrapper">
 				<button id="copyJsonText" class="help-anchor" type="button" aria-describedby="${getHelpTipId('copy-json')}">${t('Copy JSON')}</button>
 				${renderHelpTip('copy-json', t('Copy textarea JSON to system clipboard.'))}
+			</span>
+			<span class="help-wrapper button-grid-full">
+				<button id="exportJsonText" class="help-anchor" type="button" aria-describedby="${getHelpTipId('export-json')}">${t('Export JSON')}</button>
+				${renderHelpTip('export-json', t('Download textarea JSON as a .json file.'))}
 			</span>
 		</div>
 	`;
@@ -518,14 +521,8 @@ const openSidebarShortcutLabel = document.querySelector<HTMLElement>(
 	'#openSidebarShortcutLabel'
 )!;
 const status = document.querySelector<HTMLElement>('#status')!;
-const actionSummarySection = document.querySelector<HTMLElement>(
-	'#actionSummarySection'
-)!;
-const toggleActionSummaryButton = document.querySelector<HTMLButtonElement>(
-	'#toggleActionSummary'
-)!;
 const actionJson = document.querySelector<HTMLTextAreaElement>('#actionJson')!;
-const actionSummary = document.querySelector<HTMLElement>('#actionSummary')!;
+const actionPackageList = document.querySelector<HTMLElement>('#actionPackageList')!;
 const clearJsonButton = document.querySelector<HTMLButtonElement>('#clearJson')!;
 const debugLogSection = document.querySelector<HTMLElement>('#debugLogSection')!;
 const feedbackList = document.querySelector<HTMLElement>('#feedbackList')!;
@@ -550,7 +547,6 @@ const backgroundPreview =
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
 let debugLogCollapsed = true;
-let actionSummaryCollapsed = true;
 let currentExtensionShortcuts: ExtensionShortcuts = {
 	openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
 	commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
@@ -579,16 +575,6 @@ function updateDebugLogState(): void {
 		debugLogCollapsed ? t('Expand debug log') : t('Collapse debug log')
 	);
 	toggleDebugLogButton.setAttribute('aria-expanded', String(!debugLogCollapsed));
-}
-
-function setActionSummaryCollapsed(collapsed: boolean): void {
-	actionSummaryCollapsed = collapsed;
-	actionSummary.hidden = collapsed || actionSummarySection.hidden;
-	toggleActionSummaryButton.setAttribute('aria-expanded', String(!collapsed));
-	toggleActionSummaryButton.setAttribute(
-		'aria-label',
-		collapsed ? t('Expand action summary') : t('Collapse action summary')
-	);
 }
 
 function renderFeedbackHistory(events: DebugEvent[] = []): void {
@@ -768,66 +754,24 @@ function prettyJson(json: string): string {
 	}
 }
 
-function formatAutomationAnywhereSummary(summary: AutomationAnywhereJsonSummary): string {
-	const lines = [`Copied actions: ${summary.actionCount}`, '', 'Packages:'];
-	if (summary.packages.length) {
-		for (const pkg of summary.packages) {
-			lines.push(`- ${pkg.name} ${pkg.version}`);
-		}
-	} else {
-		lines.push('- none');
-	}
-
-	lines.push('', 'Actions by package:');
-	if (summary.actionsByPackage.length) {
-		for (const group of summary.actionsByPackage) {
-			lines.push(`- ${group.packageName} ${group.version}`);
-			for (const action of group.actions) {
-				lines.push(`  - ${action.commandName}: ${action.count}`);
-			}
-		}
-	} else {
-		lines.push('- none');
-	}
-
-	return lines.join('\n');
-}
-
-function getActionSummaryText(json: string): string {
-	const input = json.trim();
-	if (!input) return '';
-
-	try {
-		const parsed = JSON.parse(input);
-		if (!isAutomationAnywhereJson(parsed)) {
-			return t('JSON is not Automation Anywhere clipboard JSON.');
-		}
-		try {
-			return formatAutomationAnywhereSummary(
-				summarizeAutomationAnywhereJson(parsed)
-			);
-		} catch (error) {
-			void debugError('aa-json', 'AA JSON summarization failed.', { error }, {
-				feedback: true,
-			});
-			return t('Automation Anywhere summary failed.');
-		}
-	} catch {
-		return t('Invalid JSON.');
-	}
-}
-
 function updateClearJsonButton(): void {
 	clearJsonButton.hidden = !actionJson.value.trim();
 }
 
 function updateActionJsonState(): void {
 	updateClearJsonButton();
-	const summaryText = getActionSummaryText(actionJson.value);
-	actionSummary.textContent = summaryText;
-	actionSummarySection.hidden = !summaryText;
-	if (!summaryText) actionSummaryCollapsed = true;
-	setActionSummaryCollapsed(actionSummaryCollapsed);
+	const input = actionJson.value.trim();
+	if (!input) {
+		clearAutomationAnywhereJsonDetails(actionPackageList);
+		return;
+	}
+
+	try {
+		const parsed = JSON.parse(input);
+		renderAutomationAnywhereJsonDetails(actionPackageList, parsed);
+	} catch {
+		clearAutomationAnywhereJsonDetails(actionPackageList);
+	}
 }
 
 function setActionJsonValue(json: string): void {
@@ -1556,11 +1500,6 @@ toggleDebugLogButton.addEventListener('click', () => {
 	void refreshFeedbackHistory();
 });
 
-toggleActionSummaryButton.addEventListener('click', () => {
-	setActionSummaryCollapsed(!actionSummaryCollapsed);
-});
-setActionSummaryCollapsed(true);
-
 copyFeedbackButton.addEventListener('click', () => {
 	void getFeedbackHistory()
 		.then((events) => navigator.clipboard.writeText(formatFeedbackForAi(events)))
@@ -1606,6 +1545,21 @@ document.querySelector<HTMLButtonElement>('#copyJsonText')!.addEventListener('cl
 		setStatus(t('JSON copied to clipboard.'), 'info', 'json');
 	} catch {
 		setStatus(t('Clipboard write failed.'), 'error', 'json');
+	}
+});
+
+document.querySelector<HTMLButtonElement>('#exportJsonText')!.addEventListener('click', () => {
+	const json = actionJson.value.trim();
+	if (!json) {
+		setStatus(t('JSON textarea is empty.'), 'warn', 'json');
+		return;
+	}
+	try {
+		downloadJsonTextFile(getJsonDownloadText(json), 'action-json.json');
+		setStatus(t('JSON exported.'), 'info', 'json');
+	} catch (error) {
+		void debugWarn('json', 'Action JSON export parse failed.', { error }, { feedback: true });
+		setStatus(t('Invalid JSON.'), 'error', 'json');
 	}
 });
 
