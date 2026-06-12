@@ -15,7 +15,7 @@ export default defineConfig({
 	},
 	manifest: ({ browser }) => ({
 		name: '__MSG_extensionName__',
-		version: '1.5.1',
+		version: '1.5.2',
 		description: '__MSG_extensionDescription__',
 		default_locale: 'en',
 		author: 'jamir-boop',

@@ -151,6 +151,10 @@ const STYLE_FEATURE_GROUPS = [
 	title: string;
 	keys: readonly StyleFeatureKey[];
 }>;
+const STYLE_FEATURE_HELP_TIPS: Partial<Record<StyleFeatureKey, string>> = {
+	makeSidebarScrollable:
+		'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
+};
 
 function getClipboardSlotLabel(slot: number): string {
 	return slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
@@ -288,13 +292,16 @@ function renderUniversalClipboardSection(): string {
 }
 
 function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): string {
+	const helpTip = STYLE_FEATURE_HELP_TIPS[feature.key];
+	const helpTipId = `style-feature-${feature.key}`;
 	return `
-		<label class="setting-row userstyle-dependent">
+		<label class="setting-row userstyle-dependent${helpTip ? ' help-anchor' : ''}"${helpTip ? ` aria-describedby="${getHelpTipId(helpTipId)}"` : ''}>
 			<span>
 				<strong>${t(feature.label)}</strong>
 				<small>${t(feature.description)}</small>
 			</span>
 			<input id="styleFeature-${feature.key}" type="checkbox">
+			${helpTip ? renderHelpTip(helpTipId, t(helpTip)) : ''}
 		</label>
 	`;
 }

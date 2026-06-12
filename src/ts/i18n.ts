@@ -88,8 +88,8 @@ const ES: Record<string, string> = {
 	'Hide Flow, List, and Dual tabs button group.':
 		'Oculta el grupo de botones Flujo, Lista y Dual.',
 	'Scrollable folders': 'Carpetas desplazables',
-	'Make folder sidebar sticky and scrollable.':
-		'Hace fija y desplazable la barra lateral de carpetas.',
+	'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.':
+		'Hace fija y desplazable la barra lateral de carpetas. En paginas de carpeta, centra automaticamente la carpeta activa.',
 	'Folder columns': 'Columnas de carpeta',
 	'Widen folder table columns.': 'Ensancha columnas de la tabla de carpetas.',
 	'Slim sidebar': 'Barra lateral delgada',

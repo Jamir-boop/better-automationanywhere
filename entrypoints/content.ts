@@ -19,6 +19,7 @@ import {
 	importActionFromJson,
 } from '../src/ts/commands';
 import { debugError, debugInfo } from '../src/ts/debug';
+import { setScrollableFoldersAutoScrollEnabled } from '../src/ts/folders';
 import { setActiveLanguagePreference, t } from '../src/ts/i18n';
 import {
 	callInitializeRepeatedly,
@@ -83,6 +84,7 @@ const OPEN_SIDEBAR_BUTTON_ID = 'better-aa-open-sidebar-button';
 const FOLDERS_ROUTE_CLASS = 'better-aa-route-folders';
 const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
 const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
+const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
 const FOLDERS_ROUTE_RE = /.*automationanywhere\.digital.*?folders.*$/i;
 
 function applyBundledAssetVariables(): void {
@@ -97,6 +99,16 @@ function applyRouteClasses(): void {
 	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, FOLDERS_ROUTE_RE.test(href));
 	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, isTaskEditorUrl(href));
 	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
+	syncScrollableFoldersAutoScroll();
+}
+
+function syncScrollableFoldersAutoScroll(): void {
+	const root = document.documentElement;
+	setScrollableFoldersAutoScrollEnabled(
+		root.classList.contains(STYLE_CLASS) &&
+			root.classList.contains(FOLDERS_ROUTE_CLASS) &&
+			root.classList.contains(SCROLLABLE_FOLDERS_CLASS)
+	);
 }
 
 function watchRouteChanges(): void {
@@ -140,6 +152,7 @@ async function applyStyleClasses(): Promise<void> {
 	}
 	setCustomPaletteButtonsEnabled(enabled && styleFeatures.customPaletteButtons);
 	setPathFinderSlimSidebarEnabled(enabled && styleFeatures.pathFinder);
+	syncScrollableFoldersAutoScroll();
 }
 
 function setStyleValue(key: string, value: string): void {

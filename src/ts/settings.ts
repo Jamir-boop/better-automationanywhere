@@ -106,7 +106,8 @@ export const STYLE_FEATURES = [
 	{
 		key: 'makeSidebarScrollable',
 		label: 'Scrollable folders',
-		description: 'Make folder sidebar sticky and scrollable.',
+		description:
+			'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
 		className: 'better-aa-make-sidebar-scrollable',
 		defaultValue: false,
 	},
