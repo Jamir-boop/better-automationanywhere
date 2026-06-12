@@ -87,6 +87,20 @@ const ES: Record<string, string> = {
 	'Hide editor tabs': 'Ocultar pestanas del editor',
 	'Hide Flow, List, and Dual tabs button group.':
 		'Oculta el grupo de botones Flujo, Lista y Dual.',
+	'Minimize running bot window': 'Minimizar ventana de bot en ejecucion',
+	'Add Minimize and Maximize controls to the running bot window.':
+		'Agrega controles Minimizar y Maximizar a la ventana de bot en ejecucion.',
+	'Adds Minimize and Maximize buttons to the running bot window. Minimized mode keeps the page behind it clickable.':
+		'Agrega botones Minimizar y Maximizar a la ventana de bot en ejecucion. El modo minimizado mantiene clicable la pagina detras.',
+	'Running bot window position': 'Posicion de ventana de bot en ejecucion',
+	'Choose where the minimized running bot window appears.':
+		'Elige donde aparece la ventana minimizada de bot en ejecucion.',
+	'Bottom left': 'Abajo izquierda',
+	'Bottom right': 'Abajo derecha',
+	'Top left': 'Arriba izquierda',
+	'Top right': 'Arriba derecha',
+	Minimize: 'Minimizar',
+	Maximize: 'Maximizar',
 	'Scrollable folders': 'Carpetas desplazables',
 	'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.':
 		'Hace fija y desplazable la barra lateral de carpetas. En paginas de carpeta, centra automaticamente la carpeta activa.',

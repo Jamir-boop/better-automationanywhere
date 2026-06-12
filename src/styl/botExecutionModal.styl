@@ -1,0 +1,101 @@
+.better-aa-bot-modal-control[hidden]
+	display: none !important
+
+.better-aa-bot-modal-control
+	margin-left: 8px !important
+
+body.better-aa-bot-modal-body-is-minimized
+	overflow: auto !important
+
+.better-aa-bot-modal-dialog.better-aa-bot-modal-is-minimized
+	position: static !important
+	inset: auto !important
+	width: auto !important
+	height: auto !important
+	min-width: 0 !important
+	min-height: 0 !important
+	max-width: none !important
+	max-height: none !important
+	margin: 0 !important
+	padding: 0 !important
+	transform: none !important
+	pointer-events: none !important
+
+.better-aa-bot-modal.better-aa-bot-modal-is-minimized
+	position: fixed !important
+	inset: auto auto 12px 12px !important
+	z-index: 2147483646 !important
+	width: 360px !important
+	height: auto !important
+	min-width: 0 !important
+	min-height: 0 !important
+	max-width: calc(100vw - 24px) !important
+	max-height: calc(100vh - 24px) !important
+	margin: 0 !important
+	padding: 0 !important
+	transform: none !important
+	display: block !important
+	pointer-events: auto !important
+	align-items: stretch !important
+	justify-content: flex-start !important
+	overflow: visible !important
+
+	.modal__content,
+	.message,
+	.message__main,
+	.message__main-content,
+	.message__main-contents-inner
+		width: 100% !important
+		height: auto !important
+		min-width: 0 !important
+		min-height: 0 !important
+		max-width: 100% !important
+		max-height: calc(100vh - 24px) !important
+		overflow: visible !important
+
+	.message,
+	.message__main,
+	.message__main-content,
+	.message__main-contents-inner
+		display: block !important
+
+	.message__main-contents-inner
+		padding-bottom: 0 !important
+
+	.message__content,
+	.devicechannelmodal
+		display: none !important
+
+	.message__header
+		margin: 0 !important
+
+	.message__title
+		overflow: hidden !important
+		text-overflow: ellipsis !important
+		white-space: nowrap !important
+
+	.message__controls
+		margin-top: 8px !important
+		width: 100% !important
+
+	.alert__controls
+		display: flex !important
+		flex-wrap: wrap !important
+		gap: 6px !important
+		justify-content: flex-end !important
+
+.better-aa-bot-modal-backdrop.better-aa-bot-modal-backdrop-is-minimized
+	opacity: .12 !important
+	pointer-events: none !important
+
+&[data-better-aa-bot-modal-position='bottom-right']
+	.better-aa-bot-modal.better-aa-bot-modal-is-minimized
+		inset: auto 12px 12px auto !important
+
+&[data-better-aa-bot-modal-position='top-left']
+	.better-aa-bot-modal.better-aa-bot-modal-is-minimized
+		inset: 12px auto auto 12px !important
+
+&[data-better-aa-bot-modal-position='top-right']
+	.better-aa-bot-modal.better-aa-bot-modal-is-minimized
+		inset: 12px 12px auto auto !important

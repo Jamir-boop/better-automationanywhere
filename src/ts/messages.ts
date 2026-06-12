@@ -1,5 +1,6 @@
 import type {
 	CommandPaletteShortcut,
+	BotExecutionModalPosition,
 	LanguagePreference,
 	OpenSidebarShortcut,
 	StyleFeatureKey,
@@ -47,6 +48,10 @@ export type SettingsBackgroundMessage =
 	| { type: 'SET_EXTENSION_LANGUAGE'; language: LanguagePreference }
 	| { type: 'SET_COMMAND_PALETTE_SHORTCUT'; shortcut: CommandPaletteShortcut }
 	| { type: 'SET_OPEN_SIDEBAR_SHORTCUT'; shortcut: OpenSidebarShortcut }
+	| {
+			type: 'SET_BOT_EXECUTION_MODAL_POSITION';
+			position: BotExecutionModalPosition;
+	  }
 	| { type: 'SET_STYLE_FEATURE'; key: StyleFeatureKey; enabled: boolean }
 	| { type: 'SET_STYLE_VALUE'; key: StyleValueKey; value: string }
 	| { type: 'OPEN_SIDEBAR'; tab?: SidepanelTab; focus?: SidepanelFocusTarget };

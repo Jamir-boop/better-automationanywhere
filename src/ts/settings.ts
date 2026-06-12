@@ -4,7 +4,7 @@ export type { LanguagePreference } from './i18n';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.5.0';
+export const EXTENSION_VERSION = '1.6.3';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',
@@ -19,10 +19,19 @@ export const OPEN_SIDEBAR_SHORTCUTS = {
 	CTRL_SHIFT_SPACE: 'ctrl+shift+space',
 } as const;
 
+export const BOT_EXECUTION_MODAL_POSITIONS = {
+	BOTTOM_LEFT: 'bottom-left',
+	BOTTOM_RIGHT: 'bottom-right',
+	TOP_LEFT: 'top-left',
+	TOP_RIGHT: 'top-right',
+} as const;
+
 export type CommandPaletteShortcut =
 	(typeof COMMAND_PALETTE_SHORTCUTS)[keyof typeof COMMAND_PALETTE_SHORTCUTS];
 export type OpenSidebarShortcut =
 	(typeof OPEN_SIDEBAR_SHORTCUTS)[keyof typeof OPEN_SIDEBAR_SHORTCUTS];
+export type BotExecutionModalPosition =
+	(typeof BOT_EXECUTION_MODAL_POSITIONS)[keyof typeof BOT_EXECUTION_MODAL_POSITIONS];
 
 export const stylesEnabled = storage.defineItem<boolean>('local:stylesEnabled');
 export const runButton = storage.defineItem<boolean>('local:runButton');
@@ -44,6 +53,9 @@ export const commandPaletteShortcut = storage.defineItem<CommandPaletteShortcut>
 export const openSidebarShortcut = storage.defineItem<OpenSidebarShortcut>(
 	'local:openSidebarShortcut'
 );
+export const botExecutionModalPosition = storage.defineItem<BotExecutionModalPosition>(
+	'local:botExecutionModalPosition'
+);
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;
@@ -56,6 +68,8 @@ export const DEFAULT_FORCE_ENGLISH_LOCALE = true;
 export const DEFAULT_EXTENSION_LANGUAGE: LanguagePreference = 'auto';
 export const DEFAULT_COMMAND_PALETTE_SHORTCUT = COMMAND_PALETTE_SHORTCUTS.ALT_P;
 export const DEFAULT_OPEN_SIDEBAR_SHORTCUT = OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L;
+export const DEFAULT_BOT_EXECUTION_MODAL_POSITION =
+	BOT_EXECUTION_MODAL_POSITIONS.TOP_RIGHT;
 
 export const OPEN_SIDEBAR_SHORTCUT_LABELS: Record<OpenSidebarShortcut, string> = {
 	[OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L]: 'Alt + Shift + L',
@@ -70,6 +84,23 @@ export const OPEN_SIDEBAR_SHORTCUT_OPTIONS = Object.values(
 ).map((value) => ({
 	value,
 	label: OPEN_SIDEBAR_SHORTCUT_LABELS[value],
+}));
+
+export const BOT_EXECUTION_MODAL_POSITION_LABELS: Record<
+	BotExecutionModalPosition,
+	string
+> = {
+	[BOT_EXECUTION_MODAL_POSITIONS.BOTTOM_LEFT]: 'Bottom left',
+	[BOT_EXECUTION_MODAL_POSITIONS.BOTTOM_RIGHT]: 'Bottom right',
+	[BOT_EXECUTION_MODAL_POSITIONS.TOP_LEFT]: 'Top left',
+	[BOT_EXECUTION_MODAL_POSITIONS.TOP_RIGHT]: 'Top right',
+};
+
+export const BOT_EXECUTION_MODAL_POSITION_OPTIONS = Object.values(
+	BOT_EXECUTION_MODAL_POSITIONS
+).map((value) => ({
+	value,
+	label: BOT_EXECUTION_MODAL_POSITION_LABELS[value],
 }));
 
 export const EXTENSION_LANGUAGE_OPTIONS: Array<{
@@ -101,6 +132,13 @@ export const STYLE_FEATURES = [
 		label: 'Hide editor tabs',
 		description: 'Hide Flow, List, and Dual tabs button group.',
 		className: 'better-aa-editor-tabs-buttons',
+		defaultValue: false,
+	},
+	{
+		key: 'minimizeBotModal',
+		label: 'Minimize running bot window',
+		description: 'Add Minimize and Maximize controls to the running bot window.',
+		className: 'better-aa-minimize-bot-modal',
 		defaultValue: false,
 	},
 	{
@@ -273,12 +311,28 @@ export function normalizeOpenSidebarShortcut(
 		: DEFAULT_OPEN_SIDEBAR_SHORTCUT;
 }
 
+export function normalizeBotExecutionModalPosition(
+	value: unknown
+): BotExecutionModalPosition {
+	return Object.values(BOT_EXECUTION_MODAL_POSITIONS).includes(
+		value as BotExecutionModalPosition
+	)
+		? (value as BotExecutionModalPosition)
+		: DEFAULT_BOT_EXECUTION_MODAL_POSITION;
+}
+
 export async function getCommandPaletteShortcut(): Promise<CommandPaletteShortcut> {
 	return normalizeCommandPaletteShortcut(await commandPaletteShortcut.getValue());
 }
 
 export async function getOpenSidebarShortcut(): Promise<OpenSidebarShortcut> {
 	return normalizeOpenSidebarShortcut(await openSidebarShortcut.getValue());
+}
+
+export async function getBotExecutionModalPosition(): Promise<BotExecutionModalPosition> {
+	return normalizeBotExecutionModalPosition(
+		await botExecutionModalPosition.getValue()
+	);
 }
 
 export function getCommandPaletteShortcutLabel(
@@ -289,6 +343,12 @@ export function getCommandPaletteShortcutLabel(
 
 export function getOpenSidebarShortcutLabel(value: OpenSidebarShortcut): string {
 	return OPEN_SIDEBAR_SHORTCUT_LABELS[value];
+}
+
+export function getBotExecutionModalPositionLabel(
+	value: BotExecutionModalPosition
+): string {
+	return BOT_EXECUTION_MODAL_POSITION_LABELS[value];
 }
 
 export function getStyleFeatureDefault(key: StyleFeatureKey): boolean {

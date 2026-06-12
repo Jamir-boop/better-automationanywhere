@@ -25,7 +25,9 @@ import {
 } from '@/src/ts/automation-anywhere-json';
 import {
 	COMMAND_PALETTE_SHORTCUTS,
+	BOT_EXECUTION_MODAL_POSITION_OPTIONS,
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
+	DEFAULT_BOT_EXECUTION_MODAL_POSITION,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_DEBUG_ENABLED,
 	DEFAULT_EXTENSION_LANGUAGE,
@@ -39,6 +41,7 @@ import {
 	OPEN_SIDEBAR_SHORTCUT_OPTIONS,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
+	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
 	commandPaletteShortcut,
@@ -46,6 +49,7 @@ import {
 	extensionLanguage,
 	forceEnglishLocale,
 	getBlockTaskbotNodeLabelClicks,
+	getBotExecutionModalPosition,
 	getCommandPaletteEnabled,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
@@ -59,6 +63,7 @@ import {
 	getStyleFeatureValues,
 	getStyleValues,
 	getStylesEnabled,
+	normalizeBotExecutionModalPosition,
 	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
 	openSidebarShortcut,
@@ -67,6 +72,7 @@ import {
 	styleFeatureItems,
 	styleValueItems,
 	stylesEnabled,
+	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
 	type OpenSidebarShortcut,
 	type StyleFeatureKey,
@@ -137,7 +143,12 @@ const BACKGROUND_COLOR_KEYS = [
 const STYLE_FEATURE_GROUPS = [
 	{
 		title: 'Taskbot Editor',
-		keys: ['customPaletteButtons', 'runButton', 'editorTabsButtons'],
+		keys: [
+			'customPaletteButtons',
+			'runButton',
+			'editorTabsButtons',
+			'minimizeBotModal',
+		],
 	},
 	{
 		title: 'Folder navigation',
@@ -152,6 +163,8 @@ const STYLE_FEATURE_GROUPS = [
 	keys: readonly StyleFeatureKey[];
 }>;
 const STYLE_FEATURE_HELP_TIPS: Partial<Record<StyleFeatureKey, string>> = {
+	minimizeBotModal:
+		'Adds Minimize and Maximize buttons to the running bot window. Minimized mode keeps the page behind it clickable.',
 	makeSidebarScrollable:
 		'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
 };
@@ -303,6 +316,7 @@ function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): st
 			<input id="styleFeature-${feature.key}" type="checkbox">
 			${helpTip ? renderHelpTip(helpTipId, t(helpTip)) : ''}
 		</label>
+		${feature.key === 'minimizeBotModal' ? renderBotExecutionModalPositionControl() : ''}
 	`;
 }
 
@@ -320,6 +334,20 @@ function renderStyleFeatureControls(): string {
 			</div>
 		`;
 	}).join('');
+}
+
+function renderBotExecutionModalPositionControl(): string {
+	return `
+		<label class="select-row userstyle-dependent bot-modal-position-dependent">
+			<span>
+				<strong>${t('Running bot window position')}</strong>
+				<small>${t('Choose where the minimized running bot window appears.')}</small>
+			</span>
+			<select id="botExecutionModalPosition">
+				${BOT_EXECUTION_MODAL_POSITION_OPTIONS.map((option) => `<option value="${option.value}">${t(option.label)}</option>`).join('')}
+			</select>
+		</label>
+	`;
 }
 
 function renderStyleValueControl(field: (typeof STYLE_VALUE_FIELDS)[number]): string {
@@ -523,6 +551,11 @@ const shortcutSelect = document.querySelector<HTMLSelectElement>(
 const openSidebarShortcutSelect = document.querySelector<HTMLSelectElement>(
 	'#openSidebarShortcut'
 )!;
+const botExecutionModalPositionSelect = document.querySelector<HTMLSelectElement>(
+	'#botExecutionModalPosition'
+)!;
+const botExecutionModalPositionRow =
+	botExecutionModalPositionSelect.closest<HTMLElement>('.bot-modal-position-dependent')!;
 const shortcutLabel = document.querySelector<HTMLElement>('#shortcutLabel')!;
 const openSidebarShortcutLabel = document.querySelector<HTMLElement>(
 	'#openSidebarShortcutLabel'
@@ -969,6 +1002,9 @@ function normalizeStyleValueForComparison(key: StyleValueKey, value: string): st
 
 function isUserstyleAtDefault(): boolean {
 	if (stylesInput.checked !== DEFAULT_STYLES_ENABLED) return false;
+	if (botExecutionModalPositionSelect.value !== DEFAULT_BOT_EXECUTION_MODAL_POSITION) {
+		return false;
+	}
 	for (const feature of STYLE_FEATURES) {
 		if (getStyleFeatureInput(feature.key).checked !== feature.defaultValue) {
 			return false;
@@ -1013,7 +1049,15 @@ function updateUserstyleDependentState(): void {
 			control.disabled = disabled;
 		});
 	});
+	updateBotExecutionModalPositionState();
 	updateRestoreDefaultsButton();
+}
+
+function updateBotExecutionModalPositionState(): void {
+	const disabled =
+		!stylesInput.checked || !getStyleFeatureInput('minimizeBotModal').checked;
+	botExecutionModalPositionRow.classList.toggle('is-disabled', disabled);
+	botExecutionModalPositionSelect.disabled = disabled;
 }
 
 function validateBackgroundFile(file: File): string | null {
@@ -1072,6 +1116,7 @@ async function loadState(): Promise<void> {
 		debug,
 		shortcut,
 		sidebarShortcut,
+		botModalPosition,
 		styleFeatures,
 		styleValues,
 	] = await Promise.all([
@@ -1085,6 +1130,7 @@ async function loadState(): Promise<void> {
 		getDebugEnabled(),
 		getCommandPaletteShortcut(),
 		getOpenSidebarShortcut(),
+		getBotExecutionModalPosition(),
 		getStyleFeatureValues(),
 		getStyleValues(),
 	]);
@@ -1112,6 +1158,7 @@ async function loadState(): Promise<void> {
 	openSidebarShortcutSelect.value = sidebarShortcut;
 	currentOpenSidebarShortcut = sidebarShortcut;
 	updateOpenSidebarShortcutLabel(sidebarShortcut);
+	botExecutionModalPositionSelect.value = botModalPosition;
 	await refreshExtensionShortcuts();
 	renderStaticAboutHelp(shortcut);
 
@@ -1274,9 +1321,22 @@ openSidebarShortcutSelect.addEventListener('change', () => {
 	setStatus(t('Sidebar shortcut saved.'), 'info', 'settings');
 });
 
+botExecutionModalPositionSelect.addEventListener('change', () => {
+	const position = normalizeBotExecutionModalPosition(
+		botExecutionModalPositionSelect.value
+	) as BotExecutionModalPosition;
+	botExecutionModalPositionSelect.value = position;
+	updateRestoreDefaultsButton();
+	void sendBackgroundMessage({
+		type: 'SET_BOT_EXECUTION_MODAL_POSITION',
+		position,
+	});
+});
+
 STYLE_FEATURES.forEach((feature) => {
 	getStyleFeatureInput(feature.key).addEventListener('change', (event) => {
 		const input = event.currentTarget as HTMLInputElement;
+		if (feature.key === 'minimizeBotModal') updateBotExecutionModalPositionState();
 		updateRestoreDefaultsButton();
 		void sendBackgroundMessage({
 			type: 'SET_STYLE_FEATURE',
@@ -1398,6 +1458,7 @@ resetGradientColorsButton.addEventListener('click', async () => {
 
 restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 	stylesInput.checked = DEFAULT_STYLES_ENABLED;
+	botExecutionModalPositionSelect.value = DEFAULT_BOT_EXECUTION_MODAL_POSITION;
 	STYLE_FEATURES.forEach((feature) => {
 		getStyleFeatureInput(feature.key).checked = feature.defaultValue;
 	});
@@ -1410,6 +1471,10 @@ restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 		sendBackgroundMessage({
 			type: 'TOGGLE_STYLES',
 			enabled: DEFAULT_STYLES_ENABLED,
+		}),
+		sendBackgroundMessage({
+			type: 'SET_BOT_EXECUTION_MODAL_POSITION',
+			position: DEFAULT_BOT_EXECUTION_MODAL_POSITION,
 		}),
 		...STYLE_FEATURES.map((feature) =>
 			sendBackgroundMessage({
@@ -1624,9 +1689,14 @@ openSidebarShortcut.watch((value) => {
 		renderStaticAboutHelp(currentShortcut);
 	});
 });
+botExecutionModalPosition.watch((value) => {
+	botExecutionModalPositionSelect.value = normalizeBotExecutionModalPosition(value);
+	updateRestoreDefaultsButton();
+});
 STYLE_FEATURES.forEach((feature) => {
 	styleFeatureItems[feature.key].watch((value) => {
 		getStyleFeatureInput(feature.key).checked = value ?? feature.defaultValue;
+		if (feature.key === 'minimizeBotModal') updateBotExecutionModalPositionState();
 		updateRestoreDefaultsButton();
 	});
 });

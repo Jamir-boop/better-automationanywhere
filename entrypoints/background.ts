@@ -15,6 +15,7 @@ import {
 	isAutomationAnywhereUrl,
 } from '../src/ts/automation-anywhere';
 import {
+	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
 	commandPaletteShortcut,
@@ -26,6 +27,7 @@ import {
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getStylesEnabled,
+	normalizeBotExecutionModalPosition,
 	normalizeCommandPaletteShortcut,
 	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
@@ -308,6 +310,17 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 			shortcut,
 		});
 	}
+	if (message.type === 'SET_BOT_EXECUTION_MODAL_POSITION') {
+		const position = normalizeBotExecutionModalPosition(message.position);
+		await botExecutionModalPosition.setValue(position);
+		void debugInfo('userstyle', 'Bot execution modal position saved.', {
+			position,
+		});
+		await broadcastToAutomationTabs({
+			type: 'SET_BOT_EXECUTION_MODAL_POSITION',
+			position,
+		});
+	}
 	if (message.type === 'SET_STYLE_FEATURE') {
 		await styleFeatureItems[message.key].setValue(message.enabled);
 		void debugInfo('userstyle', 'Style feature saved.', {
@@ -350,6 +363,7 @@ function isSettingsBackgroundMessage(message: RuntimeMessage): message is Settin
 		message.type === 'SET_EXTENSION_LANGUAGE' ||
 		message.type === 'SET_COMMAND_PALETTE_SHORTCUT' ||
 		message.type === 'SET_OPEN_SIDEBAR_SHORTCUT' ||
+		message.type === 'SET_BOT_EXECUTION_MODAL_POSITION' ||
 		message.type === 'SET_STYLE_FEATURE' ||
 		message.type === 'SET_STYLE_VALUE'
 	);

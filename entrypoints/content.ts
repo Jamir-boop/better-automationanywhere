@@ -14,6 +14,10 @@ import {
 	isTextFileUrl,
 } from '../src/ts/automation-anywhere';
 import {
+	setBotExecutionModalEnabled,
+	setBotExecutionModalPosition,
+} from '../src/ts/bot-execution-modal';
+import {
 	exportActionToClipboard,
 	getHelpHtml,
 	importActionFromJson,
@@ -32,11 +36,13 @@ import {
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
+	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
 	extensionLanguage,
 	forceEnglishLocale,
 	getBlockTaskbotNodeLabelClicks,
+	getBotExecutionModalPosition,
 	getCommandPaletteEnabled,
 	getCommandPaletteShortcut,
 	getExtensionLanguage,
@@ -47,6 +53,7 @@ import {
 	getStyleFeatureValues,
 	getStylesEnabled,
 	getStyleValues,
+	normalizeBotExecutionModalPosition,
 	normalizeOpenSidebarShortcut,
 	openSidebarShortcut,
 	RUN_BUTTON_CLASS,
@@ -85,6 +92,7 @@ const FOLDERS_ROUTE_CLASS = 'better-aa-route-folders';
 const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
 const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
 const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
+const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
 const FOLDERS_ROUTE_RE = /.*automationanywhere\.digital.*?folders.*$/i;
 
 function applyBundledAssetVariables(): void {
@@ -100,6 +108,7 @@ function applyRouteClasses(): void {
 	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, isTaskEditorUrl(href));
 	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
 	syncScrollableFoldersAutoScroll();
+	syncBotExecutionModal();
 }
 
 function syncScrollableFoldersAutoScroll(): void {
@@ -108,6 +117,15 @@ function syncScrollableFoldersAutoScroll(): void {
 		root.classList.contains(STYLE_CLASS) &&
 			root.classList.contains(FOLDERS_ROUTE_CLASS) &&
 			root.classList.contains(SCROLLABLE_FOLDERS_CLASS)
+	);
+}
+
+function syncBotExecutionModal(): void {
+	const root = document.documentElement;
+	setBotExecutionModalEnabled(
+		root.classList.contains(STYLE_CLASS) &&
+			root.classList.contains(TASKBOT_ROUTE_CLASS) &&
+			root.classList.contains(BOT_EXECUTION_MODAL_CLASS)
 	);
 }
 
@@ -153,6 +171,7 @@ async function applyStyleClasses(): Promise<void> {
 	setCustomPaletteButtonsEnabled(enabled && styleFeatures.customPaletteButtons);
 	setPathFinderSlimSidebarEnabled(enabled && styleFeatures.pathFinder);
 	syncScrollableFoldersAutoScroll();
+	syncBotExecutionModal();
 }
 
 function setStyleValue(key: string, value: string): void {
@@ -179,6 +198,7 @@ async function applyStyleValues(): Promise<void> {
 async function applyInitialSettings(): Promise<void> {
 	try {
 		setActiveLanguagePreference(await getExtensionLanguage());
+		setBotExecutionModalPosition(await getBotExecutionModalPosition());
 		await applyStyleClasses();
 		await applyStyleValues();
 		setSoundsEnabled(await getSoundsEnabled());
@@ -364,6 +384,12 @@ async function handleRuntimeMessage(
 			setActiveOpenSidebarShortcut(message.shortcut);
 			return;
 		}
+		if (message.type === 'SET_BOT_EXECUTION_MODAL_POSITION') {
+			setBotExecutionModalPosition(
+				normalizeBotExecutionModalPosition(message.position)
+			);
+			return;
+		}
 		if (message.type === 'SET_STYLE_FEATURE') {
 			const feature = STYLE_FEATURES.find((item) => item.key === message.key);
 			if (feature) {
@@ -469,6 +495,9 @@ export default defineContentScript({
 		});
 		openSidebarShortcut.watch((value) => {
 			setActiveOpenSidebarShortcut(normalizeOpenSidebarShortcut(value));
+		});
+		botExecutionModalPosition.watch((value) => {
+			setBotExecutionModalPosition(normalizeBotExecutionModalPosition(value));
 		});
 		STYLE_FEATURES.forEach((feature) => {
 			if (feature.key === 'runButton') return;
