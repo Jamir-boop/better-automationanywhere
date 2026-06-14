@@ -17,6 +17,10 @@ interface DebugOptions {
 	feedback?: boolean;
 }
 
+interface FeedbackOptions {
+	keepDetails?: boolean;
+}
+
 const FEEDBACK_LIMIT = 25;
 const SENSITIVE_KEY_RE = /blob|clipboard|dataurl|json|payload|password|secret|token/i;
 
@@ -32,7 +36,12 @@ function safeSource(source: string): string {
 	return source.trim() || 'unknown';
 }
 
-function sanitizeValue(key: string, value: unknown, debugEnabled: boolean): unknown {
+function sanitizeValue(
+	key: string,
+	value: unknown,
+	debugEnabled: boolean,
+	keepDetails: boolean
+): unknown {
 	if (SENSITIVE_KEY_RE.test(key)) return '[redacted]';
 	if (value instanceof Error) {
 		return debugEnabled
@@ -40,29 +49,33 @@ function sanitizeValue(key: string, value: unknown, debugEnabled: boolean): unkn
 			: { name: value.name, message: value.message };
 	}
 	if (typeof value === 'string') {
-		return value.length > 240 ? `${value.slice(0, 240)}...` : value;
+		return !keepDetails && value.length > 240
+			? `${value.slice(0, 240)}...`
+			: value;
 	}
 	if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
 		return value;
 	}
 	if (Array.isArray(value)) {
-		return value.slice(0, 12).map((item, index) =>
-			sanitizeValue(`${key}[${index}]`, item, debugEnabled)
+		const items = keepDetails ? value : value.slice(0, 12);
+		return items.map((item, index) =>
+			sanitizeValue(`${key}[${index}]`, item, debugEnabled, keepDetails)
 		);
 	}
 	if (value && typeof value === 'object') {
-		return sanitizeDetails(value as Record<string, unknown>, debugEnabled);
+		return sanitizeDetails(value as Record<string, unknown>, debugEnabled, keepDetails);
 	}
 	return String(value);
 }
 
 function sanitizeDetails(
 	details: Record<string, unknown>,
-	debugEnabled: boolean
+	debugEnabled: boolean,
+	keepDetails = false
 ): Record<string, unknown> {
 	const sanitized: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(details)) {
-		sanitized[key] = sanitizeValue(key, value, debugEnabled);
+		sanitized[key] = sanitizeValue(key, value, debugEnabled, keepDetails);
 	}
 	return sanitized;
 }
@@ -102,17 +115,19 @@ export async function addFeedback(
 	level: FeedbackSeverity,
 	source: string,
 	message: string,
-	details?: Record<string, unknown>
+	details?: Record<string, unknown>,
+	options: FeedbackOptions = {}
 ): Promise<void> {
 	const debugEnabled = await isDebugEnabled();
+	const keepDetails = Boolean(options.keepDetails);
 	const event: DebugEvent = {
 		id: eventId(),
 		timestamp: new Date().toISOString(),
 		level,
 		source: safeSource(source),
 		message,
-		...(debugEnabled && details
-			? { details: sanitizeDetails(details, debugEnabled) }
+		...((debugEnabled || keepDetails) && details
+			? { details: sanitizeDetails(details, debugEnabled, keepDetails) }
 			: {}),
 	};
 	const current = await getFeedbackHistory();

@@ -9,6 +9,7 @@ import {
 } from '../src/ts/clipboard';
 import {
 	AUTOMATION_ANYWHERE_MATCHES,
+	isFolderRepositoryUrl,
 	isAutomationAnywhereUrl,
 	isTaskEditorUrl,
 	isTextFileUrl,
@@ -23,8 +24,15 @@ import {
 	importActionFromJson,
 } from '../src/ts/commands';
 import { debugError, debugInfo } from '../src/ts/debug';
+import { readAutomationAnywhereAuthTokenFromLocalStorage } from '../src/ts/automation-anywhere-api';
 import { setScrollableFoldersAutoScrollEnabled } from '../src/ts/folders';
 import { setActiveLanguagePreference, t } from '../src/ts/i18n';
+import {
+	createUnknownControlRoomCompatibility,
+	formatControlRoomTarget,
+	type ControlRoomCompatibilityStatus,
+} from '../src/ts/control-room-version';
+import { runStyleDoctor } from '../src/ts/style-doctor';
 import {
 	callInitializeRepeatedly,
 	setCustomPaletteButtonsEnabled,
@@ -32,6 +40,7 @@ import {
 	setPathFinderSlimSidebarEnabled,
 } from '../src/ts/initialize';
 import type { ContentActionResponse, RuntimeMessage } from '../src/ts/messages';
+import type { ControlRoomCompatibilityResponse } from '../src/ts/messages';
 import {
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
@@ -41,12 +50,14 @@ import {
 	commandPaletteEnabled,
 	extensionLanguage,
 	forceEnglishLocale,
+	forceUnsupportedControlRoomStyles,
 	getBlockTaskbotNodeLabelClicks,
 	getBotExecutionModalPosition,
 	getCommandPaletteEnabled,
 	getCommandPaletteShortcut,
 	getExtensionLanguage,
 	getForceEnglishLocale,
+	getForceUnsupportedControlRoomStyles,
 	getOpenSidebarShortcut,
 	getShowSuggestions,
 	getSoundsEnabled,
@@ -93,7 +104,6 @@ const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
 const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
 const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
 const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
-const FOLDERS_ROUTE_RE = /.*automationanywhere\.digital.*?folders.*$/i;
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -104,7 +114,7 @@ function applyBundledAssetVariables(): void {
 
 function applyRouteClasses(): void {
 	const href = location.href;
-	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, FOLDERS_ROUTE_RE.test(href));
+	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, isFolderRepositoryUrl(href));
 	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, isTaskEditorUrl(href));
 	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
 	syncScrollableFoldersAutoScroll();
@@ -156,20 +166,44 @@ function watchRouteChanges(): void {
 	window.addEventListener('hashchange', update);
 }
 
+async function getCurrentControlRoomCompatibility(): Promise<ControlRoomCompatibilityStatus> {
+	try {
+		const response = (await browser.runtime.sendMessage({
+			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
+		})) as ControlRoomCompatibilityResponse | undefined;
+		if (response?.ok) return response.compatibility;
+		return createUnknownControlRoomCompatibility(response?.error);
+	} catch (error) {
+		return createUnknownControlRoomCompatibility(
+			error instanceof Error ? error.message : undefined
+		);
+	}
+}
+
 async function applyStyleClasses(): Promise<void> {
-	const [enabled, styleFeatures] = await Promise.all([
+	const [enabled, styleFeatures, forceUnsupported, compatibility] = await Promise.all([
 		getStylesEnabled(),
 		getStyleFeatureValues(),
+		getForceUnsupportedControlRoomStyles(),
+		getCurrentControlRoomCompatibility(),
 	]);
-	document.documentElement.classList.toggle(STYLE_CLASS, enabled);
+	const effectiveEnabled =
+		enabled &&
+		(compatibility.supported || compatibility.state === 'unknown' || forceUnsupported);
+	document.documentElement.dataset.betterAaControlRoomState = compatibility.state;
+	document.documentElement.dataset.betterAaSupportedControlRoom =
+		formatControlRoomTarget(compatibility.target);
+	document.documentElement.classList.toggle(STYLE_CLASS, effectiveEnabled);
 	for (const feature of STYLE_FEATURES) {
 		document.documentElement.classList.toggle(
 			feature.className,
 			styleFeatures[feature.key]
 		);
 	}
-	setCustomPaletteButtonsEnabled(enabled && styleFeatures.customPaletteButtons);
-	setPathFinderSlimSidebarEnabled(enabled && styleFeatures.pathFinder);
+	setCustomPaletteButtonsEnabled(
+		effectiveEnabled && styleFeatures.customPaletteButtons
+	);
+	setPathFinderSlimSidebarEnabled(effectiveEnabled && styleFeatures.pathFinder);
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
 }
@@ -212,7 +246,11 @@ async function applyInitialSettings(): Promise<void> {
 		void debugError('content', 'Initial settings failed.', { error }, {
 			feedback: true,
 		});
-		document.documentElement.classList.add(STYLE_CLASS);
+		document.documentElement.classList.remove(STYLE_CLASS);
+		setCustomPaletteButtonsEnabled(false);
+		setPathFinderSlimSidebarEnabled(false);
+		syncScrollableFoldersAutoScroll();
+		syncBotExecutionModal();
 	}
 }
 
@@ -282,18 +320,7 @@ function insertOpenSidebarButton(): void {
 }
 
 function getAutomationAnywhereAuthToken(): string | null {
-	try {
-		const raw = localStorage.getItem('authToken');
-		if (!raw) return null;
-		try {
-			const parsed = JSON.parse(raw);
-			return typeof parsed === 'string' ? parsed : raw;
-		} catch {
-			return raw;
-		}
-	} catch {
-		return null;
-	}
+	return readAutomationAnywhereAuthTokenFromLocalStorage();
 }
 
 function refreshAutomationAnywhereFolderList(): boolean {
@@ -337,8 +364,14 @@ async function handleRuntimeMessage(
 				? { ok: true, message: 'Folder refresh queued.' }
 				: { ok: false, error: 'Refresh button not found.' };
 		}
+		if (message.type === 'RUN_STYLE_DOCTOR') {
+			return { ok: true, doctorReport: await runStyleDoctor() };
+		}
 		if (message.type === 'TOGGLE_STYLES') {
-			document.documentElement.classList.toggle(STYLE_CLASS, message.enabled ?? false);
+			await applyStyleClasses();
+			return;
+		}
+		if (message.type === 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES') {
 			await applyStyleClasses();
 			return;
 		}
@@ -460,12 +493,11 @@ export default defineContentScript({
 		applyBundledAssetVariables();
 		applyRouteClasses();
 		watchRouteChanges();
-		await applyInitialSettings();
-		startGlobalClipboardWatcher();
-
 		browser.runtime.onMessage.addListener((message: RuntimeMessage) => {
 			return handleRuntimeMessage(message);
 		});
+		await applyInitialSettings();
+		startGlobalClipboardWatcher();
 
 		stylesEnabled.watch(() => {
 			void applyStyleClasses();
@@ -486,6 +518,9 @@ export default defineContentScript({
 		});
 		forceEnglishLocale.watch((value) => {
 			setForceEnglishLocaleEnabled(value ?? DEFAULT_FORCE_ENGLISH_LOCALE);
+		});
+		forceUnsupportedControlRoomStyles.watch(() => {
+			void applyStyleClasses();
 		});
 		extensionLanguage.watch((value) => {
 			setActiveLanguagePreference(value);

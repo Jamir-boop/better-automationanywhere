@@ -6,7 +6,7 @@ import type {
 import { AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE } from './automation-anywhere';
 
 export const AUTOMATION_ANYWHERE_TASKBOT_TYPE = 'application/vnd.aa.taskbot';
-export const AUTOMATION_ANYWHERE_DIRECTORY_TYPES = new Set([
+const AUTOMATION_ANYWHERE_DIRECTORY_TYPES = new Set([
 	'application/vnd.aa.directory',
 	'application/vnd.aa.folder',
 ]);
@@ -180,6 +180,21 @@ export async function getActiveAutomationAnywhereContext(): Promise<
 	};
 }
 
+export function readAutomationAnywhereAuthTokenFromLocalStorage(): string | null {
+	try {
+		const raw = localStorage.getItem('authToken');
+		if (!raw) return null;
+		try {
+			const parsed = JSON.parse(raw);
+			return typeof parsed === 'string' ? parsed : raw;
+		} catch {
+			return raw;
+		}
+	} catch {
+		return null;
+	}
+}
+
 export async function getAutomationAnywhereAuthToken(tabId: number): Promise<string> {
 	let response: ContentActionResponse | undefined;
 	try {
@@ -228,20 +243,10 @@ async function getAutomationAnywhereAuthTokenViaScripting(
 	tabId: number
 ): Promise<string | null> {
 	return (
-		(await executeAutomationAnywhereScript<string | null>(tabId, () => {
-			try {
-				const raw = localStorage.getItem('authToken');
-				if (!raw) return null;
-				try {
-					const parsed = JSON.parse(raw);
-					return typeof parsed === 'string' ? parsed : raw;
-				} catch {
-					return raw;
-				}
-			} catch {
-				return null;
-			}
-		})) ?? null
+		(await executeAutomationAnywhereScript<string | null>(
+			tabId,
+			readAutomationAnywhereAuthTokenFromLocalStorage
+		)) ?? null
 	);
 }
 
@@ -365,6 +370,18 @@ export function automationAnywhereBlobResponseToBlob(
 		bytes[index] = binary.charCodeAt(index);
 	}
 	return new Blob([bytes], { type: response.type || 'application/octet-stream' });
+}
+
+export function dedupeAutomationAnywhereFiles(
+	items: AutomationAnywhereFile[]
+): AutomationAnywhereFile[] {
+	const byId = new Map<string, AutomationAnywhereFile>();
+	for (const item of items) {
+		const id = getAutomationAnywhereFileId(item);
+		if (!id) continue;
+		byId.set(id, { ...byId.get(id), ...item });
+	}
+	return [...byId.values()];
 }
 
 export class AutomationAnywhereApi {
@@ -522,11 +539,34 @@ export class AutomationAnywhereApi {
 		});
 	}
 
-	getBotDependencies(fileIds: string[]): Promise<AutomationAnywhereDependenciesResponse> {
-		return this.request<AutomationAnywhereDependenciesResponse>('/v2/repository/dependencies', {
-			method: 'POST',
-			body: { fileIds },
-		});
+	getFileDependencies(fileId: string): Promise<AutomationAnywhereDependenciesResponse> {
+		return this.request<AutomationAnywhereDependenciesResponse>(
+			`/v2/repository/files/${fileId}/dependencies`
+		);
+	}
+
+	async getBotDependencies(
+		fileIds: string[]
+	): Promise<AutomationAnywhereDependenciesResponse> {
+		if (!fileIds.length) return { dependencies: [] };
+		try {
+			return await this.request<AutomationAnywhereDependenciesResponse>(
+				'/v2/repository/dependencies',
+				{
+					method: 'POST',
+					body: { fileIds },
+				}
+			);
+		} catch {
+			const responses = await Promise.all(
+				fileIds.map((fileId) => this.getFileDependencies(fileId))
+			);
+			return {
+				dependencies: dedupeAutomationAnywhereFiles(
+					responses.flatMap((response) => response.dependencies ?? [])
+				),
+			};
+		}
 	}
 
 	downloadMetadataContent(

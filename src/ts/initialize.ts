@@ -55,7 +55,10 @@ function initialize(): void {
 }
 
 export function callInitializeRepeatedly(times = 3, interval = 5000): void {
-	let count = 0;
+	if (times <= 0) return;
+	initialize();
+	let count = 1;
+	if (count >= times) return;
 	const intervalId = setInterval(() => {
 		initialize();
 		count++;

@@ -26,6 +26,17 @@ export interface AutomationAnywhereJsonStats {
 	variableCount: number;
 }
 
+export interface AutomationAnywhereRepositoryReference {
+	value: string;
+	count: number;
+	paths: string[];
+}
+
+export interface AutomationAnywhereRepositoryReplaceResult {
+	content: unknown;
+	replaced: number;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -34,6 +45,20 @@ function isRecord(value: unknown): value is JsonRecord {
 
 function readText(value: unknown): string {
 	return typeof value === 'string' && value.trim() ? value : 'unknown';
+}
+
+function formatJsonPathSegment(key: string): string {
+	return /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
+}
+
+function getJsonPath(parentPath: string, key: string | number): string {
+	return typeof key === 'number'
+		? `${parentPath}[${key}]`
+		: `${parentPath}${formatJsonPathSegment(key)}`;
+}
+
+function isRepositoryReference(value: string): boolean {
+	return value.startsWith('repository:');
 }
 
 export function isAutomationAnywhereJson(value: unknown): value is JsonRecord & {
@@ -72,6 +97,71 @@ export function getAutomationAnywhereJsonStats(value: unknown): AutomationAnywhe
 		actionCount: Array.isArray(value.nodes) ? flattenNodes(value.nodes).length : 0,
 		variableCount: Array.isArray(value.variables) ? value.variables.length : 0,
 	};
+}
+
+export function extractAutomationAnywhereRepositoryReferences(
+	content: unknown
+): AutomationAnywhereRepositoryReference[] {
+	const referencesByValue = new Map<string, AutomationAnywhereRepositoryReference>();
+
+	function add(value: string, path: string): void {
+		const existing = referencesByValue.get(value);
+		if (existing) {
+			existing.count += 1;
+			existing.paths.push(path);
+		} else {
+			referencesByValue.set(value, { value, count: 1, paths: [path] });
+		}
+	}
+
+	function visit(value: unknown, path: string): void {
+		if (typeof value === 'string') {
+			if (isRepositoryReference(value)) add(value, path);
+			return;
+		}
+
+		if (Array.isArray(value)) {
+			value.forEach((item, index) => visit(item, getJsonPath(path, index)));
+			return;
+		}
+
+		if (!isRecord(value)) return;
+		for (const [key, item] of Object.entries(value)) {
+			visit(item, getJsonPath(path, key));
+		}
+	}
+
+	visit(content, '$');
+	return [...referencesByValue.values()].sort((left, right) =>
+		left.value.localeCompare(right.value, undefined, { sensitivity: 'base' })
+	);
+}
+
+export function replaceAutomationAnywhereRepositoryReferences(
+	content: unknown,
+	from: string,
+	to: string
+): AutomationAnywhereRepositoryReplaceResult {
+	let replaced = 0;
+
+	function replace(value: unknown): unknown {
+		if (typeof value === 'string') {
+			if (value === from) {
+				replaced += 1;
+				return to;
+			}
+			return value;
+		}
+
+		if (Array.isArray(value)) return value.map(replace);
+
+		if (!isRecord(value)) return value;
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [key, replace(item)])
+		);
+	}
+
+	return { content: replace(content), replaced };
 }
 
 export function summarizeAutomationAnywhereJson(

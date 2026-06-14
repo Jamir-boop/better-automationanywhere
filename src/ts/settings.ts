@@ -4,7 +4,7 @@ export type { LanguagePreference } from './i18n';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.6.3';
+export const EXTENSION_VERSION = '1.8.1';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',
@@ -45,6 +45,9 @@ export const blockTaskbotNodeLabelClicks = storage.defineItem<boolean>(
 	'local:blockTaskbotNodeLabelClicks'
 );
 export const forceEnglishLocale = storage.defineItem<boolean>('local:forceEnglishLocale');
+export const forceUnsupportedControlRoomStyles = storage.defineItem<boolean>(
+	'local:forceUnsupportedControlRoomStyles'
+);
 export const extensionLanguage =
 	storage.defineItem<LanguagePreference>('local:extensionLanguage');
 export const commandPaletteShortcut = storage.defineItem<CommandPaletteShortcut>(
@@ -65,6 +68,7 @@ export const DEFAULT_DEBUG_ENABLED = false;
 export const DEFAULT_COMMAND_PALETTE_ENABLED = true;
 export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = true;
 export const DEFAULT_FORCE_ENGLISH_LOCALE = true;
+export const DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES = false;
 export const DEFAULT_EXTENSION_LANGUAGE: LanguagePreference = 'auto';
 export const DEFAULT_COMMAND_PALETTE_SHORTCUT = COMMAND_PALETTE_SHORTCUTS.ALT_P;
 export const DEFAULT_OPEN_SIDEBAR_SHORTCUT = OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L;
@@ -283,6 +287,13 @@ export async function getBlockTaskbotNodeLabelClicks(): Promise<boolean> {
 
 export async function getForceEnglishLocale(): Promise<boolean> {
 	return (await forceEnglishLocale.getValue()) ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+}
+
+export async function getForceUnsupportedControlRoomStyles(): Promise<boolean> {
+	return (
+		(await forceUnsupportedControlRoomStyles.getValue()) ??
+		DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES
+	);
 }
 
 export function normalizeExtensionLanguage(value: unknown): LanguagePreference {

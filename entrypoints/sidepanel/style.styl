@@ -285,6 +285,50 @@ main
 		font-size: .74rem
 		text-transform: uppercase
 
+.control-room-status
+	display: flex
+	flex-direction: column
+	gap: 8px
+	padding: 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-1)
+
+.control-room-head
+	display: flex
+	align-items: center
+	justify-content: space-between
+	gap: 8px
+
+	strong
+		display: block
+		font-size: .82rem
+
+	small
+		display: block
+		color: var(--text-muted)
+		font-size: .68rem
+
+	button
+		flex: 0 0 auto
+		padding: 4px 7px
+		font-size: .68rem
+
+.control-room-meta,
+.control-room-alert
+	margin: 0
+	color: var(--text-muted)
+	font-size: .68rem
+	line-height: 1.3
+	overflow-wrap: anywhere
+
+.control-room-alert
+	color: #FFD45A
+
+.force-control-room-row
+	padding-top: 6px
+	border-top: 1px solid var(--border)
+
 .setting-row,
 .select-row,
 .slot-row,
@@ -348,6 +392,7 @@ input[type='checkbox']
 
 select,
 input[type='text'],
+input[type='search'],
 input[type='file'],
 textarea
 	width: 100%
@@ -419,6 +464,52 @@ textarea
 	color: #FF8A8A
 	font-size: .72rem
 	line-height: 1.3
+
+.taskbot-json-tools
+	display: flex
+	flex-direction: column
+	gap: 8px
+
+	select
+		max-width: 100%
+
+.taskbot-json-fields
+	display: grid
+	grid-template-columns: repeat(2, minmax(0, 1fr))
+	gap: 8px
+
+	label
+		display: flex
+		flex-direction: column
+		gap: 4px
+		min-width: 0
+		color: var(--text-muted)
+		font-size: .68rem
+		text-transform: uppercase
+
+.taskbot-json-checkbox
+	display: inline-flex
+	align-items: center
+	gap: 6px
+	color: var(--text-muted)
+	font-size: .72rem
+	white-space: nowrap
+
+	input
+		width: 18px
+		height: 18px
+
+.taskbot-json-actions
+	button
+		min-width: 0
+		white-space: normal
+
+.taskbot-repository-tools
+	display: flex
+	flex-direction: column
+	gap: 8px
+	padding-top: 8px
+	border-top: 1px solid var(--border)
 
 .json-field
 	position: relative

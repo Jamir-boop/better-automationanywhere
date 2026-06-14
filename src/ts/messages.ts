@@ -7,6 +7,8 @@ import type {
 	StyleValueKey,
 } from './settings';
 import type { SidepanelFocusTarget, SidepanelTab } from './sidepanel-state';
+import type { ControlRoomCompatibilityStatus } from './control-room-version';
+import type { StyleDoctorReport } from './style-doctor';
 
 export interface AutomationAnywhereApiRequestConfig {
 	url: string;
@@ -32,6 +34,10 @@ export interface ToolCapabilities {
 	universalClipboard: boolean;
 }
 
+export type ControlRoomCompatibilityResponse =
+	| { ok: true; compatibility: ControlRoomCompatibilityStatus }
+	| { ok: false; error: string };
+
 export type AutomationAnywhereApiResponse =
 	| { ok: true; data?: unknown }
 	| { ok: false; error: string; status?: number };
@@ -45,6 +51,7 @@ export type SettingsBackgroundMessage =
 	| { type: 'SET_COMMAND_PALETTE_ENABLED'; enabled: boolean }
 	| { type: 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS'; enabled: boolean }
 	| { type: 'SET_FORCE_ENGLISH_LOCALE'; enabled: boolean }
+	| { type: 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES'; enabled: boolean }
 	| { type: 'SET_EXTENSION_LANGUAGE'; language: LanguagePreference }
 	| { type: 'SET_COMMAND_PALETTE_SHORTCUT'; shortcut: CommandPaletteShortcut }
 	| { type: 'SET_OPEN_SIDEBAR_SHORTCUT'; shortcut: OpenSidebarShortcut }
@@ -65,6 +72,11 @@ export type ExtensionShortcutsMessage = {
 	type: 'GET_EXTENSION_SHORTCUTS';
 };
 
+export type ControlRoomCompatibilityMessage = {
+	type: 'GET_CONTROL_ROOM_COMPATIBILITY';
+	forceRefresh?: boolean;
+};
+
 export type RouteChangedMessage = {
 	type: 'AA_ROUTE_CHANGED';
 	url: string;
@@ -74,6 +86,7 @@ export type BackgroundMessage =
 	| SettingsBackgroundMessage
 	| AutomationAnywhereApiRequestMessage
 	| ExtensionShortcutsMessage
+	| ControlRoomCompatibilityMessage
 	| RouteChangedMessage;
 
 export type ContentActionMessage =
@@ -88,7 +101,8 @@ export type ContentActionMessage =
 	| { type: 'PING_AA_CONTENT' }
 	| { type: 'GET_AA_AUTH_TOKEN' }
 	| { type: 'GET_TOOL_CAPABILITIES' }
-	| { type: 'REFRESH_AA_FOLDER_LIST' };
+	| { type: 'REFRESH_AA_FOLDER_LIST' }
+	| { type: 'RUN_STYLE_DOCTOR' };
 
 export type ContentActionResponse =
 	| {
@@ -98,6 +112,7 @@ export type ContentActionResponse =
 			html?: string;
 			authToken?: string | null;
 			capabilities?: ToolCapabilities;
+			doctorReport?: StyleDoctorReport;
 	  }
 	| { ok: false; error: string };
 

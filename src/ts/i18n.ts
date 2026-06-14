@@ -31,6 +31,9 @@ const ES: Record<string, string> = {
 	'Block taskbot link clicks': 'Bloquear clics en enlaces de taskbot',
 	'Prevent left-click navigation on taskbot node links; middle-click still works.':
 		'Evita navegar con clic izquierdo en enlaces de nodos taskbot; clic medio sigue funcionando.',
+	'Taskbot link click blocked': 'Clic en enlace taskbot bloqueado',
+	'Use middle-click to open this link.':
+		'Usa clic medio para abrir este enlace.',
 	'Force Automation Anywhere English': 'Forzar Automation Anywhere en ingles',
 	'Set Automation Anywhere locale to en-US and reload when needed. Does not change this extension language.':
 		'Establece Automation Anywhere en en-US y recarga cuando haga falta. No cambia el idioma de esta extension.',
@@ -77,6 +80,45 @@ const ES: Record<string, string> = {
 	'Restore to Default': 'Restaurar predeterminado',
 	'Reset all UI Improvements options.':
 		'Restablece todas las opciones de Mejoras UI.',
+	'Control Room': 'Control Room',
+	'Checking version...': 'Verificando version...',
+	Refresh: 'Actualizar',
+	'Version unavailable.': 'Version no disponible.',
+	'Supported target: {target}': 'Target soportado: {target}',
+	'Supported target matched.': 'Target soportado coincide.',
+	'Unsupported target.': 'Target no soportado.',
+	'Current: {current}. Supported target: {target}. Validated build: {build}.':
+		'Actual: {current}. Target soportado: {target}. Build validado: {build}.',
+	'Build differs from validated build {build}. Styles still load.':
+		'Build difiere del build validado {build}. Los estilos igual cargan.',
+	'Control Room version unavailable: {message}':
+		'Version de Control Room no disponible: {message}',
+	'Control Room version unavailable.':
+		'Version de Control Room no disponible.',
+	'UI Improvements blocked until target matches or force is enabled.':
+		'Mejoras UI bloqueadas hasta que el target coincida o se active forzar.',
+	'Force styles on unsupported Control Room':
+		'Forzar estilos en Control Room no soportado',
+	'Use UI Improvements even when Control Room target differs.':
+		'Usa Mejoras UI aunque el target de Control Room difiera.',
+	'Unsupported Control Room styles forced on.':
+		'Estilos en Control Room no soportado forzados.',
+	'Unsupported Control Room styles force disabled.':
+		'Forzado de estilos en Control Room no soportado desactivado.',
+	'Run Doctor': 'Ejecutar Doctor',
+	'Run selector Doctor and write report to Debug Log.':
+		'Ejecuta Doctor de selectores y escribe el reporte en el Log debug.',
+	'Doctor running...': 'Doctor ejecutandose...',
+	'Doctor failed.': 'Doctor fallo.',
+	'Doctor report added to Debug Log.':
+		'Reporte de Doctor agregado al Log debug.',
+	'Doctor {view}: {passed} pass, {failed} fail, {warnings} warn, {skipped} skip.':
+		'Doctor {view}: {passed} ok, {failed} fallo, {warnings} alerta, {skipped} omitido.',
+	'No Doctor findings.': 'Sin hallazgos de Doctor.',
+	Pass: 'Ok',
+	Fail: 'Fallo',
+	Warn: 'Alerta',
+	Skip: 'Omitido',
 	'Injected styles': 'Estilos inyectados',
 	'Enable all custom style rules': 'Activa todas las reglas de estilo personalizadas',
 	'Palette buttons': 'Botones de paleta',
@@ -490,6 +532,44 @@ const ES: Record<string, string> = {
 	'Taskbot JSON is empty.': 'JSON de taskbot esta vacio.',
 	'Taskbot JSON copied.': 'JSON de taskbot copiado.',
 	'Taskbot JSON formatted.': 'JSON de taskbot formateado.',
+	Find: 'Buscar',
+	Replace: 'Reemplazar',
+	'Match case': 'Coincidir mayusculas',
+	Previous: 'Anterior',
+	Next: 'Siguiente',
+	'Replace all': 'Reemplazar todo',
+	'Repository ref': 'Ref repositorio',
+	'New ref': 'Nueva ref',
+	'Find ref': 'Buscar ref',
+	'Replace ref': 'Reemplazar ref',
+	'Copy refs': 'Copiar refs',
+	'Repository refs': 'Refs de repositorio',
+	'Expand repository refs': 'Expandir refs de repositorio',
+	'Collapse repository refs': 'Contraer refs de repositorio',
+	'{count} ref(s)': '{count} ref(s)',
+	Refs: 'Refs',
+	'No repository refs found.': 'No se encontraron refs de repositorio.',
+	'No search term.': 'Sin termino de busqueda.',
+	'Match {current} of {count}.': 'Coincidencia {current} de {count}.',
+	'{count} match(es).': '{count} coincidencia(s).',
+	'Replaced 1 match.': 'Reemplazada 1 coincidencia.',
+	'Replace {count} match(es)?': 'Reemplazar {count} coincidencia(s)?',
+	'Replaced {count} match(es).': 'Reemplazadas {count} coincidencia(s).',
+	'{count} repository ref(s), {occurrences} occurrence(s).':
+		'{count} ref(s) de repositorio, {occurrences} ocurrencia(s).',
+	'New ref must start with repository:.':
+		'Nueva ref debe empezar con repository:.',
+	'Replace {count} repository ref occurrence(s)?':
+		'Reemplazar {count} ocurrencia(s) de ref de repositorio?',
+	'Replaced {count} repository ref occurrence(s).':
+		'Reemplazadas {count} ocurrencia(s) de ref de repositorio.',
+	'Repository refs copied.': 'Refs de repositorio copiadas.',
+	'Taskbot JSON changed in Control Room. Reload before saving.':
+		'El JSON de taskbot cambio en Control Room. Recarga antes de guardar.',
+	changed: 'cambiado',
+	unchanged: 'sin cambios',
+	'Save JSON for file {fileId}? Status: {status}.':
+		'Guardar JSON para archivo {fileId}? Estado: {status}.',
 	'Update taskbot content in Control Room?':
 		'Actualizar contenido del taskbot en Control Room?',
 	'Taskbot JSON saved.': 'JSON de taskbot guardado.',

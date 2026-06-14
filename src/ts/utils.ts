@@ -1,6 +1,7 @@
 import { openSidebarCommandPalette, showActions, showVariables } from './commands';
 import { debugWarn } from './debug';
 import { t } from './i18n';
+import { EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR } from './automation-anywhere';
 import * as palette from './palette';
 import {
 	COMMAND_PALETTE_SHORTCUTS,
@@ -21,6 +22,11 @@ let activeCommandPaletteEnabled = DEFAULT_COMMAND_PALETTE_ENABLED;
 let activeOpenSidebarShortcut: OpenSidebarShortcut =
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT;
 let activeBlockTaskbotNodeLabelClicks = DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS;
+let lastTaskbotLinkClickBlockedToastAt = 0;
+
+const TASKBOT_NODE_LABEL_LINK_SELECTOR =
+	'.taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]';
+const TASKBOT_LINK_CLICK_BLOCKED_TOAST_COOLDOWN_MS = 2000;
 
 interface SelectorDebugOptions {
 	feedback?: boolean;
@@ -221,18 +227,32 @@ export function getPaletteState(): 'opened' | 'closed' {
 	return paletteElement.offsetWidth <= 8 ? 'closed' : 'opened';
 }
 
+function showTaskbotLinkClickBlockedToast(): void {
+	const now = Date.now();
+	if (
+		now - lastTaskbotLinkClickBlockedToastAt <
+		TASKBOT_LINK_CLICK_BLOCKED_TOAST_COOLDOWN_MS
+	) {
+		return;
+	}
+	lastTaskbotLinkClickBlockedToastAt = now;
+	ui.showNotification(
+		t('Taskbot link click blocked'),
+		t('Use middle-click to open this link.')
+	);
+}
+
 export function registerKeyboardShortcuts(): void {
 	document.addEventListener(
 		'click',
 		(e) => {
 			if (!activeBlockTaskbotNodeLabelClicks) return;
 			const target = e.target as HTMLElement | null;
-			const nodeLink = target?.closest?.(
-				'.taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]'
-			);
+			const nodeLink = target?.closest?.(TASKBOT_NODE_LABEL_LINK_SELECTOR);
 			if (!nodeLink || e.button === 1) return;
 			e.preventDefault();
 			e.stopImmediatePropagation();
+			showTaskbotLinkClickBlockedToast();
 		},
 		true
 	);
@@ -296,7 +316,7 @@ export function registerKeyboardShortcuts(): void {
 }
 
 export function toggleToolbar(): void {
-	void clickIfExists('div.editor-layout__resize:nth-child(2) > button:nth-child(2)');
+	void clickIfExists(EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR, 'toggleToolbar');
 }
 
 export async function clickIfExists(

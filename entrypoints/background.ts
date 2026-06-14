@@ -2,6 +2,8 @@ import type {
 	AutomationAnywhereApiRequestMessage,
 	AutomationAnywhereApiResponse,
 	ContentActionResponse,
+	ControlRoomCompatibilityMessage,
+	ControlRoomCompatibilityResponse,
 	RuntimeMessage,
 	SettingsBackgroundMessage,
 } from '../src/ts/messages';
@@ -15,6 +17,16 @@ import {
 	isAutomationAnywhereUrl,
 } from '../src/ts/automation-anywhere';
 import {
+	getAutomationAnywhereAuthToken,
+	parseAutomationAnywherePageContext,
+} from '../src/ts/automation-anywhere-api';
+import {
+	createUnknownControlRoomCompatibility,
+	evaluateControlRoomCompatibility,
+	type ControlRoomCompatibilityStatus,
+	type ControlRoomVersionDetails,
+} from '../src/ts/control-room-version';
+import {
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
@@ -22,6 +34,7 @@ import {
 	debugEnabled,
 	extensionLanguage,
 	forceEnglishLocale,
+	forceUnsupportedControlRoomStyles,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
 	getOpenSidebarShortcut,
@@ -42,6 +55,12 @@ import {
 import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
 
 const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
+const CONTROL_ROOM_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const controlRoomVersionCache = new Map<
+	string,
+	{ expiresAt: number; compatibility: ControlRoomCompatibilityStatus }
+>();
 
 async function broadcastToAutomationTabs(
 	message: SettingsBackgroundMessage
@@ -76,6 +95,101 @@ async function queryAutomationAnywhereTabs(): Promise<
 		}
 	}
 	return [...tabsById.values()];
+}
+
+async function getCompatibilityTab(
+	sender: Parameters<typeof browser.runtime.onMessage.addListener>[0] extends (
+		message: any,
+		sender: infer Sender,
+		...args: any[]
+	) => any
+		? Sender
+		: never
+): Promise<{ tabId: number; url: string } | null> {
+	if (sender.tab?.id !== undefined && sender.tab.url) {
+		return { tabId: sender.tab.id, url: sender.tab.url };
+	}
+	const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+	if (tab?.id === undefined || !tab.url || !isAutomationAnywhereUrl(tab.url)) {
+		return null;
+	}
+	return { tabId: tab.id, url: tab.url };
+}
+
+function getCachedControlRoomCompatibility(
+	baseUrl: string,
+	forceRefresh?: boolean
+): ControlRoomCompatibilityStatus | null {
+	if (forceRefresh) return null;
+	const cached = controlRoomVersionCache.get(baseUrl);
+	if (!cached || cached.expiresAt < Date.now()) {
+		controlRoomVersionCache.delete(baseUrl);
+		return null;
+	}
+	return cached.compatibility;
+}
+
+function setCachedControlRoomCompatibility(
+	baseUrl: string,
+	compatibility: ControlRoomCompatibilityStatus
+): void {
+	const ttl =
+		compatibility.state === 'unknown' ? 30_000 : CONTROL_ROOM_VERSION_CACHE_TTL_MS;
+	controlRoomVersionCache.set(baseUrl, {
+		expiresAt: Date.now() + ttl,
+		compatibility,
+	});
+}
+
+async function getControlRoomCompatibility(
+	message: ControlRoomCompatibilityMessage,
+	sender: Parameters<typeof browser.runtime.onMessage.addListener>[0] extends (
+		message: any,
+		sender: infer Sender,
+		...args: any[]
+	) => any
+		? Sender
+		: never
+): Promise<ControlRoomCompatibilityResponse> {
+	const target = await getCompatibilityTab(sender);
+	if (!target) return { ok: false, error: 'Open an Automation Anywhere tab first.' };
+
+	const context = parseAutomationAnywherePageContext(target.url);
+	if (!context.baseUrl) {
+		return { ok: false, error: 'Unsupported Automation Anywhere tab.' };
+	}
+
+	const cached = getCachedControlRoomCompatibility(
+		context.baseUrl,
+		message.forceRefresh
+	);
+	if (cached) return { ok: true, compatibility: cached };
+
+	try {
+		const authToken = await getAutomationAnywhereAuthToken(target.tabId);
+		const response = await handleApiRequest({
+			type: 'AA_API_REQUEST',
+			config: {
+				url: `${context.baseUrl}/v2/settings/version/details`,
+				headers: {
+					'X-Authorization': authToken,
+				},
+			},
+		});
+
+		if (!response.ok) throw new Error(response.error);
+		const compatibility = evaluateControlRoomCompatibility(
+			response.data as ControlRoomVersionDetails
+		);
+		setCachedControlRoomCompatibility(context.baseUrl, compatibility);
+		return { ok: true, compatibility };
+	} catch (error) {
+		const compatibility = createUnknownControlRoomCompatibility(
+			error instanceof Error ? error.message : 'Control Room version unavailable.'
+		);
+		setCachedControlRoomCompatibility(context.baseUrl, compatibility);
+		return { ok: true, compatibility };
+	}
 }
 
 function createNonce(): string {
@@ -279,6 +393,13 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 		});
 		await broadcastToAutomationTabs(message);
 	}
+	if (message.type === 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES') {
+		await forceUnsupportedControlRoomStyles.setValue(message.enabled);
+		void debugInfo('userstyle', 'Unsupported Control Room force saved.', {
+			enabled: message.enabled,
+		});
+		await broadcastToAutomationTabs(message);
+	}
 	if (message.type === 'SET_EXTENSION_LANGUAGE') {
 		const language = normalizeExtensionLanguage(message.language);
 		await extensionLanguage.setValue(language);
@@ -360,6 +481,7 @@ function isSettingsBackgroundMessage(message: RuntimeMessage): message is Settin
 		message.type === 'SET_COMMAND_PALETTE_ENABLED' ||
 		message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS' ||
 		message.type === 'SET_FORCE_ENGLISH_LOCALE' ||
+		message.type === 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES' ||
 		message.type === 'SET_EXTENSION_LANGUAGE' ||
 		message.type === 'SET_COMMAND_PALETTE_SHORTCUT' ||
 		message.type === 'SET_OPEN_SIDEBAR_SHORTCUT' ||
@@ -548,6 +670,9 @@ export default defineBackground(() => {
 			});
 		}
 		if (message.type === 'AA_API_REQUEST') return handleApiRequest(message);
+		if (message.type === 'GET_CONTROL_ROOM_COMPATIBILITY') {
+			return getControlRoomCompatibility(message, sender);
+		}
 		if (message.type === 'GET_EXTENSION_SHORTCUTS') return getExtensionShortcuts();
 		if (!isSettingsBackgroundMessage(message)) return;
 		void handleSettingsMessage(message).catch((error) => {

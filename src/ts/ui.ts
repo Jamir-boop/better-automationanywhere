@@ -8,6 +8,7 @@ const PATHFINDER_EXPANDER_SELECTOR =
 	'button[data-path="Pathfinder.expander"], button.pathfinder-tray-expander';
 const PATHFINDER_COLLAPSE_BUTTON_SELECTOR =
 	'button[data-path="Pathfinder.expander"][aria-expanded="true"], button.pathfinder-tray-expander[aria-expanded="true"], button[aria-label="Collapse"]';
+const EDITOR_PALETTE_SCROLLER_SELECTOR = '.editor-palette-section__scroller';
 const DISABLED_PATHFINDER_EXPANDER_ATTR = 'data-better-aa-disabled-expander';
 const ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR =
 	'data-better-aa-original-title';
@@ -20,6 +21,7 @@ let customEditorPaletteButtonsEnabled = true;
 let pathFinderSlimSidebarEnabled = false;
 let pathFinderExpanderGuardInstalled = false;
 let allowPathFinderExpanderClick = false;
+let customEditorPaletteButtonsHoverRecoveryInstalled = false;
 
 export function setCustomEditorPaletteButtonsEnabled(enabled: boolean): void {
 	customEditorPaletteButtonsEnabled = enabled;
@@ -27,11 +29,29 @@ export function setCustomEditorPaletteButtonsEnabled(enabled: boolean): void {
 }
 
 export function syncCustomEditorPaletteButtons(): void {
+	installCustomEditorPaletteButtonsHoverRecovery();
 	if (customEditorPaletteButtonsEnabled) {
 		insertCustomEditorPaletteButtons();
 		return;
 	}
 	removeCustomEditorPaletteButtons();
+}
+
+function recoverCustomEditorPaletteButtonsOnHover(event: PointerEvent): void {
+	if (!customEditorPaletteButtonsEnabled) return;
+	if (!(event.target instanceof Element)) return;
+	if (!event.target.closest(EDITOR_PALETTE_SCROLLER_SELECTOR)) return;
+	if (document.getElementById('customActionVariableButtons')) {
+		updateCustomEditorPaletteButtonLabels();
+		return;
+	}
+	insertCustomEditorPaletteButtons();
+}
+
+function installCustomEditorPaletteButtonsHoverRecovery(): void {
+	if (customEditorPaletteButtonsHoverRecoveryInstalled) return;
+	document.addEventListener('pointerover', recoverCustomEditorPaletteButtonsOnHover, true);
+	customEditorPaletteButtonsHoverRecoveryInstalled = true;
 }
 
 export function removeCustomEditorPaletteButtons(): void {

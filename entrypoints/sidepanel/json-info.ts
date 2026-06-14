@@ -1,16 +1,18 @@
 import { extractAutomationAnywherePackages } from '@/src/ts/automation-anywhere-api';
 import {
+	extractAutomationAnywhereRepositoryReferences,
 	flattenNodes,
 	getAutomationAnywhereJsonStats,
 } from '@/src/ts/automation-anywhere-json';
 import { t } from '@/src/ts/i18n';
 
-const JSON_INFO_TAB_IDS = ['packages', 'actions', 'variables'] as const;
+const JSON_INFO_TAB_IDS = ['packages', 'actions', 'variables', 'refs'] as const;
 type JsonInfoTabId = (typeof JSON_INFO_TAB_IDS)[number];
 
 interface JsonInfoItem {
 	label: string;
 	count: number;
+	details?: string[];
 }
 
 interface JsonInfoTab {
@@ -93,12 +95,23 @@ function getPackageItems(content: unknown): JsonInfoItem[] {
 }
 
 function formatInfoItem(item: JsonInfoItem): string {
-	return item.count > 1 ? `${item.label} x${item.count}` : item.label;
+	const label = item.count > 1 ? `${item.label} x${item.count}` : item.label;
+	if (!item.details?.length) return label;
+	return `${label}\n${item.details.map((detail) => `  ${detail}`).join('\n')}`;
+}
+
+function getRepositoryReferenceItems(content: unknown): JsonInfoItem[] {
+	return extractAutomationAnywhereRepositoryReferences(content).map((reference) => ({
+		label: reference.value,
+		count: reference.count,
+		details: reference.paths,
+	}));
 }
 
 function getJsonInfoTabs(content: unknown): JsonInfoTab[] {
 	const stats = getAutomationAnywhereJsonStats(content);
 	const packageCount = extractAutomationAnywherePackages(content).length;
+	const repositoryReferences = getRepositoryReferenceItems(content);
 	return [
 		{
 			id: 'packages',
@@ -120,6 +133,13 @@ function getJsonInfoTabs(content: unknown): JsonInfoTab[] {
 			count: stats.variableCount,
 			items: getVariableItems(content),
 			emptyText: t('No variables found.'),
+		},
+		{
+			id: 'refs',
+			label: t('Refs'),
+			count: repositoryReferences.length,
+			items: repositoryReferences,
+			emptyText: t('No repository refs found.'),
 		},
 	];
 }

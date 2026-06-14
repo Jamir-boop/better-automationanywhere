@@ -17,8 +17,16 @@ import type {
 	BackgroundMessage,
 	ContentActionMessage,
 	ContentActionResponse,
+	ControlRoomCompatibilityResponse,
 	ExtensionShortcuts,
 } from '@/src/ts/messages';
+import {
+	formatControlRoomTarget,
+	formatControlRoomVersion,
+	SUPPORTED_CONTROL_ROOM_TARGET,
+	type ControlRoomCompatibilityStatus,
+} from '@/src/ts/control-room-version';
+import type { StyleDoctorReport } from '@/src/ts/style-doctor';
 import {
 	isAutomationAnywhereJson,
 	summarizeAutomationAnywhereJson,
@@ -32,6 +40,7 @@ import {
 	DEFAULT_DEBUG_ENABLED,
 	DEFAULT_EXTENSION_LANGUAGE,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
+	DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES,
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
 	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
@@ -48,6 +57,7 @@ import {
 	debugEnabled,
 	extensionLanguage,
 	forceEnglishLocale,
+	forceUnsupportedControlRoomStyles,
 	getBlockTaskbotNodeLabelClicks,
 	getBotExecutionModalPosition,
 	getCommandPaletteEnabled,
@@ -56,6 +66,7 @@ import {
 	getDebugEnabled,
 	getExtensionLanguage,
 	getForceEnglishLocale,
+	getForceUnsupportedControlRoomStyles,
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getShowSuggestions,
@@ -168,6 +179,7 @@ const STYLE_FEATURE_HELP_TIPS: Partial<Record<StyleFeatureKey, string>> = {
 	makeSidebarScrollable:
 		'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
 };
+let currentControlRoomCompatibility: ControlRoomCompatibilityStatus | null = null;
 
 function getClipboardSlotLabel(slot: number): string {
 	return slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
@@ -248,13 +260,6 @@ function renderToolsConfigSection(): string {
 			</label>
 			<label class="setting-row">
 				<span>
-					<strong>${t('Block taskbot link clicks')}</strong>
-					<small>${t('Prevent left-click navigation on taskbot node links; middle-click still works.')}</small>
-				</span>
-				<input id="blockTaskbotNodeLabelClicks" type="checkbox">
-			</label>
-			<label class="setting-row">
-				<span>
 					<strong>${t('Force Automation Anywhere English')}</strong>
 					<small>${t('Set Automation Anywhere locale to en-US and reload when needed. Does not change this extension language.')}</small>
 				</span>
@@ -320,8 +325,24 @@ function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): st
 	`;
 }
 
+function renderBlockTaskbotNodeLabelClicksControl(): string {
+	return `
+		<label class="setting-row">
+			<span>
+				<strong>${t('Block taskbot link clicks')}</strong>
+				<small>${t('Prevent left-click navigation on taskbot node links; middle-click still works.')}</small>
+			</span>
+			<input id="blockTaskbotNodeLabelClicks" type="checkbox">
+		</label>
+	`;
+}
+
 function renderStyleFeatureControls(): string {
 	return STYLE_FEATURE_GROUPS.map((group) => {
+		const extraControls =
+			group.title === 'Taskbot Editor'
+				? renderBlockTaskbotNodeLabelClicksControl()
+				: '';
 		const controls = group.keys
 			.map((key) => STYLE_FEATURES.find((feature) => feature.key === key))
 			.filter((feature): feature is (typeof STYLE_FEATURES)[number] => !!feature)
@@ -330,10 +351,34 @@ function renderStyleFeatureControls(): string {
 		return `
 			<div class="style-feature-group">
 				<h3>${t(group.title)}</h3>
+				${extraControls}
 				${controls}
 			</div>
 		`;
 	}).join('');
+}
+
+function renderControlRoomCompatibilitySection(): string {
+	return `
+		<div class="control-room-status">
+			<div class="control-room-head">
+				<span>
+					<strong>${t('Control Room')}</strong>
+					<small id="controlRoomVersionState">${t('Checking version...')}</small>
+				</span>
+				<button id="refreshControlRoomVersion" type="button">${t('Refresh')}</button>
+			</div>
+			<div id="controlRoomVersionMeta" class="control-room-meta"></div>
+			<p id="controlRoomVersionAlert" class="control-room-alert" hidden></p>
+			<label id="forceUnsupportedControlRoomRow" class="setting-row force-control-room-row" hidden>
+				<span>
+					<strong>${t('Force styles on unsupported Control Room')}</strong>
+					<small>${t('Use UI Improvements even when Control Room target differs.')}</small>
+				</span>
+				<input id="forceUnsupportedControlRoomStyles" type="checkbox">
+			</label>
+		</div>
+	`;
 }
 
 function renderBotExecutionModalPositionControl(): string {
@@ -443,6 +488,10 @@ app.innerHTML = `
 					${renderHelpTip('debug-toggle', t('Show or hide recent debug entries.'))}
 				</span>
 				<span class="help-wrapper">
+					<button id="runStyleDoctor" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-doctor')}">${t('Run Doctor')}</button>
+					${renderHelpTip('debug-doctor', t('Run selector Doctor and write report to Debug Log.'))}
+				</span>
+				<span class="help-wrapper">
 					<button id="copyFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-copy')}">${t('Copy')}</button>
 					${renderHelpTip('debug-copy', t('Copy support log for troubleshooting.'))}
 				</span>
@@ -478,6 +527,7 @@ app.innerHTML = `
 						${renderHelpTip('ui-restore-defaults', t('Reset all UI Improvements options.'))}
 					</span>
 				</div>
+				${renderControlRoomCompatibilitySection()}
 				<label class="setting-row">
 					<span>
 						<strong>${t('Injected styles')}</strong>
@@ -542,6 +592,25 @@ const blockTaskbotNodeLabelClicksInput = document.querySelector<HTMLInputElement
 )!;
 const forceEnglishLocaleInput =
 	document.querySelector<HTMLInputElement>('#forceEnglishLocale')!;
+const forceUnsupportedControlRoomStylesInput =
+	document.querySelector<HTMLInputElement>('#forceUnsupportedControlRoomStyles')!;
+const forceUnsupportedControlRoomRow = document.querySelector<HTMLElement>(
+	'#forceUnsupportedControlRoomRow'
+)!;
+const controlRoomVersionState = document.querySelector<HTMLElement>(
+	'#controlRoomVersionState'
+)!;
+const controlRoomVersionMeta = document.querySelector<HTMLElement>(
+	'#controlRoomVersionMeta'
+)!;
+const controlRoomVersionAlert = document.querySelector<HTMLElement>(
+	'#controlRoomVersionAlert'
+)!;
+const refreshControlRoomVersionButton = document.querySelector<HTMLButtonElement>(
+	'#refreshControlRoomVersion'
+)!;
+const runStyleDoctorButton =
+	document.querySelector<HTMLButtonElement>('#runStyleDoctor')!;
 const extensionLanguageSelect =
 	document.querySelector<HTMLSelectElement>('#extensionLanguage')!;
 const debugInput = document.querySelector<HTMLInputElement>('#debugEnabled')!;
@@ -593,18 +662,23 @@ let currentExtensionShortcuts: ExtensionShortcuts = {
 };
 let lastSidepanelRequestNonce: string | null = null;
 
+function showStatusMessage(message: string, severity: FeedbackSeverity = 'info'): void {
+	status.textContent = message;
+	if (!message) return;
+	status.dataset.severity = severity;
+	setTimeout(() => {
+		if (status.textContent === message) status.textContent = '';
+	}, 3000);
+}
+
 function setStatus(
 	message: string,
 	severity: FeedbackSeverity = 'info',
 	source = 'sidepanel'
 ): void {
-	status.textContent = message;
+	showStatusMessage(message, severity);
 	if (!message) return;
-	status.dataset.severity = severity;
 	void addFeedback(severity, source, message);
-	setTimeout(() => {
-		if (status.textContent === message) status.textContent = '';
-	}, 3000);
 }
 
 function updateDebugLogState(): void {
@@ -713,6 +787,187 @@ async function sendActiveTabMessage(
 		return response ?? { ok: true };
 	} catch {
 		return { ok: false, error: t('Open an Automation Anywhere tab first.') };
+	}
+}
+
+async function refreshControlRoomCompatibility(forceRefresh = false): Promise<void> {
+	controlRoomVersionState.textContent = t('Checking version...');
+	try {
+		const response = (await browser.runtime.sendMessage({
+			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
+			forceRefresh,
+		})) as ControlRoomCompatibilityResponse | undefined;
+		if (!response?.ok) {
+			currentControlRoomCompatibility = null;
+			updateControlRoomCompatibilityUi();
+			setStatus(
+				response?.error || t('Control Room version unavailable.'),
+				'warn',
+				'userstyle'
+			);
+			return;
+		}
+		currentControlRoomCompatibility = response.compatibility;
+		updateControlRoomCompatibilityUi();
+	} catch (error) {
+		currentControlRoomCompatibility = null;
+		updateControlRoomCompatibilityUi();
+		setStatus(
+			error instanceof Error ? error.message : t('Control Room version unavailable.'),
+			'warn',
+			'userstyle'
+		);
+	}
+}
+
+function updateControlRoomCompatibilityUi(): void {
+	const compatibility = currentControlRoomCompatibility;
+	const target = formatControlRoomTarget(SUPPORTED_CONTROL_ROOM_TARGET);
+	controlRoomVersionAlert.hidden = true;
+	controlRoomVersionAlert.textContent = '';
+
+	if (!compatibility) {
+		controlRoomVersionState.textContent = t('Version unavailable.');
+		controlRoomVersionMeta.textContent = t('Supported target: {target}', { target });
+		forceUnsupportedControlRoomRow.hidden = false;
+		return;
+	}
+
+	const current = formatControlRoomVersion(compatibility.current);
+	controlRoomVersionState.textContent = compatibility.supported
+		? t('Supported target matched.')
+		: compatibility.state === 'unknown'
+			? t('Version unavailable.')
+			: t('Unsupported target.');
+	controlRoomVersionMeta.textContent = t(
+		'Current: {current}. Supported target: {target}. Validated build: {build}.',
+		{
+			current,
+			target,
+			build: compatibility.target.buildNumber,
+		}
+	);
+
+	forceUnsupportedControlRoomRow.hidden =
+		(compatibility.supported || compatibility.state === 'unknown') &&
+		!forceUnsupportedControlRoomStylesInput.checked;
+	if (compatibility.supported && compatibility.buildMismatch) {
+		controlRoomVersionAlert.hidden = false;
+		controlRoomVersionAlert.textContent = t(
+			'Build differs from validated build {build}. Styles still load.',
+			{ build: compatibility.target.buildNumber }
+		);
+		return;
+	}
+	if (compatibility.state === 'unknown') {
+		controlRoomVersionAlert.hidden = false;
+		controlRoomVersionAlert.textContent = compatibility.message
+			? t('Control Room version unavailable: {message}', {
+					message: compatibility.message,
+				})
+			: t('Control Room version unavailable. Styles still load.');
+		return;
+	}
+	if (!compatibility.supported) {
+		controlRoomVersionAlert.hidden = false;
+		controlRoomVersionAlert.textContent = compatibility.message
+			? t('Control Room version unavailable: {message}', {
+					message: compatibility.message,
+				})
+			: t('UI Improvements blocked until target matches or force is enabled.');
+	}
+}
+
+function getStyleDoctorSummary(report: StyleDoctorReport): string {
+	return t(
+		'Doctor {view}: {passed} pass, {failed} fail, {warnings} warn, {skipped} skip.',
+		{
+			view: report.view,
+			passed: report.passed,
+			failed: report.failed,
+			warnings: report.warnings,
+			skipped: report.skipped,
+		}
+	);
+}
+
+function getStyleDoctorFeedbackLevel(report: StyleDoctorReport): FeedbackSeverity {
+	if (report.failed > 0) return 'error';
+	if (report.warnings > 0 || report.skipped > 0 || report.view === 'unsupported') {
+		return 'warn';
+	}
+	return 'info';
+}
+
+function createStyleDoctorDebugDetails(
+	report: StyleDoctorReport
+): Record<string, unknown> {
+	return {
+		view: report.view,
+		url: report.url,
+		...(report.message ? { message: report.message } : {}),
+		summary: {
+			checked: report.checked,
+			passed: report.passed,
+			failed: report.failed,
+			warnings: report.warnings,
+			skipped: report.skipped,
+		},
+		results: report.results.map((result) => {
+			const entry: Record<string, unknown> = {
+				id: result.id,
+				view: result.view,
+				status: result.status,
+				severity: result.severity,
+				label: result.label,
+				selector: result.selector,
+				source: result.source,
+				count: result.count,
+			};
+			if (result.reason) entry.reason = result.reason;
+			return entry;
+		}),
+	};
+}
+
+async function runStyleDoctorFromSidepanel(): Promise<void> {
+	runStyleDoctorButton.disabled = true;
+	runStyleDoctorButton.textContent = t('Doctor running...');
+	showStatusMessage(t('Doctor running...'), 'info');
+	try {
+		const response = await sendActiveTabMessage({ type: 'RUN_STYLE_DOCTOR' });
+		if (!response.ok || !response.doctorReport) {
+			const message = response.ok ? t('Doctor failed.') : response.error;
+			await addFeedback('warn', 'doctor', message);
+			await refreshFeedbackHistory();
+			showStatusMessage(message, 'warn');
+			return;
+		}
+
+		const report = response.doctorReport;
+		const level = getStyleDoctorFeedbackLevel(report);
+		await addFeedback(
+			level,
+			'doctor',
+			getStyleDoctorSummary(report),
+			createStyleDoctorDebugDetails(report),
+			{ keepDetails: true }
+		);
+		await refreshFeedbackHistory();
+		showStatusMessage(t('Doctor report added to Debug Log.'), level);
+	} catch (error) {
+		await addFeedback(
+			'error',
+			'doctor',
+			t('Doctor failed.'),
+			{ error },
+			{ keepDetails: true }
+		);
+		await refreshFeedbackHistory();
+		showStatusMessage(t('Doctor failed.'), 'error');
+	} finally {
+		runStyleDoctorButton.disabled = false;
+		runStyleDoctorButton.textContent = t('Run Doctor');
 	}
 }
 
@@ -1002,6 +1257,12 @@ function normalizeStyleValueForComparison(key: StyleValueKey, value: string): st
 
 function isUserstyleAtDefault(): boolean {
 	if (stylesInput.checked !== DEFAULT_STYLES_ENABLED) return false;
+	if (
+		forceUnsupportedControlRoomStylesInput.checked !==
+		DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES
+	) {
+		return false;
+	}
 	if (botExecutionModalPositionSelect.value !== DEFAULT_BOT_EXECUTION_MODAL_POSITION) {
 		return false;
 	}
@@ -1112,6 +1373,7 @@ async function loadState(): Promise<void> {
 		paletteEnabled,
 		blockTaskbotClicks,
 		forceEnglish,
+		forceUnsupported,
 		language,
 		debug,
 		shortcut,
@@ -1126,6 +1388,7 @@ async function loadState(): Promise<void> {
 		getCommandPaletteEnabled(),
 		getBlockTaskbotNodeLabelClicks(),
 		getForceEnglishLocale(),
+		getForceUnsupportedControlRoomStyles(),
 		getExtensionLanguage(),
 		getDebugEnabled(),
 		getCommandPaletteShortcut(),
@@ -1149,6 +1412,7 @@ async function loadState(): Promise<void> {
 	commandPaletteEnabledInput.checked = paletteEnabled;
 	blockTaskbotNodeLabelClicksInput.checked = blockTaskbotClicks;
 	forceEnglishLocaleInput.checked = forceEnglish;
+	forceUnsupportedControlRoomStylesInput.checked = forceUnsupported;
 	extensionLanguageSelect.value = language;
 	debugInput.checked = debug;
 	currentDebugEnabled = debug;
@@ -1170,6 +1434,7 @@ async function loadState(): Promise<void> {
 		setStyleValueControl(field.key, styleValues[field.key]);
 	});
 	updateUserstyleDependentState();
+	await refreshControlRoomCompatibility();
 	await refreshSlotStates();
 	await refreshFeedbackHistory();
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
@@ -1179,6 +1444,7 @@ async function loadState(): Promise<void> {
 		paletteEnabled,
 		blockTaskbotClicks,
 		forceEnglish,
+		forceUnsupported,
 		debug,
 	});
 }
@@ -1187,6 +1453,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 	button.addEventListener('click', () => {
 		setActiveTab(button.dataset.tab as SidepanelTab);
 		if (button.dataset.tab === 'settings') void refreshAboutHelp();
+		if (button.dataset.tab === 'userstyle') void refreshControlRoomCompatibility();
 	});
 });
 
@@ -1243,7 +1510,7 @@ blockTaskbotNodeLabelClicksInput.addEventListener('change', () => {
 			? t('Taskbot link click blocking enabled.')
 			: t('Taskbot link click blocking disabled.'),
 		'info',
-		'settings'
+		'userstyle'
 	);
 });
 
@@ -1259,6 +1526,29 @@ forceEnglishLocaleInput.addEventListener('change', () => {
 		'info',
 		'settings'
 	);
+});
+
+forceUnsupportedControlRoomStylesInput.addEventListener('change', () => {
+	updateRestoreDefaultsButton();
+	void sendBackgroundMessage({
+		type: 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES',
+		enabled: forceUnsupportedControlRoomStylesInput.checked,
+	});
+	setStatus(
+		forceUnsupportedControlRoomStylesInput.checked
+			? t('Unsupported Control Room styles forced on.')
+			: t('Unsupported Control Room styles force disabled.'),
+		'warn',
+		'userstyle'
+	);
+});
+
+refreshControlRoomVersionButton.addEventListener('click', () => {
+	void refreshControlRoomCompatibility(true);
+});
+
+runStyleDoctorButton.addEventListener('click', () => {
+	void runStyleDoctorFromSidepanel();
 });
 
 extensionLanguageSelect.addEventListener('change', () => {
@@ -1458,6 +1748,8 @@ resetGradientColorsButton.addEventListener('click', async () => {
 
 restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 	stylesInput.checked = DEFAULT_STYLES_ENABLED;
+	forceUnsupportedControlRoomStylesInput.checked =
+		DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES;
 	botExecutionModalPositionSelect.value = DEFAULT_BOT_EXECUTION_MODAL_POSITION;
 	STYLE_FEATURES.forEach((feature) => {
 		getStyleFeatureInput(feature.key).checked = feature.defaultValue;
@@ -1471,6 +1763,10 @@ restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 		sendBackgroundMessage({
 			type: 'TOGGLE_STYLES',
 			enabled: DEFAULT_STYLES_ENABLED,
+		}),
+		sendBackgroundMessage({
+			type: 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES',
+			enabled: DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES,
 		}),
 		sendBackgroundMessage({
 			type: 'SET_BOT_EXECUTION_MODAL_POSITION',
@@ -1558,12 +1854,9 @@ document.querySelectorAll<HTMLElement>('[data-slot-row]').forEach((row) => {
 });
 
 clearFeedbackButton.addEventListener('click', () => {
-	void clearFeedback().then(() => {
-		status.textContent = t('Debug log cleared.');
-		status.dataset.severity = 'info';
-		setTimeout(() => {
-			if (status.textContent === t('Debug log cleared.')) status.textContent = '';
-		}, 3000);
+	void clearFeedback().then(async () => {
+		await refreshFeedbackHistory();
+		showStatusMessage(t('Debug log cleared.'), 'info');
 	});
 });
 
@@ -1661,6 +1954,11 @@ blockTaskbotNodeLabelClicks.watch((value) => {
 });
 forceEnglishLocale.watch((value) => {
 	forceEnglishLocaleInput.checked = value ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+});
+forceUnsupportedControlRoomStyles.watch((value) => {
+	forceUnsupportedControlRoomStylesInput.checked =
+		value ?? DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES;
+	updateRestoreDefaultsButton();
 });
 extensionLanguage.watch((value) => {
 	const language = normalizeExtensionLanguage(value);

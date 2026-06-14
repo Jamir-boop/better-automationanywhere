@@ -1,0 +1,73 @@
+{
+  "packages": [
+    {
+      "name": "TaskBot",
+      "version": "3.1.0"
+    },
+    {
+      "name": "File",
+      "version": "2.4.0"
+    }
+  ],
+  "variables": [
+    {
+      "name": "vSource"
+    }
+  ],
+  "nodes": [
+    {
+      "uid": "11111111-1111-4111-8111-111111111111",
+      "commandName": "assign",
+      "packageName": "File",
+      "attributes": [
+        {
+          "name": "sourceFile",
+          "value": {
+            "type": "FILE",
+            "string": "repository:///Automation%20Anywhere/Bots/Sample/files/config.xml"
+          }
+        }
+      ]
+    },
+    {
+      "uid": "22222222-2222-4222-8222-222222222222",
+      "commandName": "runTask",
+      "packageName": "TaskBot",
+      "attributes": [
+        {
+          "name": "taskbotFile",
+          "value": {
+            "type": "FILE",
+            "string": "repository:///Automation%20Anywhere/Bots/Sample/tasks/child_bot"
+          }
+        }
+      ],
+      "children": [
+        {
+          "uid": "33333333-3333-4333-8333-333333333333",
+          "commandName": "runTask",
+          "packageName": "TaskBot",
+          "attributes": [
+            {
+              "name": "taskbotFile",
+              "value": {
+                "type": "FILE",
+                "string": "repository:///Automation%20Anywhere/Bots/Sample/tasks/child_bot"
+              }
+            }
+          ],
+          "capture": {
+            "thumbnailMetadataPath": "11111111-2222-3333-4444-555555555555.png",
+            "screenshotMetadataPath": "66666666-7777-8888-9999-000000000000.png"
+          }
+        }
+      ]
+    }
+  ],
+  "falsePositiveControls": {
+    "repository": "not a dependency key",
+    "description": "open repository:///Automation%20Anywhere/Bots/Sample/tasks/not_a_prefix manually",
+    "emptyString": "",
+    "number": 123
+  }
+}

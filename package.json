@@ -2,7 +2,7 @@
   "name": "better-automationanywhere-dx",
   "description": "Better AA Developer Experience for Automation Anywhere",
   "private": true,
-  "version": "1.6.3",
+  "version": "1.8.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -12,6 +12,9 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "test:aa-json": "node scripts/test-aa-json.mjs",
+    "test:saved-state": "node scripts/smoke-saved-state.mjs",
+    "check:maintenance": "tsc --noEmit && node scripts/test-aa-json.mjs && node scripts/smoke-saved-state.mjs",
     "agent:fallow": "node scripts/fallow-agent.mjs audit",
     "agent:fallow:full": "node scripts/fallow-agent.mjs",
     "agent:fallow:dead-code": "node scripts/fallow-agent.mjs dead-code",
