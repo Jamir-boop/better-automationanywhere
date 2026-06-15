@@ -4,7 +4,7 @@ export type { LanguagePreference } from './i18n';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.8.2';
+export const EXTENSION_VERSION = '1.9.0';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',
@@ -41,6 +41,7 @@ export const debugEnabled = storage.defineItem<boolean>('local:debugEnabled');
 export const commandPaletteEnabled = storage.defineItem<boolean>(
 	'local:commandPaletteEnabled'
 );
+export const keepAliveEnabled = storage.defineItem<boolean>('local:keepAliveEnabled');
 export const blockTaskbotNodeLabelClicks = storage.defineItem<boolean>(
 	'local:blockTaskbotNodeLabelClicks'
 );
@@ -66,6 +67,7 @@ export const DEFAULT_SOUNDS_ENABLED = false;
 export const DEFAULT_SHOW_SUGGESTIONS = true;
 export const DEFAULT_DEBUG_ENABLED = false;
 export const DEFAULT_COMMAND_PALETTE_ENABLED = true;
+export const DEFAULT_KEEP_ALIVE_ENABLED = false;
 export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = true;
 export const DEFAULT_FORCE_ENGLISH_LOCALE = true;
 export const DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES = false;
@@ -276,6 +278,10 @@ export async function getDebugEnabled(): Promise<boolean> {
 
 export async function getCommandPaletteEnabled(): Promise<boolean> {
 	return (await commandPaletteEnabled.getValue()) ?? DEFAULT_COMMAND_PALETTE_ENABLED;
+}
+
+export async function getKeepAliveEnabled(): Promise<boolean> {
+	return (await keepAliveEnabled.getValue()) ?? DEFAULT_KEEP_ALIVE_ENABLED;
 }
 
 export async function getBlockTaskbotNodeLabelClicks(): Promise<boolean> {

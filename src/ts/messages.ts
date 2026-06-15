@@ -49,6 +49,7 @@ export type SettingsBackgroundMessage =
 	| { type: 'SET_SHOW_SUGGESTIONS'; enabled: boolean }
 	| { type: 'SET_DEBUG_ENABLED'; enabled: boolean }
 	| { type: 'SET_COMMAND_PALETTE_ENABLED'; enabled: boolean }
+	| { type: 'SET_KEEP_ALIVE_ENABLED'; enabled: boolean }
 	| { type: 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS'; enabled: boolean }
 	| { type: 'SET_FORCE_ENGLISH_LOCALE'; enabled: boolean }
 	| { type: 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES'; enabled: boolean }

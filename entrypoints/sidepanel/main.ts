@@ -41,6 +41,7 @@ import {
 	DEFAULT_EXTENSION_LANGUAGE,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES,
+	DEFAULT_KEEP_ALIVE_ENABLED,
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
 	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
@@ -67,6 +68,7 @@ import {
 	getExtensionLanguage,
 	getForceEnglishLocale,
 	getForceUnsupportedControlRoomStyles,
+	getKeepAliveEnabled,
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getShowSuggestions,
@@ -77,6 +79,7 @@ import {
 	normalizeBotExecutionModalPosition,
 	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
+	keepAliveEnabled,
 	openSidebarShortcut,
 	showSuggestions,
 	soundsEnabled,
@@ -257,6 +260,13 @@ function renderToolsConfigSection(): string {
 					<small>${t('Short mouse-click tips for common shortcuts')}</small>
 				</span>
 				<input id="showSuggestions" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Keep Automation Anywhere session alive')}</strong>
+					<small>${t('Sends periodic in-page activity to reduce idle logout.')}</small>
+				</span>
+				<input id="keepAliveEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
@@ -579,6 +589,8 @@ const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const showSuggestionsInput =
 	document.querySelector<HTMLInputElement>('#showSuggestions')!;
+const keepAliveEnabledInput =
+	document.querySelector<HTMLInputElement>('#keepAliveEnabled')!;
 const commandPaletteEnabledInput = document.querySelector<HTMLInputElement>(
 	'#commandPaletteEnabled'
 )!;
@@ -1362,6 +1374,7 @@ async function loadState(): Promise<void> {
 		styles,
 		sounds,
 		suggestions,
+		keepAlive,
 		paletteEnabled,
 		blockTaskbotClicks,
 		forceEnglish,
@@ -1377,6 +1390,7 @@ async function loadState(): Promise<void> {
 		getStylesEnabled(),
 		getSoundsEnabled(),
 		getShowSuggestions(),
+		getKeepAliveEnabled(),
 		getCommandPaletteEnabled(),
 		getBlockTaskbotNodeLabelClicks(),
 		getForceEnglishLocale(),
@@ -1401,6 +1415,7 @@ async function loadState(): Promise<void> {
 	stylesInput.checked = styles;
 	soundsInput.checked = sounds;
 	showSuggestionsInput.checked = suggestions;
+	keepAliveEnabledInput.checked = keepAlive;
 	commandPaletteEnabledInput.checked = paletteEnabled;
 	blockTaskbotNodeLabelClicksInput.checked = blockTaskbotClicks;
 	forceEnglishLocaleInput.checked = forceEnglish;
@@ -1433,6 +1448,7 @@ async function loadState(): Promise<void> {
 		styles,
 		sounds,
 		suggestions,
+		keepAlive,
 		paletteEnabled,
 		blockTaskbotClicks,
 		forceEnglish,
@@ -1475,6 +1491,20 @@ showSuggestionsInput.addEventListener('change', () => {
 			: t('Suggestions disabled.'),
 		'info',
 		'suggestions'
+	);
+});
+
+keepAliveEnabledInput.addEventListener('change', () => {
+	void sendBackgroundMessage({
+		type: 'SET_KEEP_ALIVE_ENABLED',
+		enabled: keepAliveEnabledInput.checked,
+	});
+	setStatus(
+		keepAliveEnabledInput.checked
+			? t('Keep-alive enabled.')
+			: t('Keep-alive disabled.'),
+		'info',
+		'settings'
 	);
 });
 
@@ -1906,6 +1936,9 @@ soundsEnabled.watch((value) => {
 });
 showSuggestions.watch((value) => {
 	showSuggestionsInput.checked = value ?? DEFAULT_SHOW_SUGGESTIONS;
+});
+keepAliveEnabled.watch((value) => {
+	keepAliveEnabledInput.checked = value ?? DEFAULT_KEEP_ALIVE_ENABLED;
 });
 commandPaletteEnabled.watch((value) => {
 	commandPaletteEnabledInput.checked = value ?? DEFAULT_COMMAND_PALETTE_ENABLED;

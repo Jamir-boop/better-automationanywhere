@@ -45,6 +45,7 @@ import {
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
+	DEFAULT_KEEP_ALIVE_ENABLED,
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
@@ -58,6 +59,7 @@ import {
 	getExtensionLanguage,
 	getForceEnglishLocale,
 	getForceUnsupportedControlRoomStyles,
+	getKeepAliveEnabled,
 	getOpenSidebarShortcut,
 	getShowSuggestions,
 	getSoundsEnabled,
@@ -66,6 +68,7 @@ import {
 	getStyleValues,
 	normalizeBotExecutionModalPosition,
 	normalizeOpenSidebarShortcut,
+	keepAliveEnabled,
 	openSidebarShortcut,
 	RUN_BUTTON_CLASS,
 	STYLE_FEATURES,
@@ -104,6 +107,9 @@ const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
 const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
 const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
 const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
+const KEEP_ALIVE_INTERVAL_MS = 60_000;
+
+let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -240,6 +246,7 @@ async function applyInitialSettings(): Promise<void> {
 		setActiveCommandPaletteEnabled(await getCommandPaletteEnabled());
 		setActiveBlockTaskbotNodeLabelClicks(await getBlockTaskbotNodeLabelClicks());
 		setForceEnglishLocaleEnabled(await getForceEnglishLocale());
+		setKeepAliveEnabled(await getKeepAliveEnabled());
 		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
 		setActiveOpenSidebarShortcut(await getOpenSidebarShortcut());
 	} catch (error) {
@@ -276,6 +283,26 @@ function isTopFrame(): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function clearKeepAliveTimer(): void {
+	if (!keepAliveTimer) return;
+	clearInterval(keepAliveTimer);
+	keepAliveTimer = undefined;
+}
+
+function sendKeepAliveActivity(): void {
+	window.dispatchEvent(new Event('pointermove'));
+}
+
+function setKeepAliveEnabled(enabled: boolean): void {
+	if (!enabled || !isTopFrame()) {
+		clearKeepAliveTimer();
+		return;
+	}
+	sendKeepAliveActivity();
+	if (keepAliveTimer) return;
+	keepAliveTimer = setInterval(sendKeepAliveActivity, KEEP_ALIVE_INTERVAL_MS);
 }
 
 function insertOpenSidebarButton(): void {
@@ -392,6 +419,10 @@ async function handleRuntimeMessage(
 		}
 		if (message.type === 'SET_COMMAND_PALETTE_ENABLED') {
 			setActiveCommandPaletteEnabled(message.enabled);
+			return;
+		}
+		if (message.type === 'SET_KEEP_ALIVE_ENABLED') {
+			setKeepAliveEnabled(message.enabled);
 			return;
 		}
 		if (message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS') {
@@ -518,6 +549,9 @@ export default defineContentScript({
 		});
 		forceEnglishLocale.watch((value) => {
 			setForceEnglishLocaleEnabled(value ?? DEFAULT_FORCE_ENGLISH_LOCALE);
+		});
+		keepAliveEnabled.watch((value) => {
+			setKeepAliveEnabled(value ?? DEFAULT_KEEP_ALIVE_ENABLED);
 		});
 		forceUnsupportedControlRoomStyles.watch(() => {
 			void applyStyleClasses();

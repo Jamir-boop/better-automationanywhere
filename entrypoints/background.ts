@@ -40,6 +40,7 @@ import {
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getStylesEnabled,
+	keepAliveEnabled,
 	normalizeBotExecutionModalPosition,
 	normalizeCommandPaletteShortcut,
 	normalizeExtensionLanguage,
@@ -379,6 +380,13 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 		});
 		await broadcastToAutomationTabs(message);
 	}
+	if (message.type === 'SET_KEEP_ALIVE_ENABLED') {
+		await keepAliveEnabled.setValue(message.enabled);
+		void debugInfo('settings', 'Keep-alive setting saved.', {
+			enabled: message.enabled,
+		});
+		await broadcastToAutomationTabs(message);
+	}
 	if (message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS') {
 		await blockTaskbotNodeLabelClicks.setValue(message.enabled);
 		void debugInfo('settings', 'Taskbot link click setting saved.', {
@@ -479,6 +487,7 @@ function isSettingsBackgroundMessage(message: RuntimeMessage): message is Settin
 		message.type === 'SET_SHOW_SUGGESTIONS' ||
 		message.type === 'SET_DEBUG_ENABLED' ||
 		message.type === 'SET_COMMAND_PALETTE_ENABLED' ||
+		message.type === 'SET_KEEP_ALIVE_ENABLED' ||
 		message.type === 'SET_BLOCK_TASKBOT_NODE_LABEL_CLICKS' ||
 		message.type === 'SET_FORCE_ENGLISH_LOCALE' ||
 		message.type === 'SET_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES' ||

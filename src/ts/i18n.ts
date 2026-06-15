@@ -28,6 +28,12 @@ const ES: Record<string, string> = {
 	'Show suggestions': 'Mostrar sugerencias',
 	'Short mouse-click tips for common shortcuts':
 		'Consejos breves de clic para atajos comunes',
+	'Keep Automation Anywhere session alive':
+		'Mantener activa la sesion de Automation Anywhere',
+	'Sends periodic in-page activity to reduce idle logout.':
+		'Envia actividad periodica en la pagina para reducir cierres por inactividad.',
+	'Keep-alive enabled.': 'Keep-alive activado.',
+	'Keep-alive disabled.': 'Keep-alive desactivado.',
 	'Block taskbot link clicks': 'Bloquear clics en enlaces de taskbot',
 	'Prevent left-click navigation on taskbot node links; middle-click still works.':
 		'Evita navegar con clic izquierdo en enlaces de nodos taskbot; clic medio sigue funcionando.',
