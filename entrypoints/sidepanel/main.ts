@@ -1,11 +1,11 @@
 import './style.styl';
 import { getHelpTipId, initializeHelpTooltips, renderHelpTip } from './help';
 import {
-	clearAutomationAnywhereJsonDetails,
-	downloadJsonTextFile,
-	getJsonDownloadText,
-	renderAutomationAnywhereJsonDetails,
-} from './json-info';
+	initializeJsonWorkbench,
+	renderJsonWorkbenchActionButtons,
+	renderJsonWorkbenchSearchTools,
+	type JsonWorkbench,
+} from './json-workbench';
 import { initializeToolsPanel, renderToolsPanel } from './tools';
 import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
 import {
@@ -278,6 +278,7 @@ function renderUniversalClipboardSection(): string {
 
 		<h2>${t('Action JSON')}</h2>
 		<p class="inline-hint">${t('Advanced: imports raw Automation Anywhere clipboard JSON.')}</p>
+		${renderJsonWorkbenchSearchTools('actionJson')}
 		<div class="json-field">
 			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="${t('Universal copy loads selected action JSON here. Paste JSON here to import.')}"></textarea>
 			<button id="clearJson" class="clear-json-button help-anchor" type="button" aria-label="${t('Clear JSON')}" aria-describedby="${getHelpTipId('clear-json')}" hidden>
@@ -291,20 +292,14 @@ function renderUniversalClipboardSection(): string {
 			</button>
 			${renderHelpTip('clear-json', t('Clear the Action JSON field.'))}
 		</div>
+		<p id="actionJsonError" class="json-inline-error" hidden></p>
 		<div id="actionPackageList" class="action-package-list" hidden></div>
 		<div class="button-grid">
 			<span class="help-wrapper">
 				<button id="importJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('import-json')}">${t('Import JSON')}</button>
 				${renderHelpTip('import-json', t('Import textarea JSON into AA clipboard.'))}
 			</span>
-			<span class="help-wrapper">
-				<button id="copyJsonText" class="help-anchor" type="button" aria-describedby="${getHelpTipId('copy-json')}">${t('Copy JSON')}</button>
-				${renderHelpTip('copy-json', t('Copy textarea JSON to system clipboard.'))}
-			</span>
-			<span class="help-wrapper button-grid-full">
-				<button id="exportJsonText" class="help-anchor" type="button" aria-describedby="${getHelpTipId('export-json')}">${t('Export JSON')}</button>
-				${renderHelpTip('export-json', t('Download textarea JSON as a .json file.'))}
-			</span>
+			${renderJsonWorkbenchActionButtons('actionJson')}
 		</div>
 	`;
 }
@@ -631,6 +626,7 @@ const openSidebarShortcutLabel = document.querySelector<HTMLElement>(
 )!;
 const status = document.querySelector<HTMLElement>('#status')!;
 const actionJson = document.querySelector<HTMLTextAreaElement>('#actionJson')!;
+const actionJsonError = document.querySelector<HTMLElement>('#actionJsonError')!;
 const actionPackageList = document.querySelector<HTMLElement>('#actionPackageList')!;
 const clearJsonButton = document.querySelector<HTMLButtonElement>('#clearJson')!;
 const debugLogSection = document.querySelector<HTMLElement>('#debugLogSection')!;
@@ -656,6 +652,7 @@ const backgroundPreview =
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
 let debugLogCollapsed = true;
+let actionJsonWorkbench: JsonWorkbench;
 let currentExtensionShortcuts: ExtensionShortcuts = {
 	openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
 	commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
@@ -680,6 +677,18 @@ function setStatus(
 	if (!message) return;
 	void addFeedback(severity, source, message);
 }
+
+actionJsonWorkbench = initializeJsonWorkbench({
+	idPrefix: 'actionJson',
+	textarea: actionJson,
+	errorElement: actionJsonError,
+	detailsContainer: actionPackageList,
+	setStatus: (message, severity = 'info') => setStatus(message, severity, 'json'),
+	getExportFileName: () => 'action-json.json',
+	onChange: updateClearJsonButton,
+	emptyMessage: t('JSON textarea is empty.'),
+	copiedMessage: t('JSON copied to clipboard.'),
+});
 
 function updateDebugLogState(): void {
 	debugLogSection.classList.toggle('is-collapsed', debugLogCollapsed);
@@ -1053,25 +1062,8 @@ function updateClearJsonButton(): void {
 	clearJsonButton.hidden = !actionJson.value.trim();
 }
 
-function updateActionJsonState(): void {
-	updateClearJsonButton();
-	const input = actionJson.value.trim();
-	if (!input) {
-		clearAutomationAnywhereJsonDetails(actionPackageList);
-		return;
-	}
-
-	try {
-		const parsed = JSON.parse(input);
-		renderAutomationAnywhereJsonDetails(actionPackageList, parsed);
-	} catch {
-		clearAutomationAnywhereJsonDetails(actionPackageList);
-	}
-}
-
 function setActionJsonValue(json: string): void {
-	actionJson.value = json;
-	updateActionJsonState();
+	actionJsonWorkbench.setValue(json);
 }
 
 function getSlotStateText(json: string | null | undefined): string {
@@ -1877,7 +1869,7 @@ copyFeedbackButton.addEventListener('click', () => {
 });
 
 document.querySelector<HTMLButtonElement>('#importJson')!.addEventListener('click', async () => {
-	const json = actionJson.value.trim();
+	const json = actionJsonWorkbench.getValue().trim();
 	if (!json) {
 		setStatus(t('JSON textarea is empty.'), 'warn', 'json');
 		return;
@@ -1899,36 +1891,6 @@ document.querySelector<HTMLButtonElement>('#importJson')!.addEventListener('clic
 		'json'
 	);
 });
-
-document.querySelector<HTMLButtonElement>('#copyJsonText')!.addEventListener('click', async () => {
-	if (!actionJson.value.trim()) {
-		setStatus(t('JSON textarea is empty.'), 'warn', 'json');
-		return;
-	}
-	try {
-		await navigator.clipboard.writeText(actionJson.value);
-		setStatus(t('JSON copied to clipboard.'), 'info', 'json');
-	} catch {
-		setStatus(t('Clipboard write failed.'), 'error', 'json');
-	}
-});
-
-document.querySelector<HTMLButtonElement>('#exportJsonText')!.addEventListener('click', () => {
-	const json = actionJson.value.trim();
-	if (!json) {
-		setStatus(t('JSON textarea is empty.'), 'warn', 'json');
-		return;
-	}
-	try {
-		downloadJsonTextFile(getJsonDownloadText(json), 'action-json.json');
-		setStatus(t('JSON exported.'), 'info', 'json');
-	} catch (error) {
-		void debugWarn('json', 'Action JSON export parse failed.', { error }, { feedback: true });
-		setStatus(t('Invalid JSON.'), 'error', 'json');
-	}
-});
-
-actionJson.addEventListener('input', updateActionJsonState);
 
 clearJsonButton.addEventListener('click', () => {
 	setActionJsonValue('');
@@ -2019,7 +1981,6 @@ sidepanelRequest.watch((value) => {
 	void handleSidepanelRequest(value);
 });
 
-initializeToolsPanel({ setStatus, addFeedback, prettyJson });
+initializeToolsPanel({ setStatus, addFeedback });
 void loadState();
-updateActionJsonState();
 void sidepanelRequest.getValue().then(handleSidepanelRequest);

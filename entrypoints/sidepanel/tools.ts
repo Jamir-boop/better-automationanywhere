@@ -20,17 +20,12 @@ import {
 } from '@/src/ts/automation-anywhere-api';
 import { getHelpTipId, renderHelpTip, setHelpTip } from './help';
 import {
-	clearAutomationAnywhereJsonDetails,
-	downloadJsonTextFile,
-	getJsonDownloadText,
-	renderAutomationAnywhereJsonDetails,
-} from './json-info';
+	initializeJsonWorkbench,
+	renderJsonWorkbenchActionButtons,
+	renderJsonWorkbenchSearchTools,
+	type JsonWorkbench,
+} from './json-workbench';
 import { t } from '@/src/ts/i18n';
-import {
-	extractAutomationAnywhereRepositoryReferences,
-	replaceAutomationAnywhereRepositoryReferences,
-	type AutomationAnywhereRepositoryReference,
-} from '@/src/ts/automation-anywhere-json';
 import type {
 	ContentActionResponse,
 	RuntimeMessage,
@@ -72,7 +67,6 @@ interface InitializeToolsOptions {
 		message: string,
 		details?: Record<string, unknown>
 	): void | Promise<void>;
-	prettyJson(json: string): string;
 }
 
 interface RenderToolsPanelOptions {
@@ -130,11 +124,6 @@ interface ToolRunState {
 	startedAt: number;
 }
 
-interface TextMatch {
-	start: number;
-	end: number;
-}
-
 const PAGE_LENGTH = 200;
 const EXPORT_BATCH_SIZE = 20;
 const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
@@ -172,7 +161,6 @@ let lastRawPageLength = 0;
 let copiedFiles: CopiedToolFile[] = [];
 let taskbotJsonFileId: string | null = null;
 let taskbotJsonBaseline: string | null = null;
-let taskbotRepositoryReferences: AutomationAnywhereRepositoryReference[] = [];
 let activeToolRun: ToolRunState | null = null;
 let refreshToolsContextTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -211,29 +199,9 @@ let toolsFinishSummary: HTMLElement;
 let toolsFinishLog: HTMLElement;
 let toolsFinishClose: HTMLButtonElement;
 let taskbotSection: HTMLElement;
-let taskbotJsonContent: HTMLElement;
-let taskbotJsonToggle: HTMLButtonElement;
 let taskbotJson: HTMLTextAreaElement;
 let taskbotJsonMeta: HTMLElement;
-let taskbotJsonError: HTMLElement;
-let taskbotPackageList: HTMLElement;
-let taskbotJsonFindInput: HTMLInputElement;
-let taskbotJsonReplaceInput: HTMLInputElement;
-let taskbotJsonMatchCaseInput: HTMLInputElement;
-let taskbotJsonSearchStatus: HTMLElement;
-let taskbotJsonPreviousButton: HTMLButtonElement;
-let taskbotJsonNextButton: HTMLButtonElement;
-let taskbotJsonReplaceButton: HTMLButtonElement;
-let taskbotJsonReplaceAllButton: HTMLButtonElement;
-let taskbotRepositoryContent: HTMLElement;
-let taskbotRepositoryToggle: HTMLButtonElement;
-let taskbotRepositoryMeta: HTMLElement;
-let taskbotRepositoryRefSelect: HTMLSelectElement;
-let taskbotRepositoryReplaceInput: HTMLInputElement;
-let taskbotRepositoryStatus: HTMLElement;
-let taskbotRepositoryFindButton: HTMLButtonElement;
-let taskbotRepositoryReplaceButton: HTMLButtonElement;
-let taskbotRepositoryCopyButton: HTMLButtonElement;
+let taskbotJsonWorkbench: JsonWorkbench;
 let taskbotJsonSaveButton: HTMLButtonElement;
 let exportPackageListText = '';
 let exportFormat: ExportFormat = 'zip';
@@ -340,84 +308,25 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 			</section>
 
 			<section id="taskbotJsonSection" class="panel-section" hidden>
-				<div class="section-heading-row collapsible-section-heading">
+				<div class="section-heading-row">
 					<h2 id="taskbotJsonTitle">${t('Taskbot JSON')}</h2>
-					<span class="section-heading-actions">
-						<span id="taskbotJsonMeta" class="tools-count"></span>
-						<button id="taskbotJsonToggle" class="collapsible-toggle" type="button" aria-expanded="false" aria-controls="taskbotJsonContent" aria-label="${t('Expand Taskbot JSON')}"></button>
-					</span>
+					<span id="taskbotJsonMeta" class="tools-count"></span>
 				</div>
-				<div id="taskbotJsonContent" class="collapsible-section-content" hidden>
+				<div id="taskbotJsonContent" class="taskbot-json-content">
 					<p class="inline-hint">${t('Advanced: saves raw bot content back to Control Room.')}</p>
-					<div id="taskbotJsonTools" class="taskbot-json-tools">
-						<div class="taskbot-json-fields">
-							<label>
-								<span>${t('Find')}</span>
-								<input id="taskbotJsonFind" type="search" autocomplete="off">
-							</label>
-							<label>
-								<span>${t('Replace')}</span>
-								<input id="taskbotJsonReplace" type="text" autocomplete="off">
-							</label>
-						</div>
-						<label class="taskbot-json-checkbox">
-							<input id="taskbotJsonMatchCase" type="checkbox">
-							<span>${t('Match case')}</span>
-						</label>
-						<div class="button-grid taskbot-json-actions">
-							<button id="taskbotJsonPrevious" type="button">${t('Previous')}</button>
-							<button id="taskbotJsonNext" type="button">${t('Next')}</button>
-							<button id="taskbotJsonReplaceCurrent" type="button">${t('Replace')}</button>
-							<button id="taskbotJsonReplaceAll" type="button">${t('Replace all')}</button>
-						</div>
-						<p id="taskbotJsonSearchStatus" class="inline-hint" aria-live="polite"></p>
-						<div class="taskbot-repository-tools">
-							<div class="section-heading-row collapsible-section-heading taskbot-repository-heading">
-								<h2 id="taskbotRepositoryTitle">${t('Repository refs')}</h2>
-								<span class="section-heading-actions">
-									<span id="taskbotRepositoryMeta" class="tools-count"></span>
-									<button id="taskbotRepositoryToggle" class="collapsible-toggle" type="button" aria-expanded="false" aria-controls="taskbotRepositoryContent" aria-label="${t('Expand repository refs')}"></button>
-								</span>
-							</div>
-							<div id="taskbotRepositoryContent" class="collapsible-section-content" hidden>
-								<div class="taskbot-json-fields">
-									<label>
-										<span>${t('Repository ref')}</span>
-										<select id="taskbotRepositoryRefSelect"></select>
-									</label>
-									<label>
-										<span>${t('New ref')}</span>
-										<input id="taskbotRepositoryReplace" type="text" autocomplete="off">
-									</label>
-								</div>
-								<div class="button-grid taskbot-json-actions">
-									<button id="taskbotRepositoryFind" type="button">${t('Find ref')}</button>
-									<button id="taskbotRepositoryReplaceButton" type="button">${t('Replace ref')}</button>
-									<button id="taskbotRepositoryCopy" class="button-grid-full" type="button">${t('Copy refs')}</button>
-								</div>
-								<p id="taskbotRepositoryStatus" class="inline-hint" aria-live="polite"></p>
-							</div>
-						</div>
-					</div>
+					${renderJsonWorkbenchSearchTools('taskbotJson')}
 					<textarea id="taskbotJson" class="json-area tools-json-area" spellcheck="false" aria-describedby="taskbotJsonError"></textarea>
 					<p id="taskbotJsonError" class="json-inline-error" hidden></p>
 					<div id="taskbotPackageList" class="taskbot-package-list" hidden></div>
 					<div class="button-grid">
+						${renderJsonWorkbenchActionButtons('taskbotJson', {
+							copyLabel: 'Copy to clipboard',
+							copyHelp: 'Copy textarea JSON to system clipboard.',
+							formatLabel: 'Format',
+							exportLabel: 'Export JSON',
+							exportHelp: 'Download textarea JSON as a .json file.',
+						})}
 						<span class="help-wrapper">
-							<button id="taskbotLoadJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-load-json')}">${t('Load from Control Room')}</button>
-							${renderHelpTip('taskbot-load-json', t('Load current taskbot content JSON.'))}
-						</span>
-						<span class="help-wrapper">
-							<button id="taskbotCopyJson" type="button">${t('Copy to clipboard')}</button>
-						</span>
-						<span class="help-wrapper">
-							<button id="taskbotFormatJson" type="button">${t('Format')}</button>
-						</span>
-						<span class="help-wrapper">
-							<button id="taskbotExportJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-export-json')}">${t('Export JSON')}</button>
-							${renderHelpTip('taskbot-export-json', t('Download textarea JSON as a .json file.'))}
-						</span>
-						<span class="help-wrapper button-grid-full">
 							<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
 							${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
 						</span>
@@ -466,30 +375,21 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	toolsFinishLog = getRequiredElement('#toolsFinishLog');
 	toolsFinishClose = getRequiredElement<HTMLButtonElement>('#toolsFinishClose');
 	taskbotSection = getRequiredElement('#taskbotJsonSection');
-	taskbotJsonContent = getRequiredElement('#taskbotJsonContent');
-	taskbotJsonToggle = getRequiredElement<HTMLButtonElement>('#taskbotJsonToggle');
 	taskbotJson = getRequiredElement<HTMLTextAreaElement>('#taskbotJson');
 	taskbotJsonMeta = getRequiredElement('#taskbotJsonMeta');
-	taskbotJsonError = getRequiredElement('#taskbotJsonError');
-	taskbotPackageList = getRequiredElement('#taskbotPackageList');
-	taskbotJsonFindInput = getRequiredElement<HTMLInputElement>('#taskbotJsonFind');
-	taskbotJsonReplaceInput = getRequiredElement<HTMLInputElement>('#taskbotJsonReplace');
-	taskbotJsonMatchCaseInput = getRequiredElement<HTMLInputElement>('#taskbotJsonMatchCase');
-	taskbotJsonSearchStatus = getRequiredElement('#taskbotJsonSearchStatus');
-	taskbotJsonPreviousButton = getRequiredElement<HTMLButtonElement>('#taskbotJsonPrevious');
-	taskbotJsonNextButton = getRequiredElement<HTMLButtonElement>('#taskbotJsonNext');
-	taskbotJsonReplaceButton = getRequiredElement<HTMLButtonElement>('#taskbotJsonReplaceCurrent');
-	taskbotJsonReplaceAllButton = getRequiredElement<HTMLButtonElement>('#taskbotJsonReplaceAll');
-	taskbotRepositoryContent = getRequiredElement('#taskbotRepositoryContent');
-	taskbotRepositoryToggle = getRequiredElement<HTMLButtonElement>('#taskbotRepositoryToggle');
-	taskbotRepositoryMeta = getRequiredElement('#taskbotRepositoryMeta');
-	taskbotRepositoryRefSelect = getRequiredElement<HTMLSelectElement>('#taskbotRepositoryRefSelect');
-	taskbotRepositoryReplaceInput = getRequiredElement<HTMLInputElement>('#taskbotRepositoryReplace');
-	taskbotRepositoryStatus = getRequiredElement('#taskbotRepositoryStatus');
-	taskbotRepositoryFindButton = getRequiredElement<HTMLButtonElement>('#taskbotRepositoryFind');
-	taskbotRepositoryReplaceButton = getRequiredElement<HTMLButtonElement>('#taskbotRepositoryReplaceButton');
-	taskbotRepositoryCopyButton = getRequiredElement<HTMLButtonElement>('#taskbotRepositoryCopy');
 	taskbotJsonSaveButton = getRequiredElement<HTMLButtonElement>('#taskbotSaveJson');
+	taskbotJsonWorkbench = initializeJsonWorkbench({
+		idPrefix: 'taskbotJson',
+		textarea: taskbotJson,
+		errorElement: getRequiredElement('#taskbotJsonError'),
+		detailsContainer: getRequiredElement('#taskbotPackageList'),
+		setStatus: setToolStatus,
+		getExportFileName: () => `taskbot-${taskbotJsonFileId ?? 'json'}.json`,
+		onChange: updateTaskbotJsonMutationState,
+		emptyMessage: t('Taskbot JSON is empty.'),
+		copiedMessage: t('Taskbot JSON copied.'),
+		formattedMessage: t('Taskbot JSON formatted.'),
+	});
 
 	refreshButton.addEventListener('click', () => {
 		void refreshToolsContext();
@@ -514,54 +414,10 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	toolsFinishModal.addEventListener('click', (event) => {
 		if (event.target === toolsFinishModal) hideToolFinishModal();
 	});
-	taskbotJsonToggle.addEventListener('click', () => {
-		setTaskbotJsonCollapsed(!taskbotJsonContent.hidden);
-	});
-	getRequiredElement<HTMLButtonElement>('#taskbotLoadJson').addEventListener('click', () => {
-		void loadTaskbotJson();
-	});
-	getRequiredElement<HTMLButtonElement>('#taskbotCopyJson').addEventListener('click', () => {
-		void copyTaskbotJson();
-	});
-	getRequiredElement<HTMLButtonElement>('#taskbotFormatJson').addEventListener('click', () => {
-		formatTaskbotJson();
-	});
-	getRequiredElement<HTMLButtonElement>('#taskbotExportJson').addEventListener('click', () => {
-		exportTaskbotJsonFile();
-	});
-	taskbotJsonFindInput.addEventListener('input', updateTaskbotJsonSearchState);
-	taskbotJsonFindInput.addEventListener('keydown', (event) => {
-		if (event.key !== 'Enter') return;
-		event.preventDefault();
-		findTaskbotJsonMatch(event.shiftKey ? -1 : 1);
-	});
-	taskbotJsonReplaceInput.addEventListener('input', updateTaskbotJsonSearchState);
-	taskbotJsonMatchCaseInput.addEventListener('change', updateTaskbotJsonSearchState);
-	taskbotJsonPreviousButton.addEventListener('click', () => findTaskbotJsonMatch(-1));
-	taskbotJsonNextButton.addEventListener('click', () => findTaskbotJsonMatch(1));
-	taskbotJsonReplaceButton.addEventListener('click', replaceCurrentTaskbotJsonMatch);
-	taskbotJsonReplaceAllButton.addEventListener('click', replaceAllTaskbotJsonMatches);
-	taskbotRepositoryToggle.addEventListener('click', () => {
-		setTaskbotRepositoryCollapsed(!taskbotRepositoryContent.hidden);
-	});
-	taskbotRepositoryRefSelect.addEventListener('change', updateTaskbotRepositoryStatus);
-	taskbotRepositoryReplaceInput.addEventListener('input', updateTaskbotJsonMutationState);
-	taskbotRepositoryFindButton.addEventListener('click', findSelectedTaskbotRepositoryRef);
-	taskbotRepositoryReplaceButton.addEventListener('click', replaceSelectedTaskbotRepositoryRef);
-	taskbotRepositoryCopyButton.addEventListener('click', () => {
-		void copyTaskbotRepositoryRefs();
-	});
-	taskbotJson.addEventListener('input', () => {
-		validateTaskbotJson();
-		updateTaskbotPackageList();
-		updateTaskbotJsonSearchState();
-	});
 	taskbotJsonSaveButton.addEventListener('click', () => {
 		void saveTaskbotJson();
 	});
 	resetExportFormatToDefault();
-	setTaskbotJsonCollapsed(true);
-	setTaskbotRepositoryCollapsed(true);
 	browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 		if (message.type !== 'AA_ROUTE_CHANGED') return;
 		if (sender.tab?.active === false) return;
@@ -711,365 +567,13 @@ function showExportPackageInfo(packages: ExportPackageReference[]): void {
 	toolsExportPackageInfo.hidden = false;
 }
 
-function updateTaskbotPackageList(): void {
-	const value = taskbotJson.value.trim();
-	if (!value) {
-		clearAutomationAnywhereJsonDetails(taskbotPackageList);
-		setTaskbotRepositoryReferences([]);
-		updateTaskbotJsonMutationState();
-		return;
-	}
-
-	try {
-		const parsed = JSON.parse(value);
-		renderAutomationAnywhereJsonDetails(taskbotPackageList, parsed);
-		setTaskbotRepositoryReferences(extractAutomationAnywhereRepositoryReferences(parsed));
-	} catch {
-		clearAutomationAnywhereJsonDetails(taskbotPackageList);
-		setTaskbotRepositoryReferences([]);
-	}
-	updateTaskbotJsonMutationState();
-}
-
 function normalizeTaskbotJsonContent(content: unknown): string {
 	return JSON.stringify(content) ?? 'undefined';
 }
 
-function canParseTaskbotJson(): boolean {
-	if (!taskbotJson.value.trim()) return false;
-	try {
-		JSON.parse(taskbotJson.value);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function parseTaskbotJson(): unknown | null {
-	if (!taskbotJson.value.trim()) return null;
-	try {
-		return JSON.parse(taskbotJson.value);
-	} catch {
-		return null;
-	}
-}
-
-function normalizeSearchText(value: string): string {
-	return taskbotJsonMatchCaseInput.checked ? value : value.toLowerCase();
-}
-
-function getTaskbotJsonSearchMatches(): TextMatch[] {
-	const query = taskbotJsonFindInput.value;
-	if (!query) return [];
-
-	const text = normalizeSearchText(taskbotJson.value);
-	const needle = normalizeSearchText(query);
-	const matches: TextMatch[] = [];
-	let offset = 0;
-	while (offset <= text.length) {
-		const start = text.indexOf(needle, offset);
-		if (start < 0) break;
-		matches.push({ start, end: start + query.length });
-		offset = start + Math.max(query.length, 1);
-	}
-	return matches;
-}
-
-function getActiveTaskbotJsonMatchIndex(matches: TextMatch[]): number {
-	const selectionStart = taskbotJson.selectionStart;
-	const selectionEnd = taskbotJson.selectionEnd;
-	return matches.findIndex(
-		(match) => match.start === selectionStart && match.end === selectionEnd
-	);
-}
-
-function setTaskbotJsonSearchStatus(matches: TextMatch[]): void {
-	const query = taskbotJsonFindInput.value;
-	if (!query) {
-		taskbotJsonSearchStatus.textContent = t('No search term.');
-		return;
-	}
-	if (!matches.length) {
-		taskbotJsonSearchStatus.textContent = t('No matches.');
-		return;
-	}
-
-	const activeIndex = getActiveTaskbotJsonMatchIndex(matches);
-	taskbotJsonSearchStatus.textContent =
-		activeIndex >= 0
-			? t('Match {current} of {count}.', {
-					current: activeIndex + 1,
-					count: matches.length,
-				})
-			: t('{count} match(es).', { count: matches.length });
-}
-
-function updateTaskbotJsonSearchState(): void {
-	const matches = getTaskbotJsonSearchMatches();
-	const hasMatches = matches.length > 0;
-	taskbotJsonPreviousButton.disabled = !hasMatches;
-	taskbotJsonNextButton.disabled = !hasMatches;
-	setTaskbotJsonSearchStatus(matches);
-	updateTaskbotJsonMutationState();
-}
-
 function updateTaskbotJsonMutationState(): void {
-	const validJson = canParseTaskbotJson();
-	const hasMatches = getTaskbotJsonSearchMatches().length > 0;
-	const hasRepositoryRefs = taskbotRepositoryReferences.length > 0;
-	const hasNewRepositoryRef = taskbotRepositoryReplaceInput.value
-		.trim()
-		.startsWith('repository:');
-
-	taskbotJsonReplaceButton.disabled = !validJson || !hasMatches;
-	taskbotJsonReplaceAllButton.disabled = !validJson || !hasMatches;
-	taskbotJsonSaveButton.disabled = !validJson;
-	taskbotRepositoryRefSelect.disabled = !validJson || !hasRepositoryRefs;
-	taskbotRepositoryReplaceInput.disabled = !validJson || !hasRepositoryRefs;
-	taskbotRepositoryFindButton.disabled = !validJson || !hasRepositoryRefs;
-	taskbotRepositoryCopyButton.disabled = !validJson || !hasRepositoryRefs;
-	taskbotRepositoryReplaceButton.disabled =
-		!validJson || !hasRepositoryRefs || !hasNewRepositoryRef;
-	updateTaskbotRepositoryStatus();
-}
-
-function findTaskbotJsonMatch(direction: 1 | -1): void {
-	const matches = getTaskbotJsonSearchMatches();
-	if (!matches.length) {
-		updateTaskbotJsonSearchState();
-		return;
-	}
-
-	const position = direction > 0 ? taskbotJson.selectionEnd : taskbotJson.selectionStart;
-	const match =
-		direction > 0
-			? matches.find((item) => item.start >= position) ?? matches[0]
-			: [...matches].reverse().find((item) => item.end <= position) ??
-				matches[matches.length - 1];
-	taskbotJson.focus();
-	taskbotJson.setSelectionRange(match.start, match.end);
-	setTaskbotJsonSearchStatus(matches);
-}
-
-function replaceTextMatches(
-	text: string,
-	matches: TextMatch[],
-	replacement: string
-): string {
-	let result = '';
-	let offset = 0;
-	for (const match of matches) {
-		result += text.slice(offset, match.start);
-		result += replacement;
-		offset = match.end;
-	}
-	return result + text.slice(offset);
-}
-
-function refreshTaskbotJsonAfterEdit(message: string): void {
-	validateTaskbotJson();
-	updateTaskbotPackageList();
-	updateTaskbotJsonSearchState();
-	setToolStatus(message);
-}
-
-function replaceCurrentTaskbotJsonMatch(): void {
-	if (!canParseTaskbotJson()) {
-		setToolStatus(t('Invalid JSON.'), 'error');
-		return;
-	}
-
-	let matches = getTaskbotJsonSearchMatches();
-	let activeIndex = getActiveTaskbotJsonMatchIndex(matches);
-	if (activeIndex < 0) {
-		findTaskbotJsonMatch(1);
-		matches = getTaskbotJsonSearchMatches();
-		activeIndex = getActiveTaskbotJsonMatchIndex(matches);
-	}
-	const match = matches[activeIndex];
-	if (!match) {
-		setToolStatus(t('No matches.'), 'warn');
-		return;
-	}
-
-	const replacement = taskbotJsonReplaceInput.value;
-	taskbotJson.value = replaceTextMatches(taskbotJson.value, [match], replacement);
-	taskbotJson.focus();
-	taskbotJson.setSelectionRange(match.start, match.start + replacement.length);
-	refreshTaskbotJsonAfterEdit(t('Replaced 1 match.'));
-}
-
-function replaceAllTaskbotJsonMatches(): void {
-	if (!canParseTaskbotJson()) {
-		setToolStatus(t('Invalid JSON.'), 'error');
-		return;
-	}
-
-	const matches = getTaskbotJsonSearchMatches();
-	if (!matches.length) {
-		setToolStatus(t('No matches.'), 'warn');
-		return;
-	}
-	if (!window.confirm(t('Replace {count} match(es)?', { count: matches.length }))) {
-		return;
-	}
-
-	taskbotJson.value = replaceTextMatches(
-		taskbotJson.value,
-		matches,
-		taskbotJsonReplaceInput.value
-	);
-	taskbotJson.focus();
-	taskbotJson.setSelectionRange(0, 0);
-	refreshTaskbotJsonAfterEdit(t('Replaced {count} match(es).', { count: matches.length }));
-}
-
-function setTaskbotRepositoryReferences(
-	references: AutomationAnywhereRepositoryReference[]
-): void {
-	const selectedValue = taskbotRepositoryRefSelect.value;
-	taskbotRepositoryReferences = references;
-	taskbotRepositoryRefSelect.replaceChildren();
-
-	if (!references.length) {
-		const option = document.createElement('option');
-		option.value = '';
-		option.textContent = t('No repository refs found.');
-		taskbotRepositoryRefSelect.appendChild(option);
-		updateTaskbotRepositoryStatus();
-		return;
-	}
-
-	for (const reference of references) {
-		const option = document.createElement('option');
-		option.value = reference.value;
-		option.textContent =
-			reference.count > 1
-				? `${reference.value} x${reference.count}`
-				: reference.value;
-		option.title = reference.value;
-		taskbotRepositoryRefSelect.appendChild(option);
-	}
-
-	if (references.some((reference) => reference.value === selectedValue)) {
-		taskbotRepositoryRefSelect.value = selectedValue;
-	}
-	updateTaskbotRepositoryStatus();
-}
-
-function getSelectedTaskbotRepositoryReference():
-	| AutomationAnywhereRepositoryReference
-	| null {
-	const value = taskbotRepositoryRefSelect.value;
-	return taskbotRepositoryReferences.find((reference) => reference.value === value) ?? null;
-}
-
-function updateTaskbotRepositoryStatus(): void {
-	if (!taskbotJson.value.trim()) {
-		taskbotRepositoryMeta.textContent = '';
-		taskbotRepositoryStatus.textContent = '';
-		return;
-	}
-	if (!canParseTaskbotJson()) {
-		taskbotRepositoryMeta.textContent = '';
-		taskbotRepositoryStatus.textContent = t('Invalid JSON.');
-		return;
-	}
-	taskbotRepositoryMeta.textContent = t('{count} ref(s)', {
-		count: taskbotRepositoryReferences.length,
-	});
-	if (!taskbotRepositoryReferences.length) {
-		taskbotRepositoryStatus.textContent = t('No repository refs found.');
-		return;
-	}
-
-	const occurrences = taskbotRepositoryReferences.reduce(
-		(total, reference) => total + reference.count,
-		0
-	);
-	taskbotRepositoryStatus.textContent = t(
-		'{count} repository ref(s), {occurrences} occurrence(s).',
-		{
-			count: taskbotRepositoryReferences.length,
-			occurrences,
-		}
-	);
-}
-
-function findSelectedTaskbotRepositoryRef(): void {
-	const reference = getSelectedTaskbotRepositoryReference();
-	if (!reference) {
-		setToolStatus(t('No repository refs found.'), 'warn');
-		return;
-	}
-	taskbotJsonFindInput.value = reference.value;
-	updateTaskbotJsonSearchState();
-	taskbotJson.setSelectionRange(0, 0);
-	findTaskbotJsonMatch(1);
-}
-
-function replaceSelectedTaskbotRepositoryRef(): void {
-	const parsed = parseTaskbotJson();
-	const reference = getSelectedTaskbotRepositoryReference();
-	const replacement = taskbotRepositoryReplaceInput.value.trim();
-	if (!parsed || !reference) {
-		setToolStatus(t('No repository refs found.'), 'warn');
-		return;
-	}
-	if (!replacement.startsWith('repository:')) {
-		setToolStatus(t('New ref must start with repository:.'), 'error');
-		return;
-	}
-	if (!window.confirm(t('Replace {count} repository ref occurrence(s)?', {
-		count: reference.count,
-	}))) {
-		return;
-	}
-
-	const result = replaceAutomationAnywhereRepositoryReferences(
-		parsed,
-		reference.value,
-		replacement
-	);
-	if (!result.replaced) {
-		setToolStatus(t('No repository refs found.'), 'warn');
-		return;
-	}
-
-	taskbotJson.value = JSON.stringify(result.content, null, 2);
-	taskbotJsonFindInput.value = replacement;
-	refreshTaskbotJsonAfterEdit(
-		t('Replaced {count} repository ref occurrence(s).', {
-			count: result.replaced,
-		})
-	);
-	taskbotJson.setSelectionRange(0, 0);
-	findTaskbotJsonMatch(1);
-}
-
-function getTaskbotRepositoryRefsText(): string {
-	return taskbotRepositoryReferences
-		.map((reference) => {
-			const header =
-				reference.count > 1
-					? `${reference.value} x${reference.count}`
-					: reference.value;
-			return `${header}\n${reference.paths.map((path) => `  ${path}`).join('\n')}`;
-		})
-		.join('\n\n');
-}
-
-async function copyTaskbotRepositoryRefs(): Promise<void> {
-	if (!taskbotRepositoryReferences.length) {
-		setToolStatus(t('No repository refs found.'), 'warn');
-		return;
-	}
-	try {
-		await navigator.clipboard.writeText(getTaskbotRepositoryRefsText());
-		setToolStatus(t('Repository refs copied.'));
-	} catch {
-		setToolStatus(t('Clipboard write failed.'), 'error');
-	}
+	taskbotJsonSaveButton.disabled =
+		!taskbotJsonWorkbench || !taskbotJsonWorkbench.canParseJson();
 }
 
 async function copyExportPackageList(): Promise<void> {
@@ -1083,24 +587,6 @@ async function copyExportPackageList(): Promise<void> {
 	} catch {
 		setToolStatus(t('Clipboard write failed.'), 'error');
 	}
-}
-
-function setTaskbotJsonCollapsed(collapsed: boolean): void {
-	taskbotJsonContent.hidden = collapsed;
-	taskbotJsonToggle.setAttribute('aria-expanded', String(!collapsed));
-	taskbotJsonToggle.setAttribute(
-		'aria-label',
-		collapsed ? t('Expand Taskbot JSON') : t('Collapse Taskbot JSON')
-	);
-}
-
-function setTaskbotRepositoryCollapsed(collapsed: boolean): void {
-	taskbotRepositoryContent.hidden = collapsed;
-	taskbotRepositoryToggle.setAttribute('aria-expanded', String(!collapsed));
-	taskbotRepositoryToggle.setAttribute(
-		'aria-label',
-		collapsed ? t('Expand repository refs') : t('Collapse repository refs')
-	);
 }
 
 function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void {
@@ -1241,10 +727,7 @@ async function refreshToolsContext(): Promise<void> {
 	actionsContainer.textContent = '';
 	clearExportPackageInfo();
 	setSelectedToolPanel(null);
-	taskbotJson.value = '';
-	validateTaskbotJson();
-	updateTaskbotPackageList();
-	updateTaskbotJsonSearchState();
+	taskbotJsonWorkbench.setValue('');
 	taskbotJsonFileId = null;
 	taskbotJsonBaseline = null;
 	updateCopiedFilesStatus();
@@ -1453,7 +936,6 @@ async function selectTool(tool: ToolId): Promise<void> {
 	if (tool === 'universal-clipboard') return;
 
 	if (tool === 'taskbot-json') {
-		setTaskbotJsonCollapsed(false);
 		await loadTaskbotJson();
 		return;
 	}
@@ -2285,10 +1767,8 @@ async function loadTaskbotJson(): Promise<void> {
 
 	setSelectedToolPanel(selectedTool);
 	taskbotJsonMeta.textContent = t('File {fileId}', { fileId });
-	taskbotJson.value = '';
+	taskbotJsonWorkbench.setValue('');
 	taskbotJsonBaseline = null;
-	updateTaskbotPackageList();
-	updateTaskbotJsonSearchState();
 	taskbotJsonFileId = fileId;
 	try {
 		const content = await activeRuntime.api.getBotContent(fileId);
@@ -2296,10 +1776,7 @@ async function loadTaskbotJson(): Promise<void> {
 			return;
 		}
 		taskbotJsonBaseline = normalizeTaskbotJsonContent(content);
-		taskbotJson.value = JSON.stringify(content, null, 2);
-		validateTaskbotJson();
-		updateTaskbotPackageList();
-		updateTaskbotJsonSearchState();
+		taskbotJsonWorkbench.setValue(JSON.stringify(content, null, 2));
 		setToolStatus(t('Taskbot JSON loaded.'));
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool || taskbotJsonFileId !== fileId) {
@@ -2309,79 +1786,7 @@ async function loadTaskbotJson(): Promise<void> {
 			error instanceof Error ? error.message : t('Taskbot JSON load failed.'),
 			'error'
 		);
-		updateTaskbotPackageList();
-	}
-}
-
-async function copyTaskbotJson(): Promise<void> {
-	if (!taskbotJson.value.trim()) {
-		setToolStatus(t('Taskbot JSON is empty.'), 'warn');
-		return;
-	}
-	try {
-		await navigator.clipboard.writeText(taskbotJson.value);
-		setToolStatus(t('Taskbot JSON copied.'));
-	} catch {
-		setToolStatus(t('Clipboard write failed.'), 'error');
-	}
-}
-
-function formatTaskbotJson(): void {
-	try {
-		taskbotJson.value = options.prettyJson(taskbotJson.value);
-		JSON.parse(taskbotJson.value);
-		validateTaskbotJson();
-		updateTaskbotPackageList();
-		updateTaskbotJsonSearchState();
-		setToolStatus(t('Taskbot JSON formatted.'));
-	} catch (error) {
-		validateTaskbotJson();
-		updateTaskbotPackageList();
-		updateTaskbotJsonSearchState();
-		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
-	}
-}
-
-function exportTaskbotJsonFile(): void {
-	const json = taskbotJson.value.trim();
-	if (!json) {
-		setToolStatus(t('Taskbot JSON is empty.'), 'warn');
-		return;
-	}
-	try {
-		const fileId = taskbotJsonFileId ?? 'json';
-		downloadJsonTextFile(getJsonDownloadText(json), `taskbot-${fileId}.json`);
-		setToolStatus(t('JSON exported.'));
-	} catch (error) {
-		validateTaskbotJson();
-		updateTaskbotJsonSearchState();
-		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
-	}
-}
-
-function validateTaskbotJson(): boolean {
-	const value = taskbotJson.value.trim();
-	if (!value) {
-		taskbotJson.classList.remove('is-invalid');
-		taskbotJson.removeAttribute('aria-invalid');
-		taskbotJsonError.textContent = '';
-		taskbotJsonError.hidden = true;
-		return true;
-	}
-
-	try {
-		JSON.parse(taskbotJson.value);
-		taskbotJson.classList.remove('is-invalid');
-		taskbotJson.removeAttribute('aria-invalid');
-		taskbotJsonError.textContent = '';
-		taskbotJsonError.hidden = true;
-		return true;
-	} catch (error) {
-		taskbotJson.classList.add('is-invalid');
-		taskbotJson.setAttribute('aria-invalid', 'true');
-		taskbotJsonError.textContent = error instanceof Error ? error.message : t('Invalid JSON.');
-		taskbotJsonError.hidden = false;
-		return false;
+		taskbotJsonWorkbench.refresh();
 	}
 }
 
@@ -2392,11 +1797,11 @@ async function saveTaskbotJson(): Promise<void> {
 
 	let parsed: unknown;
 	try {
-		if (!validateTaskbotJson()) {
-			setToolStatus(taskbotJsonError.textContent || t('Invalid JSON.'), 'error');
+		if (!taskbotJsonWorkbench.validate()) {
+			setToolStatus(t('Invalid JSON.'), 'error');
 			return;
 		}
-		parsed = JSON.parse(taskbotJson.value);
+		parsed = JSON.parse(taskbotJsonWorkbench.getValue());
 	} catch (error) {
 		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
 		return;

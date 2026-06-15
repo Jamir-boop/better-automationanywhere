@@ -12,6 +12,7 @@ async function readJson(path) {
 const jsonHelpers = await importTsModule(
 	join(root, 'src', 'ts', 'automation-anywhere-json.ts')
 );
+const jsonTextHelpers = await importTsModule(join(root, 'src', 'ts', 'json-text.ts'));
 
 const fixture = await readJson(
 	join(root, 'scripts', 'fixtures', 'taskbot-json-repository-refs.json')
@@ -32,14 +33,20 @@ assert(references.every((reference) => reference.paths.every((path) => path.star
 
 const childRef = 'repository:///Automation%20Anywhere/Bots/Sample/tasks/child_bot';
 const newChildRef = 'repository:///Automation%20Anywhere/Bots/Sample/tasks/new_child_bot';
-const replaced = jsonHelpers.replaceAutomationAnywhereRepositoryReferences(
-	fixture,
-	childRef,
+const fixtureText = JSON.stringify(fixture, null, 2);
+const childRefMatches = jsonTextHelpers.getTextMatches(fixtureText, childRef, true);
+const replacedText = jsonTextHelpers.replaceTextMatches(
+	fixtureText,
+	childRefMatches,
 	newChildRef
 );
-assert.equal(replaced.replaced, 2);
-assert.equal(JSON.stringify(replaced.content).includes(childRef), false);
-assert.equal(JSON.stringify(replaced.content).includes(newChildRef), true);
+assert.equal(childRefMatches.length, 2);
+assert.equal(replacedText.includes(childRef), false);
+assert.equal(replacedText.includes(newChildRef), true);
+assert.deepEqual(jsonHelpers.getAutomationAnywhereJsonStats(JSON.parse(replacedText)), {
+	actionCount: 3,
+	variableCount: 1,
+});
 
 const summary = jsonHelpers.summarizeAutomationAnywhereJson(fixture);
 assert.equal(summary.actionCount, 3);

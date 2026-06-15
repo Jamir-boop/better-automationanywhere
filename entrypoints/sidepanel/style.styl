@@ -203,6 +203,11 @@ main
 	&[hidden]
 		display: none
 
+.taskbot-json-content
+	display: flex
+	flex-direction: column
+	gap: 8px
+
 .inline-hint
 	margin: -2px 0 0
 	color: var(--text-muted)
@@ -465,7 +470,7 @@ textarea
 	font-size: .72rem
 	line-height: 1.3
 
-.taskbot-json-tools
+.json-workbench-tools
 	display: flex
 	flex-direction: column
 	gap: 8px
@@ -473,7 +478,7 @@ textarea
 	select
 		max-width: 100%
 
-.taskbot-json-fields
+.json-workbench-fields
 	display: grid
 	grid-template-columns: repeat(2, minmax(0, 1fr))
 	gap: 8px
@@ -487,7 +492,7 @@ textarea
 		font-size: .68rem
 		text-transform: uppercase
 
-.taskbot-json-checkbox
+.json-workbench-checkbox
 	display: inline-flex
 	align-items: center
 	gap: 6px
@@ -499,17 +504,10 @@ textarea
 		width: 18px
 		height: 18px
 
-.taskbot-json-actions
+.json-workbench-actions
 	button
 		min-width: 0
 		white-space: normal
-
-.taskbot-repository-tools
-	display: flex
-	flex-direction: column
-	gap: 8px
-	padding-top: 8px
-	border-top: 1px solid var(--border)
 
 .json-field
 	position: relative

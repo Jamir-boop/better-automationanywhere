@@ -32,11 +32,6 @@ export interface AutomationAnywhereRepositoryReference {
 	paths: string[];
 }
 
-export interface AutomationAnywhereRepositoryReplaceResult {
-	content: unknown;
-	replaced: number;
-}
-
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -135,33 +130,6 @@ export function extractAutomationAnywhereRepositoryReferences(
 	return [...referencesByValue.values()].sort((left, right) =>
 		left.value.localeCompare(right.value, undefined, { sensitivity: 'base' })
 	);
-}
-
-export function replaceAutomationAnywhereRepositoryReferences(
-	content: unknown,
-	from: string,
-	to: string
-): AutomationAnywhereRepositoryReplaceResult {
-	let replaced = 0;
-
-	function replace(value: unknown): unknown {
-		if (typeof value === 'string') {
-			if (value === from) {
-				replaced += 1;
-				return to;
-			}
-			return value;
-		}
-
-		if (Array.isArray(value)) return value.map(replace);
-
-		if (!isRecord(value)) return value;
-		return Object.fromEntries(
-			Object.entries(value).map(([key, item]) => [key, replace(item)])
-		);
-	}
-
-	return { content: replace(content), replaced };
 }
 
 export function summarizeAutomationAnywhereJson(

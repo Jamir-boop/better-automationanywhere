@@ -54,6 +54,8 @@ const ES: Record<string, string> = {
 	'Copy JSON': 'Copiar JSON',
 	'Copy textarea JSON to system clipboard.':
 		'Copia el JSON del campo al portapapeles del sistema.',
+	'Format textarea JSON.': 'Formatea el JSON del campo.',
+	'JSON formatted.': 'JSON formateado.',
 	'Export JSON': 'Exportar JSON',
 	'Download textarea JSON as a .json file.':
 		'Descarga el JSON del campo como archivo .json.',
@@ -400,8 +402,6 @@ const ES: Record<string, string> = {
 	'Tool finished': 'Herramienta terminada',
 	Close: 'Cerrar',
 	'Taskbot JSON': 'JSON de taskbot',
-	'Expand Taskbot JSON': 'Expandir JSON de taskbot',
-	'Collapse Taskbot JSON': 'Contraer JSON de taskbot',
 	'Copy Files': 'Copiar archivos',
 	'Update Packages': 'Actualizar paquetes',
 	'Export Bots': 'Exportar bots',
@@ -538,15 +538,6 @@ const ES: Record<string, string> = {
 	Previous: 'Anterior',
 	Next: 'Siguiente',
 	'Replace all': 'Reemplazar todo',
-	'Repository ref': 'Ref repositorio',
-	'New ref': 'Nueva ref',
-	'Find ref': 'Buscar ref',
-	'Replace ref': 'Reemplazar ref',
-	'Copy refs': 'Copiar refs',
-	'Repository refs': 'Refs de repositorio',
-	'Expand repository refs': 'Expandir refs de repositorio',
-	'Collapse repository refs': 'Contraer refs de repositorio',
-	'{count} ref(s)': '{count} ref(s)',
 	Refs: 'Refs',
 	'No repository refs found.': 'No se encontraron refs de repositorio.',
 	'No search term.': 'Sin termino de busqueda.',
@@ -555,15 +546,6 @@ const ES: Record<string, string> = {
 	'Replaced 1 match.': 'Reemplazada 1 coincidencia.',
 	'Replace {count} match(es)?': 'Reemplazar {count} coincidencia(s)?',
 	'Replaced {count} match(es).': 'Reemplazadas {count} coincidencia(s).',
-	'{count} repository ref(s), {occurrences} occurrence(s).':
-		'{count} ref(s) de repositorio, {occurrences} ocurrencia(s).',
-	'New ref must start with repository:.':
-		'Nueva ref debe empezar con repository:.',
-	'Replace {count} repository ref occurrence(s)?':
-		'Reemplazar {count} ocurrencia(s) de ref de repositorio?',
-	'Replaced {count} repository ref occurrence(s).':
-		'Reemplazadas {count} ocurrencia(s) de ref de repositorio.',
-	'Repository refs copied.': 'Refs de repositorio copiadas.',
 	'Taskbot JSON changed in Control Room. Reload before saving.':
 		'El JSON de taskbot cambio en Control Room. Recarga antes de guardar.',
 	changed: 'cambiado',
@@ -592,9 +574,6 @@ const ES: Record<string, string> = {
 		'No se pudo crear carpeta ZIP: {folder}',
 	'Advanced: saves raw bot content back to Control Room.':
 		'Avanzado: guarda contenido del bot sin procesar en Control Room.',
-	'Load from Control Room': 'Cargar desde Control Room',
-	'Load current taskbot content JSON.':
-		'Cargar el JSON de contenido del taskbot actual.',
 	'Copy to clipboard': 'Copiar al portapapeles',
 	Format: 'Formatear',
 	'Save JSON': 'Guardar JSON',
