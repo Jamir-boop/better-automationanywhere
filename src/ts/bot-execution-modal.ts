@@ -85,9 +85,9 @@ function getDialog(modal: HTMLElement): HTMLElement | null {
 
 function getControlHost(modal: HTMLElement): HTMLElement | null {
 	return (
+		modal.querySelector<HTMLElement>(MESSAGE_TITLE_CONTAINER_SELECTOR) ??
 		modal.querySelector<HTMLElement>(ALERT_CONTROLS_SELECTOR) ??
-		modal.querySelector<HTMLElement>(MESSAGE_CONTROLS_SELECTOR) ??
-		modal.querySelector<HTMLElement>(MESSAGE_TITLE_CONTAINER_SELECTOR)
+		modal.querySelector<HTMLElement>(MESSAGE_CONTROLS_SELECTOR)
 	);
 }
 
@@ -115,35 +115,22 @@ function getTargetModals(): HTMLElement[] {
 
 function createControl(action: BotModalControl, label: string): HTMLElement {
 	const wrapper = document.createElement('div');
-	wrapper.className =
-		`command-button g-box-sizing_border-box command-button--is_solid ${CONTROL_CLASS}`;
-	wrapper.setAttribute('data-path', 'CommandButton');
+	wrapper.className = CONTROL_CLASS;
 	wrapper.setAttribute(CONTROL_ATTR, action);
 
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.tabIndex = 0;
-	button.className =
-		'rio-focus rio-focus--inset_negative-2px rio-focus--border-radius_4px ' +
-		'rio-focus--has_element-focus-visible command-button__button ' +
-		'command-button__button--primary g-reset-element ' +
-		'command-button__button--is_clickable command-button__button--is_solid';
-	button.dataset.inputStatus = 'INTERACTIVE';
+	button.className = 'better-aa-bot-modal-control-button';
 	button.setAttribute('aria-label', label);
 	button.title = label;
 
-	const clippedText = document.createElement('span');
-	clippedText.className =
-		'clipped-text clipped-text--no_wrap command-button__button-label';
-	clippedText.dataset.path = 'ClippedText';
-	clippedText.dataset.text = label;
+	const icon = document.createElement('span');
+	icon.className = 'better-aa-bot-modal-control-icon';
+	icon.setAttribute('aria-hidden', 'true');
+	icon.textContent = action === 'minimize' ? '\u2212' : '\u25A1';
 
-	const visibleText = document.createElement('span');
-	visibleText.className = 'clipped-text__string clipped-text__string--for_presentation';
-	visibleText.textContent = label;
-
-	clippedText.append(visibleText);
-	button.append(clippedText);
+	button.append(icon);
 	wrapper.append(button);
 	wireControl(wrapper);
 	return wrapper;
