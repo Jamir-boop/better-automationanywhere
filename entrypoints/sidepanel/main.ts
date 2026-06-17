@@ -484,7 +484,7 @@ app.innerHTML = `
 		</div>
 	</header>
 
-	<section id="debugLogSection" class="panel-section feedback-section is-collapsed">
+	<section id="debugLogSection" class="panel-section feedback-section is-collapsed" hidden aria-hidden="true">
 		<div class="section-heading-row">
 			<h2>${t('Debug Log')}</h2>
 			<span class="feedback-actions">
@@ -672,6 +672,10 @@ let currentExtensionShortcuts: ExtensionShortcuts = {
 let lastSidepanelRequestNonce: string | null = null;
 
 function showStatusMessage(message: string, severity: FeedbackSeverity = 'info'): void {
+	if (currentDebugEnabled) {
+		status.textContent = '';
+		return;
+	}
 	status.textContent = message;
 	if (!message) return;
 	status.dataset.severity = severity;
@@ -688,6 +692,15 @@ function setStatus(
 	showStatusMessage(message, severity);
 	if (!message) return;
 	void addFeedback(severity, source, message);
+}
+
+function updateDebugVisibility(): void {
+	const debugLogHidden = !currentDebugEnabled;
+	debugLogSection.hidden = debugLogHidden;
+	debugLogSection.setAttribute('aria-hidden', String(debugLogHidden));
+	status.hidden = currentDebugEnabled;
+	status.setAttribute('aria-hidden', String(currentDebugEnabled));
+	if (currentDebugEnabled) status.textContent = '';
 }
 
 actionJsonWorkbench = initializeJsonWorkbench({
@@ -1423,6 +1436,7 @@ async function loadState(): Promise<void> {
 	extensionLanguageSelect.value = language;
 	debugInput.checked = debug;
 	currentDebugEnabled = debug;
+	updateDebugVisibility();
 	shortcutSelect.value = shortcut;
 	currentShortcut = shortcut;
 	updateShortcutLabel(shortcut);
@@ -1591,6 +1605,7 @@ extensionLanguageSelect.addEventListener('change', () => {
 
 debugInput.addEventListener('change', () => {
 	currentDebugEnabled = debugInput.checked;
+	updateDebugVisibility();
 	void sendBackgroundMessage({
 		type: 'SET_DEBUG_ENABLED',
 		enabled: debugInput.checked,
@@ -1963,6 +1978,7 @@ extensionLanguage.watch((value) => {
 debugEnabled.watch((value) => {
 	currentDebugEnabled = value ?? DEFAULT_DEBUG_ENABLED;
 	debugInput.checked = currentDebugEnabled;
+	updateDebugVisibility();
 	void refreshFeedbackHistory();
 });
 commandPaletteShortcut.watch((value) => {
