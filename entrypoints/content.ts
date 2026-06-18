@@ -32,7 +32,7 @@ import {
 	formatControlRoomTarget,
 	type ControlRoomCompatibilityStatus,
 } from '../src/ts/control-room-version';
-import { runStyleDoctor } from '../src/ts/style-doctor';
+import { runStyleDoctor, runSingleCheck } from '../src/ts/style-doctor';
 import {
 	callInitializeRepeatedly,
 	setCustomPaletteButtonsEnabled,
@@ -393,6 +393,14 @@ async function handleRuntimeMessage(
 		}
 		if (message.type === 'RUN_STYLE_DOCTOR') {
 			return { ok: true, doctorReport: await runStyleDoctor() };
+		}
+		if (message.type === 'RUN_STYLE_DOCTOR_CHECK') {
+			const result = runSingleCheck(message.checkId);
+			if (!result) return { ok: false, error: `Unknown check: ${message.checkId}` };
+			return { ok: true, doctorCheckResult: result };
+		}
+		if (message.type === 'FINISH_STYLE_DOCTOR_RUN') {
+			return { ok: true, message: 'Doctor run finished.' };
 		}
 		if (message.type === 'TOGGLE_STYLES') {
 			await applyStyleClasses();

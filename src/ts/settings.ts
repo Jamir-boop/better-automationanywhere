@@ -60,6 +60,12 @@ export const openSidebarShortcut = storage.defineItem<OpenSidebarShortcut>(
 export const botExecutionModalPosition = storage.defineItem<BotExecutionModalPosition>(
 	'local:botExecutionModalPosition'
 );
+export const localSupportedBuilds = storage.defineItem<import('./control-room-version').SupportedControlRoomTarget[]>(
+	'local:localSupportedBuilds'
+);
+export const styleDoctorLastResults = storage.defineItem<Record<string, import('./style-doctor').StyleDoctorCheckResult[]>>(
+	'local:styleDoctorLastResults'
+);
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;

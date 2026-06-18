@@ -8,15 +8,18 @@ import {
 export type StyleDoctorView = 'taskbot-editor' | 'folder-navigation' | 'unsupported';
 export type StyleDoctorResultStatus = 'pass' | 'fail' | 'warn' | 'skip';
 export type StyleDoctorSeverity = 'required' | 'optional' | 'transient';
+export type DoctorCheckGroup = 'general' | 'taskbot-editor' | 'folder-navigation' | 'taskbot-transient';
 
 export interface StyleDoctorCheck {
 	id: string;
 	view: StyleDoctorView | 'shared';
+	group: DoctorCheckGroup;
 	label: string;
 	selector: string;
 	source: string;
 	severity: StyleDoctorSeverity;
 	requires?: 'bot-modal' | 'loading-indicator' | 'error-modal' | 'done-modal';
+	triggerHint?: string;
 }
 
 export interface StyleDoctorCheckResult extends StyleDoctorCheck {
@@ -37,10 +40,25 @@ export interface StyleDoctorReport {
 	message?: string;
 }
 
-const CHECKS: StyleDoctorCheck[] = [
+export interface DoctorComparisonResult {
+	id: string;
+	previousStatus: StyleDoctorResultStatus | null;
+	currentStatus: StyleDoctorResultStatus;
+	delta: 'fixed' | 'regressed' | 'unchanged' | 'new';
+}
+
+export const DOCTOR_CHECK_GROUPS: { key: DoctorCheckGroup; label: string }[] = [
+	{ key: 'general', label: 'General' },
+	{ key: 'taskbot-editor', label: 'Taskbot Editor' },
+	{ key: 'taskbot-transient', label: 'Taskbot Transient' },
+	{ key: 'folder-navigation', label: 'Folder Navigation' },
+];
+
+export const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'main-navigation',
 		view: 'shared',
+		group: 'general',
 		label: 'Main navigation',
 		selector: '.main-layout__navigation',
 		source: 'src/styl/rootSidebarAutoHide.styl',
@@ -49,6 +67,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'pathfinder-expander',
 		view: 'shared',
+		group: 'general',
 		label: 'Pathfinder expander',
 		selector: 'button[data-path="Pathfinder.expander"], button.pathfinder-tray-expander',
 		source: 'src/ts/ui.ts',
@@ -57,14 +76,17 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'pathfinder-collapsed',
 		view: 'shared',
+		group: 'general',
 		label: 'Collapsed Pathfinder',
 		selector: '.pathfinder--is_collapsed',
 		source: 'src/styl/rootSidebarAutoHide.styl',
 		severity: 'transient',
+		triggerHint: 'Collapse the Pathfinder sidebar to trigger this state.',
 	},
 	{
 		id: 'page-background',
 		view: 'shared',
+		group: 'general',
 		label: 'Page background',
 		selector: '.page, .main-layout__content',
 		source: 'src/styl/background.styl',
@@ -73,6 +95,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'sidebar-nav-links',
 		view: 'shared',
+		group: 'general',
 		label: 'Sidebar navigation links',
 		selector: 'nav[data-path="Pathfinder.primaryItems"] a[href^="#/"]',
 		source: 'src/ts/commands.ts',
@@ -81,15 +104,18 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'loading-indicator',
 		view: 'shared',
+		group: 'general',
 		label: 'Loading indicator',
 		selector: '.devicechannelmodal .icon-image-container, .rio-spinner--variant_LOADING, .rio-spinner--variant_WORKING',
 		source: 'src/styl/customLoadingIcon.styl',
 		severity: 'transient',
 		requires: 'loading-indicator',
+		triggerHint: 'Navigate to a page that triggers a loading spinner.',
 	},
 	{
 		id: 'taskbot-editor-layout',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Taskbot editor layout',
 		selector: '.editor-layout__palette',
 		source: 'src/ts/ui.ts',
@@ -98,6 +124,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'taskbot-canvas-node',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Taskbot canvas node',
 		selector: '.taskbot-canvas-list-node',
 		source: 'src/styl/editorMain.styl',
@@ -106,6 +133,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'taskbot-line-number',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Taskbot line numbers',
 		selector: '.taskbot-canvas-list-node > .taskbot-canvas-list-node__number',
 		source: 'src/ts/commands.ts',
@@ -114,6 +142,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'taskbot-clickable-line-number',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Clickable line numbers',
 		selector: '.taskbot-canvas-list-node > .taskbot-canvas-list-node__number.taskbot-canvas-list-node__number--clickable',
 		source: 'src/styl/editorMain.styl',
@@ -122,6 +151,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'taskbot-node-link',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Taskbot node label link',
 		selector: '.taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]',
 		source: 'src/ts/utils.ts',
@@ -130,6 +160,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Editor palette',
 		selector: '.editor-palette',
 		source: 'src/styl/editorActionsVariablesTriggers.styl',
@@ -138,6 +169,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette-scroller',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Editor palette scroller',
 		selector: '.editor-palette-section__scroller',
 		source: 'src/ts/ui.ts',
@@ -146,6 +178,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette-toggle',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Editor palette toggle',
 		selector: EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR,
 		source: 'src/ts/utils.ts',
@@ -154,6 +187,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette-actions',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Actions palette button',
 		selector: 'div.editor-palette__accordion button[aria-label="Actions"], button[data-path="EditorPalette.section.button"][aria-label="Actions"]',
 		source: 'src/ts/commands.ts',
@@ -162,6 +196,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette-variables',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Variables palette button',
 		selector: 'button[data-path="EditorPalette.section.button"][aria-label="Variables"]',
 		source: 'src/ts/commands.ts',
@@ -170,6 +205,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette-triggers',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Triggers palette button',
 		selector: 'button.editor-palette-section__header-button[data-path="EditorPalette.section.button"][aria-label="Triggers"]',
 		source: 'src/ts/commands.ts',
@@ -178,6 +214,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-palette-search-cancel',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Palette search cancel',
 		selector: '.editor-palette-search__cancel button[type="button"][tabindex="-1"]',
 		source: 'src/ts/commands.ts',
@@ -186,6 +223,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-draggable-child',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Draggable palette item',
 		selector: '.editor-palette-item__child--is_draggable',
 		source: 'src/styl/taskbot.styl',
@@ -194,6 +232,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'editor-tabs',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Editor tabs',
 		selector: '.taskbot-editor__toolbar__tabs > .editortabs[role="tablist"][data-path="EditorTabs"]',
 		source: 'src/styl/editorTabsButtons.styl',
@@ -202,6 +241,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'run-button',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Run button',
 		selector: 'button[aria-label="Run"][name="run"], button[name="run"]',
 		source: 'src/styl/editorRunButton.styl',
@@ -210,6 +250,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'code-input',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Code input',
 		selector: '[data-path="CodeInput"]',
 		source: 'src/styl/codeInput.styl',
@@ -218,6 +259,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'shared-copy-button',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Shared copy button',
 		selector: '.aa-icon-action-clipboard-copy--shared',
 		source: 'src/ts/clipboard.ts',
@@ -226,6 +268,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'shared-paste-button',
 		view: 'taskbot-editor',
+		group: 'taskbot-editor',
 		label: 'Shared paste button',
 		selector: '.aa-icon-action-clipboard-paste--shared',
 		source: 'src/ts/clipboard.ts',
@@ -234,60 +277,73 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'bot-modal',
 		view: 'taskbot-editor',
+		group: 'taskbot-transient',
 		label: 'Running bot modal',
 		selector: '[data-modal-id="taskbot-action-run-now"]',
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		requires: 'bot-modal',
+		triggerHint: 'Click Run on a taskbot to trigger the running bot modal.',
 	},
 	{
 		id: 'bot-modal-controls',
 		view: 'taskbot-editor',
+		group: 'taskbot-transient',
 		label: 'Running bot modal controls',
 		selector: '.alert__controls, .message__controls, .message__title-container',
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		requires: 'bot-modal',
+		triggerHint: 'Click Run on a taskbot to trigger the running bot modal.',
 	},
 	{
 		id: 'bot-modal-dialog',
 		view: 'taskbot-editor',
+		group: 'taskbot-transient',
 		label: 'Running bot dialog',
 		selector: '[data-modal-id="taskbot-action-run-now"] [role="dialog"], [role="dialog"] [data-modal-id="taskbot-action-run-now"]',
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		requires: 'bot-modal',
+		triggerHint: 'Click Run on a taskbot to trigger the running bot modal.',
 	},
 	{
 		id: 'bot-modal-running-indicator',
 		view: 'taskbot-editor',
+		group: 'taskbot-transient',
 		label: 'Running indicator',
 		selector: '.devicechannelmodal, .rio-spinner--variant_WORKING',
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		requires: 'bot-modal',
+		triggerHint: 'Click Run on a taskbot to trigger the running indicator.',
 	},
 	{
 		id: 'error-modal',
 		view: 'taskbot-editor',
+		group: 'taskbot-transient',
 		label: 'Error modal',
 		selector: '.modal--theme_error',
 		source: 'src/ts/sounds.ts',
 		severity: 'transient',
 		requires: 'error-modal',
+		triggerHint: 'Run a taskbot that triggers an error to see this modal.',
 	},
 	{
 		id: 'done-modal',
 		view: 'taskbot-editor',
+		group: 'taskbot-transient',
 		label: 'Done modal',
 		selector: '.taskbot-success',
 		source: 'src/ts/sounds.ts',
 		severity: 'transient',
 		requires: 'done-modal',
+		triggerHint: 'Run a taskbot to completion to see the done modal.',
 	},
 	{
 		id: 'folder-list',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder list',
 		selector: '.folder-list__items',
 		source: 'src/styl/foldersScrollable.styl',
@@ -296,6 +352,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'folder-list-item',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder list item',
 		selector: '.folder-list-item',
 		source: 'src/styl/foldersScrollable.styl',
@@ -304,6 +361,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'active-folder',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Active folder',
 		selector: '.folder-list-item--is_active',
 		source: 'src/ts/folders.ts',
@@ -312,6 +370,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'folder-table-row',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder table row',
 		selector: '.datatable-row',
 		source: 'src/styl/foldersColumns.styl',
@@ -320,6 +379,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'folder-table-column',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder table column',
 		selector: '.datatable-column',
 		source: 'src/styl/foldersColumns.styl',
@@ -328,6 +388,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'folder-table-header',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder table header',
 		selector: '.datatable-header-container',
 		source: 'src/styl/foldersColumns.styl',
@@ -336,6 +397,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'folder-refresh',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder refresh button',
 		selector: '[name="table-refresh"]',
 		source: 'entrypoints/content.ts',
@@ -344,6 +406,7 @@ const CHECKS: StyleDoctorCheck[] = [
 	{
 		id: 'folder-page-title',
 		view: 'folder-navigation',
+		group: 'folder-navigation',
 		label: 'Folder page title',
 		selector: '.pagetitle-label',
 		source: 'src/styl/foldersScrollable.styl',
@@ -363,7 +426,7 @@ function hasSelector(selector: string): boolean {
 	return countSelector(selector) > 0;
 }
 
-function detectStyleDoctorView(): StyleDoctorView {
+export function detectStyleDoctorView(): StyleDoctorView {
 	if (
 		isTaskEditorUrl(location.href) ||
 		hasSelector('.editor-layout__palette, .taskbot-canvas-list-node, .editor-layout__canvas')
@@ -450,6 +513,46 @@ function checkSelector(check: StyleDoctorCheck): StyleDoctorCheckResult {
 			reason: error instanceof Error ? error.message : 'Selector query failed.',
 		};
 	}
+}
+
+export function runSingleCheck(checkId: string): StyleDoctorCheckResult | null {
+	const check = CHECKS.find((c) => c.id === checkId);
+	if (!check) return null;
+	return checkSelector(check);
+}
+
+export function getChecksForGroup(group: DoctorCheckGroup): StyleDoctorCheck[] {
+	return CHECKS.filter((c) => c.group === group);
+}
+
+export function getChecksForView(view: StyleDoctorView): StyleDoctorCheck[] {
+	return CHECKS.filter((c) => shouldRunCheck(c, view));
+}
+
+export function compareResults(
+	previous: StyleDoctorCheckResult[] | null,
+	current: StyleDoctorCheckResult[]
+): DoctorComparisonResult[] {
+	const previousMap = new Map(previous?.map((r) => [r.id, r.status]) ?? []);
+	return current.map((result) => {
+		const prev = previousMap.get(result.id) ?? null;
+		let delta: DoctorComparisonResult['delta'];
+		if (prev === null) {
+			delta = 'new';
+		} else if (result.status === 'pass' && prev !== 'pass') {
+			delta = 'fixed';
+		} else if (result.status !== 'pass' && prev === 'pass') {
+			delta = 'regressed';
+		} else {
+			delta = 'unchanged';
+		}
+		return {
+			id: result.id,
+			previousStatus: prev,
+			currentStatus: result.status,
+			delta,
+		};
+	});
 }
 
 export async function runStyleDoctor(): Promise<StyleDoctorReport> {

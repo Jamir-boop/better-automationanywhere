@@ -52,10 +52,23 @@ export function formatControlRoomVersion(details?: ControlRoomVersionDetails): s
 	return build ? `${target} build ${build}` : target;
 }
 
+function matchesTarget(
+	current: ControlRoomVersionDetails,
+	target: SupportedControlRoomTarget
+): boolean {
+	return (
+		normalizeVersionPart(current.versionNumber) === target.versionNumber &&
+		normalizeVersionPart(current.versionRelease) === target.versionRelease
+	);
+}
+
 export function evaluateControlRoomCompatibility(
 	current?: ControlRoomVersionDetails,
-	message?: string
+	message?: string,
+	localOverrides?: SupportedControlRoomTarget[]
 ): ControlRoomCompatibilityStatus {
+	const allTargets = [SUPPORTED_CONTROL_ROOM_TARGET, ...(localOverrides ?? [])];
+
 	if (!current) {
 		return {
 			state: 'unknown',
@@ -66,21 +79,18 @@ export function evaluateControlRoomCompatibility(
 		};
 	}
 
-	const currentVersion = normalizeVersionPart(current.versionNumber);
-	const currentRelease = normalizeVersionPart(current.versionRelease);
-	const currentBuild = normalizeVersionPart(current.buildNumber);
-	const supported =
-		currentVersion === SUPPORTED_CONTROL_ROOM_TARGET.versionNumber &&
-		currentRelease === SUPPORTED_CONTROL_ROOM_TARGET.versionRelease;
+	const matchedTarget = allTargets.find((target) => matchesTarget(current, target));
+	const supported = Boolean(matchedTarget);
+	const target = matchedTarget ?? SUPPORTED_CONTROL_ROOM_TARGET;
 
 	return {
 		state: supported ? 'supported' : 'unsupported',
 		supported,
 		buildMismatch:
 			supported &&
-			Boolean(currentBuild) &&
-			currentBuild !== SUPPORTED_CONTROL_ROOM_TARGET.buildNumber,
-		target: SUPPORTED_CONTROL_ROOM_TARGET,
+			Boolean(normalizeVersionPart(current.buildNumber)) &&
+			normalizeVersionPart(current.buildNumber) !== target.buildNumber,
+		target,
 		current,
 		message,
 	};

@@ -8,7 +8,7 @@ import type {
 } from './settings';
 import type { SidepanelFocusTarget, SidepanelTab } from './sidepanel-state';
 import type { ControlRoomCompatibilityStatus } from './control-room-version';
-import type { StyleDoctorReport } from './style-doctor';
+import type { StyleDoctorCheckResult, StyleDoctorReport } from './style-doctor';
 
 export interface AutomationAnywhereApiRequestConfig {
 	url: string;
@@ -103,7 +103,9 @@ export type ContentActionMessage =
 	| { type: 'GET_AA_AUTH_TOKEN' }
 	| { type: 'GET_TOOL_CAPABILITIES' }
 	| { type: 'REFRESH_AA_FOLDER_LIST' }
-	| { type: 'RUN_STYLE_DOCTOR' };
+	| { type: 'RUN_STYLE_DOCTOR' }
+	| { type: 'RUN_STYLE_DOCTOR_CHECK'; checkId: string }
+	| { type: 'FINISH_STYLE_DOCTOR_RUN' };
 
 export type ContentActionResponse =
 	| {
@@ -114,6 +116,7 @@ export type ContentActionResponse =
 			authToken?: string | null;
 			capabilities?: ToolCapabilities;
 			doctorReport?: StyleDoctorReport;
+			doctorCheckResult?: StyleDoctorCheckResult;
 	  }
 	| { ok: false; error: string };
 

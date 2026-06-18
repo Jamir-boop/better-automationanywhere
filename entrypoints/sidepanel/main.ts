@@ -25,8 +25,17 @@ import {
 	formatControlRoomVersion,
 	SUPPORTED_CONTROL_ROOM_TARGET,
 	type ControlRoomCompatibilityStatus,
+	type SupportedControlRoomTarget,
 } from '@/src/ts/control-room-version';
-import type { StyleDoctorReport } from '@/src/ts/style-doctor';
+import type { StyleDoctorCheckResult } from '@/src/ts/style-doctor';
+import {
+	CHECKS,
+	DOCTOR_CHECK_GROUPS,
+	compareResults,
+	getChecksForGroup,
+	type DoctorCheckGroup,
+	type DoctorComparisonResult,
+} from '@/src/ts/style-doctor';
 import {
 	isAutomationAnywhereJson,
 	summarizeAutomationAnywhereJson,
@@ -86,6 +95,8 @@ import {
 	styleFeatureItems,
 	styleValueItems,
 	stylesEnabled,
+	localSupportedBuilds,
+	styleDoctorLastResults,
 	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
 	type OpenSidebarShortcut,
@@ -484,38 +495,13 @@ app.innerHTML = `
 		</div>
 	</header>
 
-	<section id="debugLogSection" class="panel-section feedback-section is-collapsed" hidden aria-hidden="true">
-		<div class="section-heading-row">
-			<h2>${t('Debug Log')}</h2>
-			<span class="feedback-actions">
-				<span class="help-wrapper">
-					<button id="toggleDebugLog" class="debug-log-toggle help-anchor" type="button" aria-expanded="false" aria-label="${t('Expand debug log')}" aria-describedby="${getHelpTipId('debug-toggle')}"></button>
-					${renderHelpTip('debug-toggle', t('Show or hide recent debug entries.'))}
-				</span>
-				<span class="help-wrapper">
-					<button id="runStyleDoctor" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-doctor')}">${t('Run Doctor')}</button>
-					${renderHelpTip('debug-doctor', t('Run selector Doctor and write report to Debug Log.'))}
-				</span>
-				<span class="help-wrapper">
-					<button id="copyFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-copy')}">${t('Copy')}</button>
-					${renderHelpTip('debug-copy', t('Copy support log for troubleshooting.'))}
-				</span>
-				<span class="help-wrapper">
-					<button id="clearFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-clear')}">${t('Clear')}</button>
-					${renderHelpTip('debug-clear', t('Clear local debug log entries.'))}
-				</span>
-			</span>
-		</div>
-		<p class="inline-hint">${t('Debug Mode stores local support logs. Nothing is sent automatically.')}</p>
-		<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
-	</section>
-
 	<p id="status" role="status"></p>
 
 	<nav class="tab-list" role="tablist" aria-label="${t('Sidebar sections')}">
 		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">${t('Tools')}</button>
 		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">${t('UI Improvements')}</button>
 		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">${t('Settings')}</button>
+		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="doctor" hidden>${t('Doctor')}</button>
 	</nav>
 
 	<main>
@@ -579,6 +565,52 @@ app.innerHTML = `
 				</span>
 			</section>
 		</section>
+
+		<section class="tab-panel doctor-panel" role="tabpanel" data-panel="doctor" hidden>
+			<section class="panel-section">
+				<h2>${t('Doctor')}</h2>
+				<div class="doctor-view-pills" role="group" aria-label="${t('Doctor view selector')}">
+					<button class="doctor-pill is-active" type="button" data-doctor-view="general">${t('General')}</button>
+					<button class="doctor-pill" type="button" data-doctor-view="taskbot-editor">${t('Taskbot Editor')}</button>
+					<button class="doctor-pill" type="button" data-doctor-view="folder-navigation">${t('Folder Navigation')}</button>
+				</div>
+				<div id="doctorChecklist" class="doctor-checklist"></div>
+				<div class="doctor-actions">
+					<button id="runDoctorView" class="help-anchor" type="button">${t('Run Doctor')}</button>
+					<span id="doctorSummary" class="doctor-summary"></span>
+				</div>
+			</section>
+
+			<section class="panel-section feedback-section is-collapsed" id="debugLogSection" hidden aria-hidden="true">
+				<div class="section-heading-row">
+					<h2>${t('Debug Log')}</h2>
+					<span class="feedback-actions">
+						<span class="help-wrapper">
+							<button id="toggleDebugLog" class="debug-log-toggle help-anchor" type="button" aria-expanded="false" aria-label="${t('Expand debug log')}" aria-describedby="${getHelpTipId('debug-toggle')}"></button>
+							${renderHelpTip('debug-toggle', t('Show or hide recent debug entries.'))}
+						</span>
+						<span class="help-wrapper">
+							<button id="copyFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-copy')}">${t('Copy')}</button>
+							${renderHelpTip('debug-copy', t('Copy support log for troubleshooting.'))}
+						</span>
+						<span class="help-wrapper">
+							<button id="clearFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-clear')}">${t('Clear')}</button>
+							${renderHelpTip('debug-clear', t('Clear local debug log entries.'))}
+						</span>
+					</span>
+				</div>
+				<p class="inline-hint">${t('Debug Mode stores local support logs. Nothing is sent automatically.')}</p>
+				<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
+			</section>
+
+			<section class="panel-section">
+				<div class="section-heading-row">
+					<h2>${t('Supported Builds')}</h2>
+				</div>
+				<div id="supportedBuildsList" class="supported-builds-list"></div>
+				<button id="addCurrentBuild" class="help-anchor" type="button" hidden>${t('Add current build to supported')}</button>
+			</section>
+		</section>
 	</main>
 
 `;
@@ -616,8 +648,6 @@ const controlRoomVersionAlert = document.querySelector<HTMLElement>(
 const refreshControlRoomVersionButton = document.querySelector<HTMLButtonElement>(
 	'#refreshControlRoomVersion'
 )!;
-const runStyleDoctorButton =
-	document.querySelector<HTMLButtonElement>('#runStyleDoctor')!;
 const extensionLanguageSelect =
 	document.querySelector<HTMLSelectElement>('#extensionLanguage')!;
 const debugInput = document.querySelector<HTMLInputElement>('#debugEnabled')!;
@@ -670,9 +700,14 @@ let currentExtensionShortcuts: ExtensionShortcuts = {
 	commandPalette: getCommandPaletteShortcutLabel(currentShortcut),
 };
 let lastSidepanelRequestNonce: string | null = null;
+let currentDoctorView: DoctorCheckGroup = 'general';
+let currentDoctorResults: StyleDoctorCheckResult[] = [];
+let previousDoctorResults: StyleDoctorCheckResult[] | null = null;
+let doctorRunning = false;
+let activeTab: SidepanelTab = 'tools';
 
 function showStatusMessage(message: string, severity: FeedbackSeverity = 'info'): void {
-	if (currentDebugEnabled) {
+	if (currentDebugEnabled && activeTab === 'doctor') {
 		status.textContent = '';
 		return;
 	}
@@ -695,12 +730,22 @@ function setStatus(
 }
 
 function updateDebugVisibility(): void {
-	const debugLogHidden = !currentDebugEnabled;
-	debugLogSection.hidden = debugLogHidden;
-	debugLogSection.setAttribute('aria-hidden', String(debugLogHidden));
-	status.hidden = currentDebugEnabled;
-	status.setAttribute('aria-hidden', String(currentDebugEnabled));
-	if (currentDebugEnabled) status.textContent = '';
+	const doctorTabButton = document.querySelector<HTMLButtonElement>('[data-tab="doctor"]');
+	const doctorPanel = document.querySelector<HTMLElement>('[data-panel="doctor"]');
+	if (doctorTabButton) doctorTabButton.hidden = !currentDebugEnabled;
+	if (doctorPanel && !currentDebugEnabled) {
+		doctorPanel.hidden = true;
+		if (activeTab === 'doctor') setActiveTab('tools');
+	}
+	if (currentDebugEnabled) {
+		debugLogSection.hidden = debugLogCollapsed;
+		debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
+	} else {
+		debugLogSection.hidden = true;
+		debugLogSection.setAttribute('aria-hidden', 'true');
+	}
+	updateStatusVisibility();
+	updateAddCurrentBuildButton();
 }
 
 actionJsonWorkbench = initializeJsonWorkbench({
@@ -790,7 +835,15 @@ function formatFeedbackForAi(events: DebugEvent[]): string {
 	].join('\n').trimEnd();
 }
 
+function updateStatusVisibility(): void {
+	const shouldHide = currentDebugEnabled && activeTab === 'doctor';
+	status.hidden = shouldHide;
+	status.setAttribute('aria-hidden', String(shouldHide));
+	if (shouldHide) status.textContent = '';
+}
+
 function setActiveTab(tab: SidepanelTab): void {
+	activeTab = tab;
 	document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 		const active = button.dataset.tab === tab;
 		button.classList.toggle('is-active', active);
@@ -801,6 +854,12 @@ function setActiveTab(tab: SidepanelTab): void {
 		panel.classList.toggle('is-active', active);
 		panel.hidden = !active;
 	});
+	if (tab === 'doctor' && currentDebugEnabled) {
+		debugLogSection.hidden = debugLogCollapsed;
+		debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
+		updateAddCurrentBuildButton();
+	}
+	updateStatusVisibility();
 }
 
 async function sendBackgroundMessage(message: BackgroundMessage): Promise<void> {
@@ -912,97 +971,134 @@ function updateControlRoomCompatibilityUi(): void {
 	}
 }
 
-function getStyleDoctorSummary(report: StyleDoctorReport): string {
-	return t(
-		'Doctor {view}: {passed} pass, {failed} fail, {warnings} warn, {skipped} skip.',
+const doctorChecklist = document.querySelector<HTMLElement>('#doctorChecklist')!;
+const doctorSummary = document.querySelector<HTMLElement>('#doctorSummary')!;
+const runDoctorViewButton =
+	document.querySelector<HTMLButtonElement>('#runDoctorView')!;
+const doctorPills = document.querySelectorAll<HTMLButtonElement>('.doctor-pill');
+
+function getDoctorGroupLabel(group: DoctorCheckGroup): string {
+	return DOCTOR_CHECK_GROUPS.find((g) => g.key === group)?.label ?? group;
+}
+
+function renderDoctorChecklist(): void {
+	const checks = getChecksForGroup(currentDoctorView);
+	const comparison = currentDoctorResults.length
+		? compareResults(previousDoctorResults, currentDoctorResults)
+		: [];
+
+	doctorChecklist.textContent = '';
+	for (const check of checks) {
+		const row = document.createElement('div');
+		row.className = 'doctor-check-row';
+		row.dataset.checkId = check.id;
+
+		const comp = comparison.find((c) => c.id === check.id);
+		if (comp) {
+			row.classList.add(`doctor-status-${comp.currentStatus}`);
+			if (comp.delta === 'fixed') row.classList.add('doctor-delta-fixed');
+			if (comp.delta === 'regressed') row.classList.add('doctor-delta-regressed');
+		}
+
+		const icon = document.createElement('span');
+		icon.className = 'doctor-check-icon';
+		if (comp) {
+			icon.textContent =
+				comp.currentStatus === 'pass'
+					? '\u2713'
+					: comp.currentStatus === 'fail'
+						? '\u2717'
+						: comp.currentStatus === 'warn'
+							? '\u26A0'
+							: '\u2014';
+		} else {
+			icon.textContent = '\u2013';
+		}
+
+		const label = document.createElement('span');
+		label.className = 'doctor-check-label';
+		label.textContent = check.label;
+
+		const meta = document.createElement('span');
+		meta.className = 'doctor-check-meta';
+		const parts = [check.severity, check.source];
+		if (check.triggerHint && check.severity === 'transient') {
+			parts.push(check.triggerHint);
+		}
+		if (comp && comp.currentStatus !== 'pass' && comp.currentStatus !== 'skip') {
+			const result = currentDoctorResults.find((r) => r.id === check.id);
+			if (result?.reason) parts.push(result.reason);
+		}
+		meta.textContent = parts.join(' \u00B7 ');
+
+		row.appendChild(icon);
+		row.appendChild(label);
+		row.appendChild(meta);
+		doctorChecklist.appendChild(row);
+	}
+}
+
+function updateDoctorSummary(): void {
+	if (!currentDoctorResults.length) {
+		doctorSummary.textContent = '';
+		return;
+	}
+	const pass = currentDoctorResults.filter((r) => r.status === 'pass').length;
+	const fail = currentDoctorResults.filter((r) => r.status === 'fail').length;
+	const warn = currentDoctorResults.filter((r) => r.status === 'warn').length;
+	const skip = currentDoctorResults.filter((r) => r.status === 'skip').length;
+	doctorSummary.textContent = `${pass} pass, ${fail} fail, ${warn} warn, ${skip} skip`;
+}
+
+async function runDoctorViewScan(): Promise<void> {
+	if (doctorRunning) return;
+	doctorRunning = true;
+	runDoctorViewButton.disabled = true;
+	runDoctorViewButton.textContent = t('Scanning...');
+
+	const checks = getChecksForGroup(currentDoctorView);
+	const results: StyleDoctorCheckResult[] = [];
+
+	for (const check of checks) {
+		const response = await sendActiveTabMessage({
+			type: 'RUN_STYLE_DOCTOR_CHECK',
+			checkId: check.id,
+		});
+		const result = response.ok ? response.doctorCheckResult : null;
+		if (result) {
+			results.push(result);
+			currentDoctorResults = results;
+			renderDoctorChecklist();
+			updateDoctorSummary();
+		}
+		await new Promise((r) => setTimeout(r, 100));
+	}
+
+	previousDoctorResults = results.length ? [...results] : previousDoctorResults;
+	currentDoctorResults = results;
+	renderDoctorChecklist();
+	updateDoctorSummary();
+
+	const allResults = (await styleDoctorLastResults.getValue()) ?? {};
+	allResults[currentDoctorView] = results;
+	await styleDoctorLastResults.setValue(allResults);
+
+	await addFeedback(
+		results.some((r) => r.status === 'fail') ? 'warn' : 'info',
+		'doctor',
+		`Doctor ${currentDoctorView}: ${results.filter((r) => r.status === 'pass').length} pass, ${results.filter((r) => r.status === 'fail').length} fail, ${results.filter((r) => r.status === 'warn').length} warn, ${results.filter((r) => r.status === 'skip').length} skip.`,
 		{
-			view: report.view,
-			passed: report.passed,
-			failed: report.failed,
-			warnings: report.warnings,
-			skipped: report.skipped,
-		}
-	);
-}
-
-function getStyleDoctorFeedbackLevel(report: StyleDoctorReport): FeedbackSeverity {
-	if (report.failed > 0) return 'error';
-	if (report.warnings > 0 || report.skipped > 0 || report.view === 'unsupported') {
-		return 'warn';
-	}
-	return 'info';
-}
-
-function createStyleDoctorDebugDetails(
-	report: StyleDoctorReport
-): Record<string, unknown> {
-	return {
-		view: report.view,
-		url: report.url,
-		...(report.message ? { message: report.message } : {}),
-		summary: {
-			checked: report.checked,
-			passed: report.passed,
-			failed: report.failed,
-			warnings: report.warnings,
-			skipped: report.skipped,
+			view: currentDoctorView,
+			results: results.map((r) => ({ id: r.id, status: r.status, severity: r.severity })),
 		},
-		results: report.results.map((result) => {
-			const entry: Record<string, unknown> = {
-				id: result.id,
-				view: result.view,
-				status: result.status,
-				severity: result.severity,
-				label: result.label,
-				selector: result.selector,
-				source: result.source,
-				count: result.count,
-			};
-			if (result.reason) entry.reason = result.reason;
-			return entry;
-		}),
-	};
-}
+		{ keepDetails: true }
+	);
+	await refreshFeedbackHistory();
 
-async function runStyleDoctorFromSidepanel(): Promise<void> {
-	runStyleDoctorButton.disabled = true;
-	runStyleDoctorButton.textContent = t('Doctor running...');
-	showStatusMessage(t('Doctor running...'), 'info');
-	try {
-		const response = await sendActiveTabMessage({ type: 'RUN_STYLE_DOCTOR' });
-		if (!response.ok || !response.doctorReport) {
-			const message = response.ok ? t('Doctor failed.') : response.error;
-			await addFeedback('warn', 'doctor', message);
-			await refreshFeedbackHistory();
-			showStatusMessage(message, 'warn');
-			return;
-		}
-
-		const report = response.doctorReport;
-		const level = getStyleDoctorFeedbackLevel(report);
-		await addFeedback(
-			level,
-			'doctor',
-			getStyleDoctorSummary(report),
-			createStyleDoctorDebugDetails(report),
-			{ keepDetails: true }
-		);
-		await refreshFeedbackHistory();
-		showStatusMessage(t('Doctor report added to Debug Log.'), level);
-	} catch (error) {
-		await addFeedback(
-			'error',
-			'doctor',
-			t('Doctor failed.'),
-			{ error },
-			{ keepDetails: true }
-		);
-		await refreshFeedbackHistory();
-		showStatusMessage(t('Doctor failed.'), 'error');
-	} finally {
-		runStyleDoctorButton.disabled = false;
-		runStyleDoctorButton.textContent = t('Run Doctor');
-	}
+	runDoctorViewButton.disabled = false;
+	runDoctorViewButton.textContent = t('Run Doctor');
+	doctorRunning = false;
+	updateAddCurrentBuildButton();
 }
 
 function updateShortcutLabel(shortcut: CommandPaletteShortcut): void {
@@ -1070,6 +1166,12 @@ async function handleSidepanelRequest(
 
 	setActiveTab(request.tab);
 	if (request.tab === 'settings') void refreshAboutHelp();
+	if (request.tab === 'doctor') {
+		renderDoctorChecklist();
+		void renderSupportedBuilds();
+		debugLogSection.hidden = debugLogCollapsed;
+		debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
+	}
 	if (request.focus === 'actionJson') focusActionJsonTextarea();
 
 	await sidepanelRequest.setValue(null);
@@ -1458,6 +1560,9 @@ async function loadState(): Promise<void> {
 	await refreshControlRoomCompatibility();
 	await refreshSlotStates();
 	await refreshFeedbackHistory();
+	await renderSupportedBuilds();
+	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
+	previousDoctorResults = savedDoctorResults[currentDoctorView] ?? null;
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
 		styles,
 		sounds,
@@ -1473,9 +1578,16 @@ async function loadState(): Promise<void> {
 
 document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 	button.addEventListener('click', () => {
-		setActiveTab(button.dataset.tab as SidepanelTab);
-		if (button.dataset.tab === 'settings') void refreshAboutHelp();
-		if (button.dataset.tab === 'userstyle') void refreshControlRoomCompatibility();
+		const tab = button.dataset.tab as SidepanelTab;
+		setActiveTab(tab);
+		if (tab === 'settings') void refreshAboutHelp();
+		if (tab === 'userstyle') void refreshControlRoomCompatibility();
+		if (tab === 'doctor') {
+			renderDoctorChecklist();
+			void renderSupportedBuilds();
+			debugLogSection.hidden = debugLogCollapsed;
+			debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
+		}
 	});
 });
 
@@ -1583,8 +1695,97 @@ refreshControlRoomVersionButton.addEventListener('click', () => {
 	void refreshControlRoomCompatibility(true);
 });
 
-runStyleDoctorButton.addEventListener('click', () => {
-	void runStyleDoctorFromSidepanel();
+doctorPills.forEach((pill) => {
+	pill.addEventListener('click', async () => {
+		currentDoctorView = pill.dataset.doctorView as DoctorCheckGroup;
+		doctorPills.forEach((p) => p.classList.toggle('is-active', p === pill));
+		const saved = (await styleDoctorLastResults.getValue()) ?? {};
+		currentDoctorResults = saved[currentDoctorView] ?? [];
+		previousDoctorResults = currentDoctorResults.length ? currentDoctorResults : null;
+		renderDoctorChecklist();
+		updateDoctorSummary();
+	});
+});
+
+runDoctorViewButton.addEventListener('click', () => {
+	void runDoctorViewScan();
+});
+
+const supportedBuildsList = document.querySelector<HTMLElement>('#supportedBuildsList')!;
+const addCurrentBuildButton = document.querySelector<HTMLButtonElement>('#addCurrentBuild')!;
+
+async function renderSupportedBuilds(): Promise<void> {
+	const builds = (await localSupportedBuilds.getValue()) ?? [];
+	supportedBuildsList.textContent = '';
+	if (!builds.length) {
+		const empty = document.createElement('p');
+		empty.className = 'feedback-empty';
+		empty.textContent = t('No local supported builds added.');
+		supportedBuildsList.appendChild(empty);
+	} else {
+		for (const build of builds) {
+			const row = document.createElement('div');
+			row.className = 'supported-build-row';
+			const label = document.createElement('span');
+			label.textContent = `${build.versionNumber} ${build.versionRelease} build ${build.buildNumber}`;
+			const removeBtn = document.createElement('button');
+			removeBtn.type = 'button';
+			removeBtn.textContent = t('Remove');
+			removeBtn.addEventListener('click', async () => {
+				const current = (await localSupportedBuilds.getValue()) ?? [];
+				await localSupportedBuilds.setValue(
+					current.filter(
+						(b) =>
+							b.versionNumber !== build.versionNumber ||
+							b.versionRelease !== build.versionRelease ||
+							b.buildNumber !== build.buildNumber
+					)
+				);
+				await renderSupportedBuilds();
+				setStatus(t('Supported build removed.'), 'info', 'doctor');
+			});
+			row.appendChild(label);
+			row.appendChild(removeBtn);
+			supportedBuildsList.appendChild(row);
+		}
+	}
+}
+
+function updateAddCurrentBuildButton(): void {
+	const allPassed =
+		currentDoctorResults.length > 0 &&
+		currentDoctorResults.every((r) => r.status === 'pass' || r.status === 'skip');
+	addCurrentBuildButton.hidden = !(
+		currentDebugEnabled &&
+		activeTab === 'doctor' &&
+		allPassed &&
+		currentControlRoomCompatibility?.current
+	);
+}
+
+addCurrentBuildButton.addEventListener('click', async () => {
+	if (!currentControlRoomCompatibility?.current) return;
+	const current = currentControlRoomCompatibility.current;
+	const newTarget: SupportedControlRoomTarget = {
+		versionNumber: String(current.versionNumber ?? ''),
+		versionRelease: String(current.versionRelease ?? ''),
+		buildNumber: String(current.buildNumber ?? ''),
+		productVersion: String(current.productVersion ?? SUPPORTED_CONTROL_ROOM_TARGET.productVersion),
+	};
+	const builds = (await localSupportedBuilds.getValue()) ?? [];
+	const exists = builds.some(
+		(b) =>
+			b.versionNumber === newTarget.versionNumber &&
+			b.versionRelease === newTarget.versionRelease &&
+			b.buildNumber === newTarget.buildNumber
+	);
+	if (!exists) {
+		await localSupportedBuilds.setValue([...builds, newTarget]);
+		await renderSupportedBuilds();
+		setStatus(t('Build added to supported list.'), 'info', 'doctor');
+	} else {
+		setStatus(t('Build already in supported list.'), 'warn', 'doctor');
+	}
 });
 
 extensionLanguageSelect.addEventListener('change', () => {
