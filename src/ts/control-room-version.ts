@@ -25,12 +25,21 @@ export interface ControlRoomCompatibilityStatus {
 	message?: string;
 }
 
-export const SUPPORTED_CONTROL_ROOM_TARGET: SupportedControlRoomTarget = {
-	versionNumber: '20.1.0.0',
-	versionRelease: 'LTS',
-	buildNumber: '45946',
-	productVersion: '40.0.0',
-};
+export const SUPPORTED_CONTROL_ROOM_TARGETS: SupportedControlRoomTarget[] = [
+	{
+		versionNumber: '20.1.0.0',
+		versionRelease: 'LTS',
+		buildNumber: '45946', //prot
+		productVersion: '40.0.0',
+	},
+	{
+	  versionNumber: '20.1.0.0',
+	  versionRelease: 'LTS',
+	  buildNumber: '45983', //latam
+	  productVersion: '40.0.0',
+	},
+];
+export const SUPPORTED_CONTROL_ROOM_TARGET = SUPPORTED_CONTROL_ROOM_TARGETS[0];
 
 function normalizeVersionPart(value: unknown): string {
 	return String(value ?? '').trim();
@@ -64,11 +73,8 @@ function matchesTarget(
 
 export function evaluateControlRoomCompatibility(
 	current?: ControlRoomVersionDetails,
-	message?: string,
-	localOverrides?: SupportedControlRoomTarget[]
+	message?: string
 ): ControlRoomCompatibilityStatus {
-	const allTargets = [SUPPORTED_CONTROL_ROOM_TARGET, ...(localOverrides ?? [])];
-
 	if (!current) {
 		return {
 			state: 'unknown',
@@ -79,7 +85,7 @@ export function evaluateControlRoomCompatibility(
 		};
 	}
 
-	const matchedTarget = allTargets.find((target) => matchesTarget(current, target));
+	const matchedTarget = SUPPORTED_CONTROL_ROOM_TARGETS.find((target) => matchesTarget(current, target));
 	const supported = Boolean(matchedTarget);
 	const target = matchedTarget ?? SUPPORTED_CONTROL_ROOM_TARGET;
 

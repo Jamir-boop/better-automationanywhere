@@ -94,16 +94,26 @@ textarea
 		width: 34px
 		height: 18px
 
-.tab-list
+.tab-list,
+.health-subtabs
 	display: grid
-	grid-template-columns: repeat(3, 1fr)
+	grid-template-columns: repeat(3, minmax(0, 1fr))
 	gap: 4px
 	padding: 3px
 	border: 1px solid var(--border)
 	border-radius: 8px
 	background: var(--surface-2)
 
-.tab-button
+	&.has-health-tab
+		grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) minmax(0, 3fr) minmax(0, 1fr)
+
+.health-subtabs
+	display: flex
+	grid-template-columns: unset
+
+.tab-button,
+.health-subtab
+	min-width: 0
 	min-height: 34px
 	padding: 6px 8px
 	color: var(--text)
@@ -111,6 +121,9 @@ textarea
 	border: 0
 	border-radius: 6px
 	cursor: pointer
+	overflow: hidden
+	text-overflow: ellipsis
+	white-space: nowrap
 
 	&:hover
 		color: var(--text-on-accent)
@@ -119,6 +132,15 @@ textarea
 	&.is-active
 		outline: 1px solid var(--accent-active)
 		outline-offset: -1px
+
+.health-subtab
+	flex: 1
+	min-height: 30px
+	font-size: .74rem
+
+.tab-button-health
+	font-size: 1rem
+	line-height: 1
 
 main
 	display: flex
@@ -714,7 +736,7 @@ button
 
 .feedback-section
 	gap: 3px
-	padding: 0px
+	padding: 12px
 
 	h2
 		font-size: .74rem
@@ -732,41 +754,13 @@ button
 			padding: 3px 6px
 			font-size: .66rem
 
-		.debug-log-toggle
-			position: relative
-			display: inline-flex
-			align-items: center
-			justify-content: center
-			width: 24px
-			height: 22px
-			padding: 0
-			font-size: 0
-			line-height: 0
-
-			&::before
-				content: '▾'
-				position: absolute
-				top: 50%
-				left: 50%
-				color: currentColor
-				font-size: .78rem
-				line-height: 1
-				transform: translate(-50%, -50%)
-
-			&[aria-expanded='true']::before
-				content: '▴'
-
 .feedback-list
 	--feedback-row-height: 26px
 	display: flex
 	flex-direction: column
 	gap: 3px
-	max-height: calc(var(--feedback-row-height) * 4 + 12px)
+	max-height: calc(var(--feedback-row-height) * 25 + 12px)
 	overflow: auto
-
-.feedback-section.is-collapsed .feedback-list
-	max-height: calc(var(--feedback-row-height) + 2px)
-	overflow: hidden
 
 .feedback-empty
 	margin: 0
@@ -808,6 +802,183 @@ button
 
 .feedback-error
 	border-color: #A33A3A
+
+.feedback-summary
+	display: contents
+	cursor: pointer
+
+.feedback-line details[open] .feedback-summary small,
+.feedback-line details[open] .feedback-summary span
+	color: var(--accent)
+
+.feedback-details,
+.doctor-check-details,
+.build-candidate-snippet
+	margin: 0
+	padding: 6px 8px
+	color: var(--text)
+	background: var(--surface-0)
+	border: 1px solid var(--border)
+	border-radius: 4px
+	font-family: Cascadia Code NF, Consolas, monospace
+	font-size: .62rem
+	line-height: 1.3
+	white-space: pre-wrap
+	overflow-wrap: anywhere
+	user-select: text
+	cursor: text
+
+.feedback-details
+	grid-column: 1 / -1
+
+.doctor-check-details
+	border: 0
+	border-top: 1px solid var(--border)
+	border-radius: 0
+	line-height: 1.4
+
+.health-subpanel
+	display: flex
+	flex-direction: column
+	gap: 12px
+
+.doctor-view-pills
+	display: flex
+	gap: 4px
+	flex-wrap: wrap
+
+.doctor-pill
+	min-width: 0
+	padding: 4px 8px
+	font-size: .72rem
+	white-space: nowrap
+
+.doctor-checklist
+	display: flex
+	flex-direction: column
+	gap: 3px
+
+.doctor-check-row
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+	overflow: hidden
+
+.doctor-check-summary
+	display: flex
+	align-items: center
+	gap: 6px
+	padding: 4px 8px
+	cursor: pointer
+	list-style: none
+
+	&::-webkit-details-marker
+		display: none
+
+.doctor-check-icon
+	width: 16px
+	flex: 0 0 auto
+	text-align: center
+	font-size: .78rem
+
+.doctor-check-label
+	flex: 1 1 auto
+	min-width: 0
+	font-size: .74rem
+	overflow: hidden
+	text-overflow: ellipsis
+	white-space: nowrap
+
+.doctor-check-meta
+	flex: 0 1 auto
+	min-width: 0
+	color: var(--text-muted)
+	font-size: .62rem
+	overflow: hidden
+	text-overflow: ellipsis
+	white-space: nowrap
+
+.doctor-status-pass .doctor-check-icon
+	color: #3AA35C
+
+.doctor-status-fail .doctor-check-icon
+	color: #FF8A8A
+
+.doctor-status-warn .doctor-check-icon
+	color: #FFD45A
+
+.doctor-status-skip .doctor-check-icon
+	color: var(--text-muted)
+
+.doctor-delta-fixed
+	border-color: #3AA35C
+
+.doctor-delta-regressed
+	border-color: #A33A3A
+
+.doctor-transient-group
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-1)
+	padding: 6px
+
+	summary
+		padding: 2px 4px
+		font-size: .72rem
+		color: var(--text-muted)
+		cursor: pointer
+
+.doctor-transient-list
+	display: flex
+	flex-direction: column
+	gap: 3px
+	margin-top: 4px
+
+.doctor-actions
+	display: flex
+	align-items: center
+	gap: 8px
+
+.doctor-summary
+	color: var(--text-muted)
+	font-size: .68rem
+
+.supported-builds-list
+	display: flex
+	flex-direction: column
+	gap: 4px
+
+.supported-build-row
+	display: flex
+	align-items: center
+	justify-content: space-between
+	gap: 8px
+	padding: 4px 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+	font-size: .74rem
+
+	&.is-current-match
+		border-color: var(--accent)
+
+.supported-build-marker
+	color: var(--accent)
+	font-size: .62rem
+	font-weight: 700
+	text-transform: uppercase
+
+.build-candidate
+	display: flex
+	flex-direction: column
+	gap: 6px
+	padding: 8px
+	border: 1px solid var(--accent)
+	border-radius: 6px
+	background: var(--surface-1)
+
+	.inline-hint
+		margin: 0
 
 .info-panel
 	align-items: flex-start

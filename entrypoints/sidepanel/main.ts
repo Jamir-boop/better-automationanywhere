@@ -24,17 +24,14 @@ import {
 	formatControlRoomTarget,
 	formatControlRoomVersion,
 	SUPPORTED_CONTROL_ROOM_TARGET,
+	SUPPORTED_CONTROL_ROOM_TARGETS,
 	type ControlRoomCompatibilityStatus,
-	type SupportedControlRoomTarget,
 } from '@/src/ts/control-room-version';
-import type { StyleDoctorCheckResult } from '@/src/ts/style-doctor';
+import type { StyleDoctorCheck, StyleDoctorCheckResult } from '@/src/ts/style-doctor';
 import {
-	CHECKS,
-	DOCTOR_CHECK_GROUPS,
 	compareResults,
 	getChecksForGroup,
 	type DoctorCheckGroup,
-	type DoctorComparisonResult,
 } from '@/src/ts/style-doctor';
 import {
 	isAutomationAnywhereJson,
@@ -95,7 +92,6 @@ import {
 	styleFeatureItems,
 	styleValueItems,
 	stylesEnabled,
-	localSupportedBuilds,
 	styleDoctorLastResults,
 	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
@@ -499,9 +495,9 @@ app.innerHTML = `
 
 	<nav class="tab-list" role="tablist" aria-label="${t('Sidebar sections')}">
 		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">${t('Tools')}</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">${t('UI Improvements')}</button>
+		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">${t('UI')}</button>
 		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">${t('Settings')}</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="doctor" hidden>${t('Doctor')}</button>
+		<button class="tab-button tab-button-health" type="button" role="tab" aria-selected="false" data-tab="doctor" aria-label="${t('Health')}" title="${t('Health')}" hidden>✅</button>
 	</nav>
 
 	<main>
@@ -567,28 +563,43 @@ app.innerHTML = `
 		</section>
 
 		<section class="tab-panel doctor-panel" role="tabpanel" data-panel="doctor" hidden>
-			<section class="panel-section">
-				<h2>${t('Doctor')}</h2>
-				<div class="doctor-view-pills" role="group" aria-label="${t('Doctor view selector')}">
-					<button class="doctor-pill is-active" type="button" data-doctor-view="general">${t('General')}</button>
-					<button class="doctor-pill" type="button" data-doctor-view="taskbot-editor">${t('Taskbot Editor')}</button>
-					<button class="doctor-pill" type="button" data-doctor-view="folder-navigation">${t('Folder Navigation')}</button>
-				</div>
-				<div id="doctorChecklist" class="doctor-checklist"></div>
-				<div class="doctor-actions">
-					<button id="runDoctorView" class="help-anchor" type="button">${t('Run Doctor')}</button>
-					<span id="doctorSummary" class="doctor-summary"></span>
-				</div>
-			</section>
+			<div class="health-subtabs" role="tablist" aria-label="${t('Health sections')}">
+				<button class="health-subtab is-active" type="button" role="tab" aria-selected="true" data-health-section="health">${t('Health')}</button>
+				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="logs">${t('Debug Logs')}</button>
+			</div>
 
-			<section class="panel-section feedback-section is-collapsed" id="debugLogSection" hidden aria-hidden="true">
+			<div class="health-subpanel" data-health-subpanel="health">
+				<section class="panel-section">
+					<h2>${t('Health')}</h2>
+					<div class="doctor-view-pills" role="group" aria-label="${t('Health check view selector')}">
+						<button class="doctor-pill is-active" type="button" data-doctor-view="general">${t('General')}</button>
+						<button class="doctor-pill" type="button" data-doctor-view="taskbot-editor">${t('Taskbot Editor')}</button>
+						<button class="doctor-pill" type="button" data-doctor-view="folder-navigation">${t('Folder Navigation')}</button>
+					</div>
+					<div id="doctorChecklist" class="doctor-checklist"></div>
+					<div class="doctor-actions">
+						<button id="runDoctorView" class="help-anchor" type="button">${t('Run Checks')}</button>
+						<span id="doctorSummary" class="doctor-summary"></span>
+					</div>
+				</section>
+
+				<section class="panel-section">
+					<div class="section-heading-row">
+						<h2>${t('Supported Builds')}</h2>
+					</div>
+					<div id="supportedBuildsList" class="supported-builds-list"></div>
+					<div id="buildCandidate" class="build-candidate" hidden>
+						<p id="buildCandidateMessage" class="inline-hint"></p>
+						<pre id="buildCandidateSnippet" class="build-candidate-snippet"></pre>
+						<button id="copyBuildCandidate" class="help-anchor" type="button">${t('Copy candidate')}</button>
+					</div>
+				</section>
+			</div>
+
+			<section class="panel-section feedback-section health-subpanel" id="debugLogSection" data-health-subpanel="logs" hidden aria-hidden="true">
 				<div class="section-heading-row">
-					<h2>${t('Debug Log')}</h2>
+					<h2>${t('Debug Logs')}</h2>
 					<span class="feedback-actions">
-						<span class="help-wrapper">
-							<button id="toggleDebugLog" class="debug-log-toggle help-anchor" type="button" aria-expanded="false" aria-label="${t('Expand debug log')}" aria-describedby="${getHelpTipId('debug-toggle')}"></button>
-							${renderHelpTip('debug-toggle', t('Show or hide recent debug entries.'))}
-						</span>
 						<span class="help-wrapper">
 							<button id="copyFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-copy')}">${t('Copy')}</button>
 							${renderHelpTip('debug-copy', t('Copy support log for troubleshooting.'))}
@@ -601,14 +612,6 @@ app.innerHTML = `
 				</div>
 				<p class="inline-hint">${t('Debug Mode stores local support logs. Nothing is sent automatically.')}</p>
 				<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
-			</section>
-
-			<section class="panel-section">
-				<div class="section-heading-row">
-					<h2>${t('Supported Builds')}</h2>
-				</div>
-				<div id="supportedBuildsList" class="supported-builds-list"></div>
-				<button id="addCurrentBuild" class="help-anchor" type="button" hidden>${t('Add current build to supported')}</button>
 			</section>
 		</section>
 	</main>
@@ -673,8 +676,6 @@ const actionPackageList = document.querySelector<HTMLElement>('#actionPackageLis
 const clearJsonButton = document.querySelector<HTMLButtonElement>('#clearJson')!;
 const debugLogSection = document.querySelector<HTMLElement>('#debugLogSection')!;
 const feedbackList = document.querySelector<HTMLElement>('#feedbackList')!;
-const toggleDebugLogButton =
-	document.querySelector<HTMLButtonElement>('#toggleDebugLog')!;
 const copyFeedbackButton =
 	document.querySelector<HTMLButtonElement>('#copyFeedback')!;
 const clearFeedbackButton =
@@ -693,7 +694,8 @@ const backgroundPreview =
 	document.querySelector<HTMLElement>('#backgroundPreview')!;
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
-let debugLogCollapsed = true;
+type HealthSection = 'health' | 'logs';
+let activeHealthSection: HealthSection = 'health';
 let actionJsonWorkbench: JsonWorkbench;
 let currentExtensionShortcuts: ExtensionShortcuts = {
 	openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),
@@ -732,20 +734,20 @@ function setStatus(
 function updateDebugVisibility(): void {
 	const doctorTabButton = document.querySelector<HTMLButtonElement>('[data-tab="doctor"]');
 	const doctorPanel = document.querySelector<HTMLElement>('[data-panel="doctor"]');
+	const tabList = document.querySelector<HTMLElement>('.tab-list')!;
 	if (doctorTabButton) doctorTabButton.hidden = !currentDebugEnabled;
+	tabList.classList.toggle('has-health-tab', currentDebugEnabled);
 	if (doctorPanel && !currentDebugEnabled) {
 		doctorPanel.hidden = true;
 		if (activeTab === 'doctor') setActiveTab('tools');
 	}
-	if (currentDebugEnabled) {
-		debugLogSection.hidden = debugLogCollapsed;
-		debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
+	if (currentDebugEnabled && activeTab === 'doctor') {
+		setHealthSection(activeHealthSection);
 	} else {
 		debugLogSection.hidden = true;
 		debugLogSection.setAttribute('aria-hidden', 'true');
 	}
 	updateStatusVisibility();
-	updateAddCurrentBuildButton();
 }
 
 actionJsonWorkbench = initializeJsonWorkbench({
@@ -760,18 +762,7 @@ actionJsonWorkbench = initializeJsonWorkbench({
 	copiedMessage: t('JSON copied to clipboard.'),
 });
 
-function updateDebugLogState(): void {
-	debugLogSection.classList.toggle('is-collapsed', debugLogCollapsed);
-	feedbackList.dataset.collapsed = String(debugLogCollapsed);
-	toggleDebugLogButton.setAttribute(
-		'aria-label',
-		debugLogCollapsed ? t('Expand debug log') : t('Collapse debug log')
-	);
-	toggleDebugLogButton.setAttribute('aria-expanded', String(!debugLogCollapsed));
-}
-
 function renderFeedbackHistory(events: DebugEvent[] = []): void {
-	updateDebugLogState();
 	feedbackList.textContent = '';
 	if (!events.length) {
 		const empty = document.createElement('p');
@@ -781,23 +772,32 @@ function renderFeedbackHistory(events: DebugEvent[] = []): void {
 		return;
 	}
 
-	const visibleEvents = debugLogCollapsed ? events.slice(0, 1) : events;
-	for (const event of visibleEvents) {
-		const row = document.createElement('div');
-		row.className = `feedback-line feedback-${event.level}`;
-
+	for (const event of events) {
 		const meta = document.createElement('small');
-		meta.textContent = `${new Date(event.timestamp).toLocaleTimeString()} - ${event.level.toUpperCase()} - ${event.source}${
-			event.details ? ` - ${t('DETAILS IN COPY')}` : ''
-		}`;
-
+		meta.textContent = `${new Date(event.timestamp).toLocaleTimeString()} - ${event.level.toUpperCase()} - ${event.source}`;
 		const message = document.createElement('span');
 		message.textContent = event.message;
 
-		row.appendChild(meta);
-		row.appendChild(message);
-
-		feedbackList.appendChild(row);
+		if (event.details) {
+			const row = document.createElement('details');
+			row.className = `feedback-line feedback-${event.level}`;
+			const summary = document.createElement('summary');
+			summary.className = 'feedback-summary';
+			summary.appendChild(meta);
+			summary.appendChild(message);
+			const body = document.createElement('pre');
+			body.className = 'feedback-details';
+			body.textContent = JSON.stringify(event.details, null, 2);
+			row.appendChild(summary);
+			row.appendChild(body);
+			feedbackList.appendChild(row);
+		} else {
+			const row = document.createElement('div');
+			row.className = `feedback-line feedback-${event.level}`;
+			row.appendChild(meta);
+			row.appendChild(message);
+			feedbackList.appendChild(row);
+		}
 	}
 }
 
@@ -855,9 +855,7 @@ function setActiveTab(tab: SidepanelTab): void {
 		panel.hidden = !active;
 	});
 	if (tab === 'doctor' && currentDebugEnabled) {
-		debugLogSection.hidden = debugLogCollapsed;
-		debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
-		updateAddCurrentBuildButton();
+		setHealthSection(activeHealthSection);
 	}
 	updateStatusVisibility();
 }
@@ -969,6 +967,7 @@ function updateControlRoomCompatibilityUi(): void {
 				})
 			: t('UI Improvements blocked until target matches or force is enabled.');
 	}
+	renderSupportedBuilds();
 }
 
 const doctorChecklist = document.querySelector<HTMLElement>('#doctorChecklist')!;
@@ -977,19 +976,49 @@ const runDoctorViewButton =
 	document.querySelector<HTMLButtonElement>('#runDoctorView')!;
 const doctorPills = document.querySelectorAll<HTMLButtonElement>('.doctor-pill');
 
-function getDoctorGroupLabel(group: DoctorCheckGroup): string {
-	return DOCTOR_CHECK_GROUPS.find((g) => g.key === group)?.label ?? group;
+const healthSubtabs = document.querySelectorAll<HTMLButtonElement>('[data-health-section]');
+const healthSubpanels = document.querySelectorAll<HTMLElement>('[data-health-subpanel]');
+
+function setHealthSection(section: HealthSection): void {
+	activeHealthSection = section;
+	healthSubtabs.forEach((button) => {
+		const active = button.dataset.healthSection === section;
+		button.classList.toggle('is-active', active);
+		button.setAttribute('aria-selected', String(active));
+	});
+	healthSubpanels.forEach((panel) => {
+		const active = panel.dataset.healthSubpanel === section;
+		panel.hidden = !active;
+		panel.setAttribute('aria-hidden', String(!active));
+	});
+	if (section === 'logs') void refreshFeedbackHistory();
+}
+
+healthSubtabs.forEach((button) => {
+	button.addEventListener('click', () => {
+		setHealthSection(button.dataset.healthSection as HealthSection);
+	});
+});
+
+function getHealthChecksForView(group: DoctorCheckGroup): StyleDoctorCheck[] {
+	if (group !== 'taskbot-editor') return getChecksForGroup(group);
+	return [...getChecksForGroup(group), ...getChecksForGroup('taskbot-transient')];
 }
 
 function renderDoctorChecklist(): void {
-	const checks = getChecksForGroup(currentDoctorView);
 	const comparison = currentDoctorResults.length
 		? compareResults(previousDoctorResults, currentDoctorResults)
 		: [];
 
 	doctorChecklist.textContent = '';
-	for (const check of checks) {
-		const row = document.createElement('div');
+
+	const mainChecks = getChecksForGroup(currentDoctorView);
+	const transientChecks = currentDoctorView === 'taskbot-editor'
+		? getChecksForGroup('taskbot-transient')
+		: [];
+
+	function renderCheckRow(check: StyleDoctorCheck): HTMLElement {
+		const row = document.createElement('details');
 		row.className = 'doctor-check-row';
 		row.dataset.checkId = check.id;
 
@@ -999,6 +1028,9 @@ function renderDoctorChecklist(): void {
 			if (comp.delta === 'fixed') row.classList.add('doctor-delta-fixed');
 			if (comp.delta === 'regressed') row.classList.add('doctor-delta-regressed');
 		}
+
+		const summary = document.createElement('summary');
+		summary.className = 'doctor-check-summary';
 
 		const icon = document.createElement('span');
 		icon.className = 'doctor-check-icon';
@@ -1031,10 +1063,50 @@ function renderDoctorChecklist(): void {
 		}
 		meta.textContent = parts.join(' \u00B7 ');
 
-		row.appendChild(icon);
-		row.appendChild(label);
-		row.appendChild(meta);
-		doctorChecklist.appendChild(row);
+		summary.appendChild(icon);
+		summary.appendChild(label);
+		summary.appendChild(meta);
+
+		const body = document.createElement('pre');
+		body.className = 'doctor-check-details';
+		const result = currentDoctorResults.find((r) => r.id === check.id);
+		const detailLines = [
+			`${t('Selector')}: ${check.selector}`,
+			`${t('Source')}: ${check.source}`,
+			`${t('Severity')}: ${check.severity}`,
+			`${t('Status')}: ${result?.status ?? t('Not checked')}`,
+			`${t('Count')}: ${result?.count ?? 0}`,
+		];
+		if (check.triggerHint) detailLines.push(`${t('Trigger')}: ${check.triggerHint}`);
+		if (result?.reason) detailLines.push(`${t('Reason')}: ${result.reason}`);
+		body.textContent = detailLines.join('\n');
+
+		row.appendChild(summary);
+		row.appendChild(body);
+		return row;
+	}
+
+	for (const check of mainChecks) {
+		doctorChecklist.appendChild(renderCheckRow(check));
+	}
+
+	if (transientChecks.length) {
+		const details = document.createElement('details');
+		details.className = 'doctor-transient-group';
+		details.open = true;
+
+		const summary = document.createElement('summary');
+		summary.textContent = t('Taskbot transient items');
+
+		const list = document.createElement('div');
+		list.className = 'doctor-transient-list';
+		for (const check of transientChecks) {
+			list.appendChild(renderCheckRow(check));
+		}
+
+		details.appendChild(summary);
+		details.appendChild(list);
+		doctorChecklist.appendChild(details);
 	}
 }
 
@@ -1056,7 +1128,7 @@ async function runDoctorViewScan(): Promise<void> {
 	runDoctorViewButton.disabled = true;
 	runDoctorViewButton.textContent = t('Scanning...');
 
-	const checks = getChecksForGroup(currentDoctorView);
+	const checks = getHealthChecksForView(currentDoctorView);
 	const results: StyleDoctorCheckResult[] = [];
 
 	for (const check of checks) {
@@ -1083,10 +1155,15 @@ async function runDoctorViewScan(): Promise<void> {
 	allResults[currentDoctorView] = results;
 	await styleDoctorLastResults.setValue(allResults);
 
+	const pass = results.filter((r) => r.status === 'pass').length;
+	const fail = results.filter((r) => r.status === 'fail').length;
+	const warn = results.filter((r) => r.status === 'warn').length;
+	const skip = results.filter((r) => r.status === 'skip').length;
+
 	await addFeedback(
-		results.some((r) => r.status === 'fail') ? 'warn' : 'info',
-		'doctor',
-		`Doctor ${currentDoctorView}: ${results.filter((r) => r.status === 'pass').length} pass, ${results.filter((r) => r.status === 'fail').length} fail, ${results.filter((r) => r.status === 'warn').length} warn, ${results.filter((r) => r.status === 'skip').length} skip.`,
+		fail > 0 ? 'warn' : 'info',
+		'health',
+		`Health ${currentDoctorView}: ${pass} pass, ${fail} fail, ${warn} warn, ${skip} skip.`,
 		{
 			view: currentDoctorView,
 			results: results.map((r) => ({ id: r.id, status: r.status, severity: r.severity })),
@@ -1096,9 +1173,8 @@ async function runDoctorViewScan(): Promise<void> {
 	await refreshFeedbackHistory();
 
 	runDoctorViewButton.disabled = false;
-	runDoctorViewButton.textContent = t('Run Doctor');
+	runDoctorViewButton.textContent = t('Run Checks');
 	doctorRunning = false;
-	updateAddCurrentBuildButton();
 }
 
 function updateShortcutLabel(shortcut: CommandPaletteShortcut): void {
@@ -1168,9 +1244,8 @@ async function handleSidepanelRequest(
 	if (request.tab === 'settings') void refreshAboutHelp();
 	if (request.tab === 'doctor') {
 		renderDoctorChecklist();
-		void renderSupportedBuilds();
-		debugLogSection.hidden = debugLogCollapsed;
-		debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
+		renderSupportedBuilds();
+		setHealthSection(activeHealthSection);
 	}
 	if (request.focus === 'actionJson') focusActionJsonTextarea();
 
@@ -1560,7 +1635,7 @@ async function loadState(): Promise<void> {
 	await refreshControlRoomCompatibility();
 	await refreshSlotStates();
 	await refreshFeedbackHistory();
-	await renderSupportedBuilds();
+	renderSupportedBuilds();
 	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
 	previousDoctorResults = savedDoctorResults[currentDoctorView] ?? null;
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
@@ -1582,12 +1657,11 @@ document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 		setActiveTab(tab);
 		if (tab === 'settings') void refreshAboutHelp();
 		if (tab === 'userstyle') void refreshControlRoomCompatibility();
-		if (tab === 'doctor') {
-			renderDoctorChecklist();
-			void renderSupportedBuilds();
-			debugLogSection.hidden = debugLogCollapsed;
-			debugLogSection.setAttribute('aria-hidden', String(debugLogCollapsed));
-		}
+	if (tab === 'doctor') {
+		renderDoctorChecklist();
+		renderSupportedBuilds();
+		setHealthSection(activeHealthSection);
+	}
 	});
 });
 
@@ -1712,80 +1786,61 @@ runDoctorViewButton.addEventListener('click', () => {
 });
 
 const supportedBuildsList = document.querySelector<HTMLElement>('#supportedBuildsList')!;
-const addCurrentBuildButton = document.querySelector<HTMLButtonElement>('#addCurrentBuild')!;
+const buildCandidate = document.querySelector<HTMLElement>('#buildCandidate')!;
+const buildCandidateMessage = document.querySelector<HTMLElement>('#buildCandidateMessage')!;
+const buildCandidateSnippet = document.querySelector<HTMLElement>('#buildCandidateSnippet')!;
+const copyBuildCandidateButton = document.querySelector<HTMLButtonElement>('#copyBuildCandidate')!;
 
-async function renderSupportedBuilds(): Promise<void> {
-	const builds = (await localSupportedBuilds.getValue()) ?? [];
+function renderSupportedBuilds(): void {
 	supportedBuildsList.textContent = '';
-	if (!builds.length) {
-		const empty = document.createElement('p');
-		empty.className = 'feedback-empty';
-		empty.textContent = t('No local supported builds added.');
-		supportedBuildsList.appendChild(empty);
-	} else {
-		for (const build of builds) {
-			const row = document.createElement('div');
-			row.className = 'supported-build-row';
-			const label = document.createElement('span');
-			label.textContent = `${build.versionNumber} ${build.versionRelease} build ${build.buildNumber}`;
-			const removeBtn = document.createElement('button');
-			removeBtn.type = 'button';
-			removeBtn.textContent = t('Remove');
-			removeBtn.addEventListener('click', async () => {
-				const current = (await localSupportedBuilds.getValue()) ?? [];
-				await localSupportedBuilds.setValue(
-					current.filter(
-						(b) =>
-							b.versionNumber !== build.versionNumber ||
-							b.versionRelease !== build.versionRelease ||
-							b.buildNumber !== build.buildNumber
-					)
-				);
-				await renderSupportedBuilds();
-				setStatus(t('Supported build removed.'), 'info', 'doctor');
-			});
-			row.appendChild(label);
-			row.appendChild(removeBtn);
-			supportedBuildsList.appendChild(row);
+	for (const build of SUPPORTED_CONTROL_ROOM_TARGETS) {
+		const row = document.createElement('div');
+		row.className = 'supported-build-row';
+		const isCurrent =
+			currentControlRoomCompatibility?.supported &&
+			currentControlRoomCompatibility.target.versionNumber === build.versionNumber &&
+			currentControlRoomCompatibility.target.versionRelease === build.versionRelease;
+		row.classList.toggle('is-current-match', Boolean(isCurrent));
+		const label = document.createElement('span');
+		label.textContent = `${build.versionNumber} ${build.versionRelease} build ${build.buildNumber} product ${build.productVersion}`;
+		row.appendChild(label);
+		if (isCurrent) {
+			const marker = document.createElement('span');
+			marker.className = 'supported-build-marker';
+			marker.textContent = t('current');
+			row.appendChild(marker);
 		}
+		supportedBuildsList.appendChild(row);
 	}
+	updateBuildCandidate();
 }
 
-function updateAddCurrentBuildButton(): void {
-	const allPassed =
-		currentDoctorResults.length > 0 &&
-		currentDoctorResults.every((r) => r.status === 'pass' || r.status === 'skip');
-	addCurrentBuildButton.hidden = !(
-		currentDebugEnabled &&
-		activeTab === 'doctor' &&
-		allPassed &&
-		currentControlRoomCompatibility?.current
-	);
+function updateBuildCandidate(): void {
+	const compat = currentControlRoomCompatibility;
+	if (!compat?.current || compat.state === 'unknown') {
+		buildCandidate.hidden = true;
+		return;
+	}
+	const showCandidate = !compat.supported || compat.buildMismatch;
+	buildCandidate.hidden = !showCandidate;
+	if (!showCandidate) return;
+
+	buildCandidateMessage.textContent = !compat.supported
+		? t('Unsupported Control Room detected. Review before adding to source.')
+		: t('Validated build differs. Review before updating source.');
+	const current = compat.current;
+	const snippet = `{\n  versionNumber: '${String(current.versionNumber ?? '')}',\n  versionRelease: '${String(current.versionRelease ?? '')}',\n  buildNumber: '${String(current.buildNumber ?? '')}',\n  productVersion: '${String(current.productVersion ?? SUPPORTED_CONTROL_ROOM_TARGET.productVersion)}',\n}`;
+	buildCandidateSnippet.textContent = snippet;
 }
 
-addCurrentBuildButton.addEventListener('click', async () => {
-	if (!currentControlRoomCompatibility?.current) return;
-	const current = currentControlRoomCompatibility.current;
-	const newTarget: SupportedControlRoomTarget = {
-		versionNumber: String(current.versionNumber ?? ''),
-		versionRelease: String(current.versionRelease ?? ''),
-		buildNumber: String(current.buildNumber ?? ''),
-		productVersion: String(current.productVersion ?? SUPPORTED_CONTROL_ROOM_TARGET.productVersion),
-	};
-	const builds = (await localSupportedBuilds.getValue()) ?? [];
-	const exists = builds.some(
-		(b) =>
-			b.versionNumber === newTarget.versionNumber &&
-			b.versionRelease === newTarget.versionRelease &&
-			b.buildNumber === newTarget.buildNumber
-	);
-	if (!exists) {
-		await localSupportedBuilds.setValue([...builds, newTarget]);
-		await renderSupportedBuilds();
-		setStatus(t('Build added to supported list.'), 'info', 'doctor');
-	} else {
-		setStatus(t('Build already in supported list.'), 'warn', 'doctor');
-	}
+copyBuildCandidateButton.addEventListener('click', () => {
+	const snippet = buildCandidateSnippet.textContent;
+	if (!snippet) return;
+	void navigator.clipboard.writeText(snippet).then(() => {
+		setStatus(t('Candidate copied to clipboard.'), 'info', 'health');
+	}).catch(() => {
+		setStatus(t('Copy failed.'), 'error', 'health');
+	});
 });
 
 extensionLanguageSelect.addEventListener('change', () => {
@@ -2096,11 +2151,6 @@ clearFeedbackButton.addEventListener('click', () => {
 		await refreshFeedbackHistory();
 		showStatusMessage(t('Debug log cleared.'), 'info');
 	});
-});
-
-toggleDebugLogButton.addEventListener('click', () => {
-	debugLogCollapsed = !debugLogCollapsed;
-	void refreshFeedbackHistory();
 });
 
 copyFeedbackButton.addEventListener('click', () => {

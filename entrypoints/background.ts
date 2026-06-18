@@ -41,7 +41,6 @@ import {
 	getOpenSidebarShortcutLabel,
 	getStylesEnabled,
 	keepAliveEnabled,
-	localSupportedBuilds,
 	normalizeBotExecutionModalPosition,
 	normalizeCommandPaletteShortcut,
 	normalizeExtensionLanguage,
@@ -180,11 +179,8 @@ async function getControlRoomCompatibility(
 		});
 
 		if (!response.ok) throw new Error(response.error);
-		const localOverrides = (await localSupportedBuilds.getValue()) ?? [];
 		const compatibility = evaluateControlRoomCompatibility(
-			response.data as ControlRoomVersionDetails,
-			undefined,
-			localOverrides
+			response.data as ControlRoomVersionDetails
 		);
 		setCachedControlRoomCompatibility(context.baseUrl, compatibility);
 		return { ok: true, compatibility };

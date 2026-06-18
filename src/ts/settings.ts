@@ -4,7 +4,7 @@ export type { LanguagePreference } from './i18n';
 
 export const STYLE_CLASS = 'better-aa-styles-enabled';
 export const RUN_BUTTON_CLASS = 'better-aa-run-button-enabled';
-export const EXTENSION_VERSION = '1.9.3';
+export const EXTENSION_VERSION = '1.10.3';
 
 export const COMMAND_PALETTE_SHORTCUTS = {
 	ALT_P: 'alt+p',
@@ -59,9 +59,6 @@ export const openSidebarShortcut = storage.defineItem<OpenSidebarShortcut>(
 );
 export const botExecutionModalPosition = storage.defineItem<BotExecutionModalPosition>(
 	'local:botExecutionModalPosition'
-);
-export const localSupportedBuilds = storage.defineItem<import('./control-room-version').SupportedControlRoomTarget[]>(
-	'local:localSupportedBuilds'
 );
 export const styleDoctorLastResults = storage.defineItem<Record<string, import('./style-doctor').StyleDoctorCheckResult[]>>(
 	'local:styleDoctorLastResults'

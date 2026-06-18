@@ -113,16 +113,7 @@ const ES: Record<string, string> = {
 		'Estilos en Control Room no soportado forzados.',
 	'Unsupported Control Room styles force disabled.':
 		'Forzado de estilos en Control Room no soportado desactivado.',
-	'Run Doctor': 'Ejecutar Doctor',
-	'Run selector Doctor and write report to Debug Log.':
-		'Ejecuta Doctor de selectores y escribe el reporte en el Log debug.',
-	'Doctor running...': 'Doctor ejecutandose...',
-	'Doctor failed.': 'Doctor fallo.',
-	'Doctor report added to Debug Log.':
-		'Reporte de Doctor agregado al Log debug.',
-	'Doctor {view}: {passed} pass, {failed} fail, {warnings} warn, {skipped} skip.':
-		'Doctor {view}: {passed} ok, {failed} fallo, {warnings} alerta, {skipped} omitido.',
-	'No Doctor findings.': 'Sin hallazgos de Doctor.',
+	'Run Checks': 'Ejecutar checks',
 	Pass: 'Ok',
 	Fail: 'Fallo',
 	Warn: 'Alerta',
@@ -204,18 +195,12 @@ const ES: Record<string, string> = {
 	'GitHub repository': 'Repositorio GitHub',
 	'Open project repository.': 'Abre el repositorio del proyecto.',
 	'Debug Mode': 'Modo debug',
-	'Debug Log': 'Log debug',
-	'Expand debug log': 'Expandir log debug',
-	'Collapse debug log': 'Contraer log debug',
-	'Show or hide recent debug entries.':
-		'Muestra u oculta entradas debug recientes.',
 	'Copy support log for troubleshooting.':
 		'Copia el log de soporte para diagnostico.',
 	'Clear local debug log entries.': 'Limpia entradas debug locales.',
 	'Debug Mode stores local support logs. Nothing is sent automatically.':
 		'Modo debug guarda logs de soporte locales. Nada se envia automaticamente.',
 	'No debug log.': 'No hay log debug.',
-	'DETAILS IN COPY': 'DETALLES EN COPIA',
 	'Debug log cleared.': 'Log debug limpiado.',
 	'Debug log copied for AI.': 'Log debug copiado para IA.',
 	'Debug log copy failed.': 'Copia de log debug fallo.',
@@ -606,6 +591,28 @@ const ES: Record<string, string> = {
 	'No actions recorded.': 'No hay acciones registradas.',
 	'Folder refresh queued.': 'Actualizacion de carpeta en cola.',
 	'Refresh button not found.': 'Boton de actualizar no encontrado.',
+	UI: 'UI',
+	Health: 'Salud',
+	'Health sections': 'Secciones de salud',
+	'Health check view selector': 'Selector de vista de salud',
+	'Debug Logs': 'Logs debug',
+	'Scanning...': 'Escaneando...',
+	'Taskbot transient items': 'Items transitorios de Taskbot',
+	Selector: 'Selector',
+	Source: 'Fuente',
+	Severity: 'Severidad',
+	Status: 'Estado',
+	'Not checked': 'Sin revisar',
+	Count: 'Cantidad',
+	Trigger: 'Disparador',
+	Reason: 'Razon',
+	current: 'actual',
+	'Unsupported Control Room detected. Review before adding to source.':
+		'Control Room no soportado detectado. Revisa antes de agregar al codigo fuente.',
+	'Validated build differs. Review before updating source.':
+		'Build validado difiere. Revisa antes de actualizar el codigo fuente.',
+	'Candidate copied to clipboard.': 'Candidato copiado al portapapeles.',
+	'Copy candidate': 'Copiar candidato',
 };
 
 let activeLocale: AppLocale = detectBrowserLocale();
