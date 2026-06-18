@@ -44,31 +44,3 @@ cursiveCascadiaFont()
 	font-family: Cascadia Code monospace !important
 	font-feature-settings: 'ss01' !important
 	font-style: italic
-
-
-// Run button animations
-// Define shaking animation without scaling
-@keyframes shakeSideToSide
-	shakeSize = 2px
-	10%,
-	30%,
-	50%,
-	70%,
-	90%
-		transform: translateX(- shakeSize)
-
-	20%,
-	40%,
-	60%,
-	80%
-		transform: translateX(shakeSize)
-
-@keyframes pulse
-	0%
-		transform: scale(1)
-
-	50%
-		transform: scale(1.15)
-
-	100%
-		transform: scale(1)

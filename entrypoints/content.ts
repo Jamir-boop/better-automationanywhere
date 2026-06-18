@@ -79,6 +79,7 @@ import {
 	styleValueItems,
 	stylesEnabled,
 } from '../src/ts/settings';
+import { setRunButtonAnimationEnabled } from '../src/ts/run-button-animation';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
 import { updateCommandPaletteLanguage } from '../src/ts/palette';
@@ -206,6 +207,7 @@ async function applyStyleClasses(): Promise<void> {
 			styleFeatures[feature.key]
 		);
 	}
+	setRunButtonAnimationEnabled(effectiveEnabled && styleFeatures.runButton);
 	setCustomPaletteButtonsEnabled(
 		effectiveEnabled && styleFeatures.customPaletteButtons
 	);
@@ -412,6 +414,7 @@ async function handleRuntimeMessage(
 		}
 		if (message.type === 'SET_RUN_BUTTON_STYLE') {
 			document.documentElement.classList.toggle(RUN_BUTTON_CLASS, message.enabled);
+			setRunButtonAnimationEnabled(message.enabled);
 			return;
 		}
 		if (message.type === 'SET_SOUNDS_ENABLED') {

@@ -244,7 +244,7 @@ export const CHECKS: StyleDoctorCheck[] = [
 		group: 'taskbot-editor',
 		label: 'Run button',
 		selector: 'button[aria-label="Run"][name="run"], button[name="run"]',
-		source: 'src/styl/editorRunButton.styl',
+		source: 'src/ts/run-button-animation.ts',
 		severity: 'optional',
 	},
 	{
