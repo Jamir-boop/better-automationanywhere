@@ -1,5 +1,4 @@
 import './style.styl';
-import { getHelpTipId, initializeHelpTooltips, renderHelpTip } from './help';
 import {
 	initializeJsonWorkbench,
 	renderJsonWorkbenchActionButtons,
@@ -183,12 +182,6 @@ const STYLE_FEATURE_GROUPS = [
 	title: string;
 	keys: readonly StyleFeatureKey[];
 }>;
-const STYLE_FEATURE_HELP_TIPS: Partial<Record<StyleFeatureKey, string>> = {
-	minimizeBotModal:
-		'Adds Minimize and Maximize buttons to the running bot window. Minimized mode keeps the page behind it clickable.',
-	makeSidebarScrollable:
-		'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
-};
 let currentControlRoomCompatibility: ControlRoomCompatibilityStatus | null = null;
 let controlRoomCompatibilityRequestId = 0;
 
@@ -204,14 +197,8 @@ function renderClipboardSlotRow(slot: number): string {
 		<div class="slot-row is-empty" data-slot-row="${slot}" role="button" tabindex="0" aria-label="${t('Load {label}', { label })}">
 			<span class="slot-label">${label}</span>
 			<span class="slot-state" data-slot-state="${slot}">${t('Empty')}</span>
-			<span class="help-wrapper">
-				<button class="help-anchor" type="button" data-copy-slot="${slot}" aria-describedby="${getHelpTipId(`slot-${slot}-copy`)}">${t('Copy')}</button>
-				${renderHelpTip(`slot-${slot}-copy`, t('Save current AA clipboard to this slot.'))}
-			</span>
-			<span class="help-wrapper">
-				<button class="help-anchor" type="button" data-paste-slot="${slot}" aria-describedby="${getHelpTipId(`slot-${slot}-paste`)}">${t('Paste')}</button>
-				${renderHelpTip(`slot-${slot}-paste`, t('Paste this slot through AA shared paste.'))}
-			</span>
+			<button type="button" data-copy-slot="${slot}" title="${t('Save current AA clipboard to this slot.')}">${t('Copy')}</button>
+			<button type="button" data-paste-slot="${slot}" title="${t('Paste this slot through AA shared paste.')}">${t('Paste')}</button>
 		</div>
 	`;
 }
@@ -299,7 +286,7 @@ function renderUniversalClipboardSection(): string {
 		${renderJsonWorkbenchSearchTools('actionJson')}
 		<div class="json-field">
 			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="${t('Universal copy loads selected action JSON here. Paste JSON here to import.')}"></textarea>
-			<button id="clearJson" class="clear-json-button help-anchor" type="button" aria-label="${t('Clear JSON')}" aria-describedby="${getHelpTipId('clear-json')}" hidden>
+			<button id="clearJson" class="clear-json-button" type="button" aria-label="${t('Clear JSON')}" title="${t('Clear JSON')}" hidden>
 				<svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="M3 6h18"></path>
 					<path d="M8 6V4h8v2"></path>
@@ -308,31 +295,24 @@ function renderUniversalClipboardSection(): string {
 					<path d="M14 11v6"></path>
 				</svg>
 			</button>
-			${renderHelpTip('clear-json', t('Clear the Action JSON field.'))}
 		</div>
 		<p id="actionJsonError" class="json-inline-error" hidden></p>
 		<div id="actionPackageList" class="action-package-list" hidden></div>
 		<div class="button-grid">
-			<span class="help-wrapper">
-				<button id="importJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('import-json')}">${t('Import JSON')}</button>
-				${renderHelpTip('import-json', t('Import textarea JSON into AA clipboard.'))}
-			</span>
+			<button id="importJson" type="button">${t('Import JSON')}</button>
 			${renderJsonWorkbenchActionButtons('actionJson')}
 		</div>
 	`;
 }
 
 function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): string {
-	const helpTip = STYLE_FEATURE_HELP_TIPS[feature.key];
-	const helpTipId = `style-feature-${feature.key}`;
 	return `
-		<label class="setting-row userstyle-dependent${helpTip ? ' help-anchor' : ''}"${helpTip ? ` aria-describedby="${getHelpTipId(helpTipId)}"` : ''}>
+		<label class="setting-row userstyle-dependent">
 			<span>
 				<strong>${t(feature.label)}</strong>
 				<small>${t(feature.description)}</small>
 			</span>
 			<input id="styleFeature-${feature.key}" type="checkbox">
-			${helpTip ? renderHelpTip(helpTipId, t(helpTip)) : ''}
 		</label>
 		${feature.key === 'minimizeBotModal' ? renderBotExecutionModalPositionControl() : ''}
 	`;
@@ -419,10 +399,7 @@ function renderStyleValueControl(field: (typeof STYLE_VALUE_FIELDS)[number]): st
 				<input id="styleValue-${field.key}" type="hidden">
 				<div class="upload-row">
 					<input id="backgroundUpload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif">
-					<span class="help-wrapper">
-						<button id="clearBackgroundUpload" class="help-anchor" type="button" aria-describedby="${getHelpTipId('loading-default')}">${t('Use default')}</button>
-						${renderHelpTip('loading-default', t('Use bundled loading animation image.'))}
-					</span>
+					<button id="clearBackgroundUpload" type="button">${t('Use default')}</button>
 				</div>
 				<div id="backgroundPreview" class="background-preview" aria-label="${t('Loading animation preview')}"></div>
 			</div>
@@ -510,10 +487,7 @@ app.innerHTML = `
 			<section class="panel-section">
 				<div class="section-heading-row">
 					<h2>${t('UI Improvements')}</h2>
-					<span class="help-wrapper">
-						<button id="restoreUserstyleDefaults" class="help-anchor" type="button" aria-describedby="${getHelpTipId('ui-restore-defaults')}" hidden>${t('Restore to Default')}</button>
-						${renderHelpTip('ui-restore-defaults', t('Reset all UI Improvements options.'))}
-					</span>
+					<button id="restoreUserstyleDefaults" type="button" hidden>${t('Restore to Default')}</button>
 				</div>
 				${renderControlRoomCompatibilitySection()}
 				<label class="setting-row">
@@ -534,10 +508,7 @@ app.innerHTML = `
 			<section class="panel-section">
 				<div class="section-heading-row">
 					<h2>${t('Background Customization')}</h2>
-					<span class="help-wrapper">
-						<button id="resetGradientColors" class="help-anchor" type="button" aria-describedby="${getHelpTipId('reset-gradient-colors')}">${t('Reset Colors')}</button>
-						${renderHelpTip('reset-gradient-colors', t('Restore background gradient defaults.'))}
-					</span>
+					<button id="resetGradientColors" type="button">${t('Reset Colors')}</button>
 				</div>
 				${renderBackgroundColorControls()}
 			</section>
@@ -552,14 +523,11 @@ app.innerHTML = `
 					<strong>${extensionVersion}</strong>
 				</div>
 				<div id="aboutHelp" class="help-content"></div>
-				<span class="help-wrapper">
-					<a class="github-link help-anchor" href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank" rel="noreferrer" aria-label="${t('GitHub repository')}" aria-describedby="${getHelpTipId('github-link')}">
-						<svg aria-hidden="true" viewBox="0 0 24 24">
-							<path d="M12 .5C5.65.5.75 5.65.75 12.02c0 5.1 3.29 9.42 7.86 10.94.58.1.79-.25.79-.56v-2.14c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18.92-.26 1.91-.38 2.9-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.56A11.54 11.54 0 0 0 23.25 12C23.25 5.65 18.35.5 12 .5Z"></path>
-						</svg>
-					</a>
-					${renderHelpTip('github-link', t('Open project repository.'))}
-				</span>
+				<a class="github-link" href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank" rel="noreferrer" aria-label="${t('GitHub repository')}" title="${t('GitHub repository')}">
+					<svg aria-hidden="true" viewBox="0 0 24 24">
+						<path d="M12 .5C5.65.5.75 5.65.75 12.02c0 5.1 3.29 9.42 7.86 10.94.58.1.79-.25.79-.56v-2.14c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18.92-.26 1.91-.38 2.9-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.56A11.54 11.54 0 0 0 23.25 12C23.25 5.65 18.35.5 12 .5Z"></path>
+					</svg>
+				</a>
 			</section>
 		</section>
 
@@ -579,7 +547,7 @@ app.innerHTML = `
 					</div>
 					<div id="doctorChecklist" class="doctor-checklist"></div>
 					<div class="doctor-actions">
-						<button id="runDoctorView" class="help-anchor" type="button">${t('Run Checks')}</button>
+						<button id="runDoctorView" type="button">${t('Run Checks')}</button>
 						<span id="doctorSummary" class="doctor-summary"></span>
 					</div>
 				</section>
@@ -592,7 +560,7 @@ app.innerHTML = `
 					<div id="buildCandidate" class="build-candidate" hidden>
 						<p id="buildCandidateMessage" class="inline-hint"></p>
 						<pre id="buildCandidateSnippet" class="build-candidate-snippet"></pre>
-						<button id="copyBuildCandidate" class="help-anchor" type="button">${t('Copy candidate')}</button>
+						<button id="copyBuildCandidate" type="button">${t('Copy candidate')}</button>
 					</div>
 				</section>
 			</div>
@@ -601,14 +569,8 @@ app.innerHTML = `
 				<div class="section-heading-row">
 					<h2>${t('Debug Logs')}</h2>
 					<span class="feedback-actions">
-						<span class="help-wrapper">
-							<button id="copyFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-copy')}">${t('Copy')}</button>
-							${renderHelpTip('debug-copy', t('Copy support log for troubleshooting.'))}
-						</span>
-						<span class="help-wrapper">
-							<button id="clearFeedback" class="help-anchor" type="button" aria-describedby="${getHelpTipId('debug-clear')}">${t('Clear')}</button>
-							${renderHelpTip('debug-clear', t('Clear local debug log entries.'))}
-						</span>
+						<button id="copyFeedback" type="button">${t('Copy')}</button>
+						<button id="clearFeedback" type="button">${t('Clear')}</button>
 					</span>
 				</div>
 				<p class="inline-hint">${t('Debug Mode stores local support logs. Nothing is sent automatically.')}</p>
@@ -618,8 +580,6 @@ app.innerHTML = `
 	</main>
 
 `;
-
-initializeHelpTooltips();
 
 const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;

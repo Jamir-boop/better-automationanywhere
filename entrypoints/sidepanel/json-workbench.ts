@@ -6,7 +6,6 @@ import {
 	replaceTextMatches,
 	type TextMatch,
 } from '@/src/ts/json-text';
-import { getHelpTipId, renderHelpTip } from './help';
 import {
 	clearAutomationAnywhereJsonDetails,
 	downloadJsonTextFile,
@@ -119,22 +118,10 @@ export function renderJsonWorkbenchActionButtons(
 	idPrefix: string,
 	labels: JsonWorkbenchActionLabels = {}
 ): string {
-	const copyHelpId = `${idPrefix}-copy-json`;
-	const formatHelpId = `${idPrefix}-format-json`;
-	const exportHelpId = `${idPrefix}-export-json`;
 	return `
-		<span class="help-wrapper">
-			<button id="${idPrefix}Copy" class="help-anchor" type="button" aria-describedby="${getHelpTipId(copyHelpId)}">${t(labels.copyLabel ?? 'Copy JSON')}</button>
-			${renderHelpTip(copyHelpId, t(labels.copyHelp ?? 'Copy textarea JSON to system clipboard.'))}
-		</span>
-		<span class="help-wrapper">
-			<button id="${idPrefix}Format" class="help-anchor" type="button" aria-describedby="${getHelpTipId(formatHelpId)}">${t(labels.formatLabel ?? 'Format')}</button>
-			${renderHelpTip(formatHelpId, t(labels.formatHelp ?? 'Format textarea JSON.'))}
-		</span>
-		<span class="help-wrapper">
-			<button id="${idPrefix}Export" class="help-anchor" type="button" aria-describedby="${getHelpTipId(exportHelpId)}">${t(labels.exportLabel ?? 'Export JSON')}</button>
-			${renderHelpTip(exportHelpId, t(labels.exportHelp ?? 'Download textarea JSON as a .json file.'))}
-		</span>
+		<button id="${idPrefix}Copy" type="button" title="${t(labels.copyHelp ?? 'Copy textarea JSON to system clipboard.')}">${t(labels.copyLabel ?? 'Copy JSON')}</button>
+		<button id="${idPrefix}Format" type="button" title="${t(labels.formatHelp ?? 'Format textarea JSON.')}">${t(labels.formatLabel ?? 'Format')}</button>
+		<button id="${idPrefix}Export" type="button" title="${t(labels.exportHelp ?? 'Download textarea JSON as a .json file.')}">${t(labels.exportLabel ?? 'Export JSON')}</button>
 	`;
 }
 

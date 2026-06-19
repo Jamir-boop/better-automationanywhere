@@ -235,64 +235,6 @@ main
 	line-height: 1.28
 	overflow-wrap: anywhere
 
-.help-wrapper
-	position: relative
-	display: inline-flex
-	min-width: 0
-
-.help-anchor
-	position: relative
-
-.help-tooltip
-	position: fixed
-	top: 0
-	left: 0
-	right: auto
-	z-index: 1200
-	width: max-content
-	max-width: 280px
-	padding: 7px 9px
-	color: var(--text)
-	background: var(--surface-0)
-	border: 1px solid var(--border-strong)
-	border-radius: 6px
-	box-shadow: 0 12px 30px rgba(0, 0, 0, .56)
-	font-size: .68rem
-	font-weight: 400
-	line-height: 1.32
-	text-align: left
-	text-transform: none
-	white-space: normal
-	overflow-wrap: anywhere
-	visibility: hidden
-	opacity: 0
-	pointer-events: none
-	transform: translateY(-3px)
-	transition: opacity .12s ease, transform .12s ease
-
-.help-tooltip[data-placement='top']
-	transform: translateY(3px)
-
-.help-tooltip.is-visible
-	visibility: visible
-	opacity: 1
-	transform: translateY(0)
-
-.button-grid .help-wrapper,
-.tool-action-grid .help-wrapper,
-.tools-action-bar .help-wrapper,
-.slot-row .help-wrapper,
-.upload-row .help-wrapper
-	display: flex
-	width: 100%
-
-.button-grid .help-wrapper > button,
-.tool-action-grid .help-wrapper > button,
-.tools-action-bar .help-wrapper > button,
-.slot-row .help-wrapper > button,
-.upload-row .help-wrapper > button
-	width: 100%
-
 .style-feature-group
 	display: flex
 	flex-direction: column
@@ -645,10 +587,6 @@ button
 	button
 		padding-right: 6px
 		padding-left: 6px
-
-	.help-tooltip
-		color: var(--text)
-		font-size: .68rem
 
 .slot-state
 	color: var(--text-muted) !important
@@ -1205,10 +1143,6 @@ button
 	&[hidden]
 		display: none
 
-	.help-wrapper
-		display: block
-		width: 100%
-
 .tools-export-format-label
 	color: var(--accent)
 	font-size: .74rem
@@ -1216,8 +1150,9 @@ button
 	text-transform: uppercase
 
 .tools-export-format-option
-	display: flex
-	align-items: center
+	display: grid
+	grid-template-columns: 16px minmax(0, 1fr)
+	align-items: start
 	gap: 8px
 	width: 100%
 	color: var(--text)
@@ -1228,6 +1163,9 @@ button
 		width: 16px
 		height: 16px
 		accent-color: var(--accent)
+
+	small
+		grid-column: 2
 
 	&.is-disabled
 		color: var(--text-muted)

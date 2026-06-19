@@ -2,7 +2,7 @@
   "name": "better-automationanywhere-dx",
   "description": "Better AA Developer Experience for Automation Anywhere",
   "private": true,
-  "version": "1.10.8",
+  "version": "1.10.9",
   "type": "module",
   "scripts": {
     "dev": "wxt",

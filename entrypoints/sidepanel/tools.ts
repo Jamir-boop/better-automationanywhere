@@ -18,7 +18,6 @@ import {
 	type AutomationAnywherePageContext,
 	type AutomationAnywherePackage,
 } from '@/src/ts/automation-anywhere-api';
-import { getHelpTipId, renderHelpTip, setHelpTip } from './help';
 import {
 	initializeJsonWorkbench,
 	renderJsonWorkbenchActionButtons,
@@ -177,7 +176,6 @@ let selectAllInput: HTMLInputElement;
 let selectedCountText: HTMLElement;
 let fileList: HTMLElement;
 let primaryActionButton: HTMLButtonElement;
-let primaryActionHelp: HTMLElement;
 let pasteActionButton: HTMLButtonElement;
 let pasteActionWrapper: HTMLElement;
 let loadMoreButton: HTMLButtonElement;
@@ -214,16 +212,10 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				<div class="section-heading-row">
 					<h2>${t('Tools')}</h2>
 					<span class="tools-refresh-group">
-						<span class="help-wrapper">
-							<span id="toolsAvailabilityDot" class="tools-availability-dot help-anchor" data-available="false" role="status" tabindex="0" aria-label="${t('Tools unavailable')}" aria-describedby="${getHelpTipId('tools-availability')}"></span>
-							${renderHelpTip('tools-availability', t('Green = tools available. Red = no tools here.'))}
-						</span>
-						<span class="help-wrapper">
-							<button id="toolsRefresh" class="icon-button tools-refresh-button help-anchor" type="button" aria-label="${t('Refresh tools')}" aria-describedby="${getHelpTipId('tools-refresh')}" data-has-tools="false">
-								<span aria-hidden="true">&#8635;</span>
-							</button>
-							${renderHelpTip('tools-refresh', t('Detect tools for current AA page.'))}
-						</span>
+						<span id="toolsAvailabilityDot" class="tools-availability-dot" data-available="false" role="status" tabindex="0" aria-label="${t('Tools unavailable')}" title="${t('Green = tools available. Red = no tools here.')}"></span>
+						<button id="toolsRefresh" class="icon-button tools-refresh-button" type="button" aria-label="${t('Refresh tools')}" title="${t('Refresh tools')}" data-has-tools="false">
+							<span aria-hidden="true">&#8635;</span>
+						</button>
 					</span>
 				</div>
 				<p id="toolsContext" class="tools-context">${t('Open Automation Anywhere folder, taskbot, or packages page.')}</p>
@@ -253,38 +245,27 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				<p id="toolsActionHint" class="inline-hint" hidden></p>
 				<div id="toolsExportFormat" class="tools-export-format" role="radiogroup" aria-labelledby="toolsExportFormatLabel" hidden>
 					<span id="toolsExportFormatLabel" class="tools-export-format-label">${t('Export format')}</span>
-					<span class="help-wrapper">
-						<label class="tools-export-format-option">
-							<input id="toolsExportFormatZip" type="radio" name="toolsExportFormat" value="zip" aria-describedby="${getHelpTipId('tools-export-format-zip')}">
-							<span>${t('ZIP (single archive)')}</span>
-						</label>
-						${renderHelpTip('tools-export-format-zip', t('Includes taskbot dependencies and uploaded files; produces one .zip file.'))}
-					</span>
-					<span class="help-wrapper">
-						<label class="tools-export-format-option">
-							<input id="toolsExportFormatSeparate" type="radio" name="toolsExportFormat" value="separate" aria-describedby="${getHelpTipId('tools-export-format-separate')}">
-							<span>${t('Separate files')}</span>
-						</label>
-						${renderHelpTip('tools-export-format-separate', t('Downloads each selected file individually.'))}
-					</span>
+					<label class="tools-export-format-option">
+						<input id="toolsExportFormatZip" type="radio" name="toolsExportFormat" value="zip" aria-describedby="toolsExportFormatZipHint">
+						<span>${t('ZIP (single archive)')}</span>
+						<small id="toolsExportFormatZipHint" class="inline-hint">${t('Includes taskbot dependencies and uploaded files; produces one .zip file.')}</small>
+					</label>
+					<label class="tools-export-format-option">
+						<input id="toolsExportFormatSeparate" type="radio" name="toolsExportFormat" value="separate" aria-describedby="toolsExportFormatSeparateHint">
+						<span>${t('Separate files')}</span>
+						<small id="toolsExportFormatSeparateHint" class="inline-hint">${t('Downloads each selected file individually.')}</small>
+					</label>
 				</div>
 				<div class="tools-action-bar">
-					<span class="help-wrapper">
-						<button id="toolsPrimaryAction" class="help-anchor" type="button" disabled aria-describedby="${getHelpTipId('tools-primary-action')}">${t('Run')}</button>
-						<span id="${getHelpTipId('tools-primary-action')}" class="help-tooltip" role="tooltip">${t('Run selected tool action.')}</span>
-					</span>
-					<span class="help-wrapper" id="toolsPasteActionWrapper">
-						<button id="toolsPasteAction" class="help-anchor" type="button" hidden aria-describedby="${getHelpTipId('tools-paste-action')}">${t('Paste copied files')}</button>
-						${renderHelpTip('tools-paste-action', t('Paste into this folder. Duplicates are skipped.'))}
+					<button id="toolsPrimaryAction" type="button" disabled title="${t('Run selected tool action.')}">${t('Run')}</button>
+					<span id="toolsPasteActionWrapper">
+						<button id="toolsPasteAction" type="button" hidden title="${t('Paste into this folder. Duplicates are skipped.')}">${t('Paste copied files')}</button>
 					</span>
 				</div>
 				<div id="toolsExportPackageInfo" class="tools-export-package-info" hidden>
 					<div class="tools-export-package-header">
 						<strong class="package-list-label">${t('Packages used:')}</strong>
-						<span class="help-wrapper">
-							<button id="toolsCopyPackageList" class="help-anchor" type="button" aria-describedby="${getHelpTipId('tools-copy-package-list')}">${t('Copy')}</button>
-							${renderHelpTip('tools-copy-package-list', t('Copy package list to clipboard.'))}
-						</span>
+						<button id="toolsCopyPackageList" type="button" title="${t('Copy package list to clipboard.')}">${t('Copy')}</button>
 					</div>
 					<div id="toolsPackageListContent" class="package-list-content"></div>
 				</div>
@@ -326,10 +307,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 							exportLabel: 'Export JSON',
 							exportHelp: 'Download textarea JSON as a .json file.',
 						})}
-						<span class="help-wrapper">
-							<button id="taskbotSaveJson" class="help-anchor" type="button" aria-describedby="${getHelpTipId('taskbot-save-json')}">${t('Save JSON')}</button>
-							${renderHelpTip('taskbot-save-json', t('Save edited JSON back to Control Room.'))}
-						</span>
+						<button id="taskbotSaveJson" type="button">${t('Save JSON')}</button>
 					</div>
 				</div>
 			</section>
@@ -353,7 +331,6 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	selectedCountText = getRequiredElement('#toolsSelectedCount');
 	fileList = getRequiredElement('#toolsFileList');
 	primaryActionButton = getRequiredElement<HTMLButtonElement>('#toolsPrimaryAction');
-	primaryActionHelp = getRequiredElement(`#${getHelpTipId('tools-primary-action')}`);
 	pasteActionButton = getRequiredElement<HTMLButtonElement>('#toolsPasteAction');
 	pasteActionWrapper = getRequiredElement('#toolsPasteActionWrapper');
 	loadMoreButton = getRequiredElement<HTMLButtonElement>('#toolsLoadMore');
@@ -910,19 +887,16 @@ function renderActionButtons(): void {
 	if (!context) return;
 
 	for (const tool of getAvailableTools(context)) {
-		const wrapper = document.createElement('span');
-		wrapper.className = 'help-wrapper';
 		const button = document.createElement('button');
 		button.type = 'button';
 		button.textContent = getToolLabel(tool);
 		button.dataset.toolAction = tool;
 		button.className = tool === currentTool ? 'is-active tool-action-button' : 'tool-action-button';
-		const helpTip = setHelpTip(button, `tool-action-${tool}`, getToolActionHelp(tool));
+		button.title = getToolActionHelp(tool);
 		button.addEventListener('click', () => {
 			void selectTool(tool);
 		});
-		wrapper.append(button, helpTip);
-		actionsContainer.appendChild(wrapper);
+		actionsContainer.appendChild(button);
 	}
 }
 
@@ -1233,7 +1207,7 @@ function updateActionBar(): void {
 	if (currentTool === 'download-packages') {
 		primaryActionButton.textContent = t('Download {count} package(s)', { count });
 	}
-	primaryActionHelp.textContent = getPrimaryActionHelp(currentTool);
+	primaryActionButton.title = getPrimaryActionHelp(currentTool);
 
 	const hint = getToolInlineHint(currentTool);
 	toolsActionHint.textContent = hint;
