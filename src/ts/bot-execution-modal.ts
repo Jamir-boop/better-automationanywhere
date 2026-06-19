@@ -15,6 +15,7 @@ const MESSAGE_TITLE_CONTAINER_SELECTOR = '.message__title-container';
 const RUNNING_INDICATOR_SELECTOR = '.devicechannelmodal, .rio-spinner--variant_WORKING';
 const BACKDROP_SELECTOR = '.modal-backdrop';
 const CONTROL_ATTR = 'data-better-aa-bot-modal-control';
+const CONTROL_HOST_ATTR = 'data-better-aa-bot-modal-control-host';
 const WIRED_ATTR = 'data-better-aa-bot-modal-wired';
 const DIALOG_CLASS = 'better-aa-bot-modal-dialog';
 const MODAL_CLASS = 'better-aa-bot-modal';
@@ -43,8 +44,8 @@ let position: BotExecutionModalPosition = DEFAULT_BOT_EXECUTION_MODAL_POSITION;
 const recordsByDialog = new WeakMap<HTMLElement, BotModalRecord>();
 const activeRecords = new Set<BotModalRecord>();
 
-function getBackdrop(dialog: HTMLElement): HTMLElement | null {
-	const previousSibling = dialog.previousElementSibling;
+function findBackdropNear(element: HTMLElement): HTMLElement | null {
+	const previousSibling = element.previousElementSibling;
 	if (
 		previousSibling instanceof HTMLElement &&
 		previousSibling.matches(BACKDROP_SELECTOR)
@@ -52,25 +53,25 @@ function getBackdrop(dialog: HTMLElement): HTMLElement | null {
 		return previousSibling;
 	}
 
-	const nextSibling = dialog.nextElementSibling;
+	const nextSibling = element.nextElementSibling;
 	if (nextSibling instanceof HTMLElement && nextSibling.matches(BACKDROP_SELECTOR)) {
 		return nextSibling;
 	}
 
-	const parent = dialog.parentElement;
+	const parent = element.parentElement;
 	if (!parent) return null;
 	const children = Array.from(parent.children);
-	const dialogIndex = children.indexOf(dialog);
-	if (dialogIndex < 0) return null;
+	const elementIndex = children.indexOf(element);
+	if (elementIndex < 0) return null;
 
-	for (let index = dialogIndex - 1; index >= 0; index -= 1) {
+	for (let index = elementIndex - 1; index >= 0; index -= 1) {
 		const child = children[index];
 		if (child instanceof HTMLElement && child.matches(BACKDROP_SELECTOR)) {
 			return child;
 		}
 	}
 
-	for (const child of children.slice(dialogIndex + 1)) {
+	for (const child of children.slice(elementIndex + 1)) {
 		if (child instanceof HTMLElement && child.matches(BACKDROP_SELECTOR)) {
 			return child;
 		}
@@ -79,12 +80,15 @@ function getBackdrop(dialog: HTMLElement): HTMLElement | null {
 }
 
 function getDialog(modal: HTMLElement): HTMLElement | null {
-	const dialog = modal.closest<HTMLElement>(DIALOG_SELECTOR);
-	return dialog instanceof HTMLElement ? dialog : null;
+	return (
+		modal.closest<HTMLElement>(DIALOG_SELECTOR) ??
+		modal.querySelector<HTMLElement>(DIALOG_SELECTOR)
+	);
 }
 
 function getControlHost(modal: HTMLElement): HTMLElement | null {
 	return (
+		modal.querySelector<HTMLElement>('.message__header') ??
 		modal.querySelector<HTMLElement>(MESSAGE_TITLE_CONTAINER_SELECTOR) ??
 		modal.querySelector<HTMLElement>(ALERT_CONTROLS_SELECTOR) ??
 		modal.querySelector<HTMLElement>(MESSAGE_CONTROLS_SELECTOR)
@@ -159,6 +163,11 @@ function ensureControls(record: BotModalRecord): void {
 	const host = getControlHost(record.modal);
 	if (!host) return;
 
+	host.setAttribute(CONTROL_HOST_ATTR, 'true');
+	record.modal
+		.querySelectorAll<HTMLElement>(`[${CONTROL_HOST_ATTR}]:not([data-better-aa-bot-modal-control-host="true"])`)
+		.forEach((el) => el.removeAttribute(CONTROL_HOST_ATTR));
+
 	let minimizeControl = record.modal.querySelector<HTMLElement>(
 		`[${CONTROL_ATTR}="minimize"]`
 	);
@@ -167,7 +176,7 @@ function ensureControls(record: BotModalRecord): void {
 	} else {
 		wireControl(minimizeControl);
 	}
-	host.append(minimizeControl);
+	if (minimizeControl.parentElement !== host) host.append(minimizeControl);
 
 	let maximizeControl = record.modal.querySelector<HTMLElement>(
 		`[${CONTROL_ATTR}="maximize"]`
@@ -177,7 +186,7 @@ function ensureControls(record: BotModalRecord): void {
 	} else {
 		wireControl(maximizeControl);
 	}
-	host.append(maximizeControl);
+	if (maximizeControl.parentElement !== host) host.append(maximizeControl);
 
 	minimizeControl.hidden = record.minimized;
 	maximizeControl.hidden = !record.minimized;
@@ -186,7 +195,7 @@ function ensureControls(record: BotModalRecord): void {
 function getOrCreateRecord(modal: HTMLElement): BotModalRecord | null {
 	const dialog = getDialog(modal);
 	if (!dialog) return null;
-	const backdrop = getBackdrop(dialog);
+	const backdrop = findBackdropNear(dialog) ?? findBackdropNear(modal);
 	if (!backdrop) return null;
 
 	const existingRecord = recordsByDialog.get(dialog);
@@ -249,6 +258,9 @@ function restoreRecord(record: BotModalRecord): void {
 	record.modal
 		.querySelectorAll<HTMLElement>(`[${CONTROL_ATTR}]`)
 		.forEach((control) => control.remove());
+	record.modal
+		.querySelectorAll<HTMLElement>(`[${CONTROL_HOST_ATTR}]`)
+		.forEach((el) => el.removeAttribute(CONTROL_HOST_ATTR));
 	record.dialog.classList.remove(DIALOG_CLASS, MINIMIZED_CLASS);
 	record.modal.classList.remove(MODAL_CLASS, MINIMIZED_CLASS);
 	record.backdrop.classList.remove(BACKDROP_CLASS, BACKDROP_MINIMIZED_CLASS);
@@ -266,7 +278,6 @@ function syncBotExecutionModals(): void {
 		const record = getOrCreateRecord(modal);
 		if (!record) continue;
 		currentDialogs.add(record.dialog);
-		ensureControls(record);
 		setMinimized(record, record.minimized);
 	}
 
@@ -294,7 +305,7 @@ function observeBotExecutionModals(): void {
 		childList: true,
 		subtree: true,
 		attributes: true,
-		attributeFilter: ['class', 'data-modal-id', 'aria-modal'],
+		attributeFilter: ['data-modal-id', 'aria-modal'],
 	});
 }
 
