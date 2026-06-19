@@ -29,13 +29,13 @@ export const SUPPORTED_CONTROL_ROOM_TARGETS: SupportedControlRoomTarget[] = [
 	{
 		versionNumber: '20.1.0.0',
 		versionRelease: 'LTS',
-		buildNumber: '45946', //prot
+		buildNumber: '45946', //latam
 		productVersion: '40.0.0',
 	},
 	{
 	  versionNumber: '20.1.0.0',
 	  versionRelease: 'LTS',
-	  buildNumber: '45983', //latam
+	  buildNumber: '45983', //prot
 	  productVersion: '40.0.0',
 	},
 ];
@@ -61,7 +61,7 @@ export function formatControlRoomVersion(details?: ControlRoomVersionDetails): s
 	return build ? `${target} build ${build}` : target;
 }
 
-function matchesTarget(
+function matchesVersionTarget(
 	current: ControlRoomVersionDetails,
 	target: SupportedControlRoomTarget
 ): boolean {
@@ -85,17 +85,18 @@ export function evaluateControlRoomCompatibility(
 		};
 	}
 
-	const matchedTarget = SUPPORTED_CONTROL_ROOM_TARGETS.find((target) => matchesTarget(current, target));
-	const supported = Boolean(matchedTarget);
-	const target = matchedTarget ?? SUPPORTED_CONTROL_ROOM_TARGET;
+	const normalizedCurrentBuild = normalizeVersionPart(current.buildNumber);
+	const exactTarget = SUPPORTED_CONTROL_ROOM_TARGETS.find(
+		(target) => matchesVersionTarget(current, target) && normalizedCurrentBuild === target.buildNumber
+	);
+	const versionTarget = SUPPORTED_CONTROL_ROOM_TARGETS.find((target) => matchesVersionTarget(current, target));
+	const supported = Boolean(versionTarget);
+	const target = exactTarget ?? versionTarget ?? SUPPORTED_CONTROL_ROOM_TARGET;
 
 	return {
 		state: supported ? 'supported' : 'unsupported',
 		supported,
-		buildMismatch:
-			supported &&
-			Boolean(normalizeVersionPart(current.buildNumber)) &&
-			normalizeVersionPart(current.buildNumber) !== target.buildNumber,
+		buildMismatch: Boolean(versionTarget && normalizedCurrentBuild && !exactTarget),
 		target,
 		current,
 		message,

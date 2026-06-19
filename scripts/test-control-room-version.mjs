@@ -9,6 +9,18 @@ const target = mod.SUPPORTED_CONTROL_ROOM_TARGET;
 assert(mod.SUPPORTED_CONTROL_ROOM_TARGETS.length >= 1, 'targets has entries');
 assert.strictEqual(mod.SUPPORTED_CONTROL_ROOM_TARGET, mod.SUPPORTED_CONTROL_ROOM_TARGETS[0], 'alias is first');
 
+for (const supportedTarget of mod.SUPPORTED_CONTROL_ROOM_TARGETS) {
+	const exact = mod.evaluateControlRoomCompatibility({
+		versionNumber: supportedTarget.versionNumber,
+		versionRelease: supportedTarget.versionRelease,
+		buildNumber: supportedTarget.buildNumber,
+	});
+	assert.strictEqual(exact.supported, true, `target ${supportedTarget.buildNumber} supported`);
+	assert.strictEqual(exact.buildMismatch, false, `target ${supportedTarget.buildNumber} buildMismatch`);
+	assert.strictEqual(exact.state, 'supported', `target ${supportedTarget.buildNumber} state`);
+	assert.strictEqual(exact.target, supportedTarget, `target ${supportedTarget.buildNumber} target`);
+}
+
 const mismatch = mod.evaluateControlRoomCompatibility({
 	versionNumber: target.versionNumber,
 	versionRelease: target.versionRelease,
@@ -17,15 +29,6 @@ const mismatch = mod.evaluateControlRoomCompatibility({
 assert.strictEqual(mismatch.supported, true);
 assert.strictEqual(mismatch.buildMismatch, true);
 assert.strictEqual(mismatch.state, 'supported');
-
-const exact = mod.evaluateControlRoomCompatibility({
-	versionNumber: target.versionNumber,
-	versionRelease: target.versionRelease,
-	buildNumber: target.buildNumber,
-});
-assert.strictEqual(exact.supported, true);
-assert.strictEqual(exact.buildMismatch, false);
-assert.strictEqual(exact.state, 'supported');
 
 const unsupported = mod.evaluateControlRoomCompatibility({
 	versionNumber: '99.99.99.99',

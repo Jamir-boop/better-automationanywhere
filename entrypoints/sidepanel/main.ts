@@ -19,6 +19,7 @@ import type {
 	ContentActionResponse,
 	ControlRoomCompatibilityResponse,
 	ExtensionShortcuts,
+	RuntimeMessage,
 } from '@/src/ts/messages';
 import {
 	formatControlRoomTarget,
@@ -190,6 +191,7 @@ const STYLE_FEATURE_HELP_TIPS: Partial<Record<StyleFeatureKey, string>> = {
 		'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
 };
 let currentControlRoomCompatibility: ControlRoomCompatibilityStatus | null = null;
+let controlRoomCompatibilityRequestId = 0;
 
 function getClipboardSlotLabel(slot: number): string {
 	return slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
@@ -882,12 +884,14 @@ async function sendActiveTabMessage(
 }
 
 async function refreshControlRoomCompatibility(forceRefresh = false): Promise<void> {
+	const requestId = ++controlRoomCompatibilityRequestId;
 	controlRoomVersionState.textContent = t('Checking version...');
 	try {
 		const response = (await browser.runtime.sendMessage({
 			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
 			forceRefresh,
 		})) as ControlRoomCompatibilityResponse | undefined;
+		if (requestId !== controlRoomCompatibilityRequestId) return;
 		if (!response?.ok) {
 			currentControlRoomCompatibility = null;
 			updateControlRoomCompatibilityUi();
@@ -901,6 +905,7 @@ async function refreshControlRoomCompatibility(forceRefresh = false): Promise<vo
 		currentControlRoomCompatibility = response.compatibility;
 		updateControlRoomCompatibilityUi();
 	} catch (error) {
+		if (requestId !== controlRoomCompatibilityRequestId) return;
 		currentControlRoomCompatibility = null;
 		updateControlRoomCompatibilityUi();
 		setStatus(
@@ -1769,6 +1774,39 @@ refreshControlRoomVersionButton.addEventListener('click', () => {
 	void refreshControlRoomCompatibility(true);
 });
 
+function shouldRefreshBuildCheckerForActiveView(): boolean {
+	return activeTab === 'doctor' && activeHealthSection === 'health';
+}
+
+let buildCheckerRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleBuildCheckerRefresh(): void {
+	if (!shouldRefreshBuildCheckerForActiveView()) return;
+	if (buildCheckerRefreshTimer) clearTimeout(buildCheckerRefreshTimer);
+	buildCheckerRefreshTimer = setTimeout(() => {
+		buildCheckerRefreshTimer = null;
+		if (!shouldRefreshBuildCheckerForActiveView()) return;
+		void refreshControlRoomCompatibility(false).then(renderSupportedBuilds);
+	}, 250);
+}
+
+browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
+	if (message.type !== 'AA_ROUTE_CHANGED') return;
+	if (sender.tab?.active === false) return;
+	scheduleBuildCheckerRefresh();
+});
+
+browser.tabs.onActivated.addListener(() => {
+	scheduleBuildCheckerRefresh();
+});
+
+browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+	if (!changeInfo.url && changeInfo.status !== 'complete') return;
+	void browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+		if (tab?.id === tabId) scheduleBuildCheckerRefresh();
+	});
+});
+
 doctorPills.forEach((pill) => {
 	pill.addEventListener('click', async () => {
 		currentDoctorView = pill.dataset.doctorView as DoctorCheckGroup;
@@ -1798,8 +1836,8 @@ function renderSupportedBuilds(): void {
 		row.className = 'supported-build-row';
 		const isCurrent =
 			currentControlRoomCompatibility?.supported &&
-			currentControlRoomCompatibility.target.versionNumber === build.versionNumber &&
-			currentControlRoomCompatibility.target.versionRelease === build.versionRelease;
+			!currentControlRoomCompatibility.buildMismatch &&
+			currentControlRoomCompatibility.target === build;
 		row.classList.toggle('is-current-match', Boolean(isCurrent));
 		const label = document.createElement('span');
 		label.textContent = `${build.versionNumber} ${build.versionRelease} build ${build.buildNumber} product ${build.productVersion}`;
