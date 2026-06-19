@@ -407,12 +407,12 @@ export function getCommandsWithNavigation(): Record<string, Command> {
 	return mergedCommands;
 }
 
-export function getHelpHtml(): string {
+export function getHelpHtml(shortcutLabel: string): string {
 	const commandsWithAliases = getCommandsWithAliases();
 	return renderHelpHtml({
 		commands: Object.values(commandsWithAliases),
 		navigationCommands: getSidebarNavigationCommands(),
-		shortcutLabel: utils.getActiveCommandPaletteShortcutLabel(),
+		shortcutLabel,
 	});
 }
 

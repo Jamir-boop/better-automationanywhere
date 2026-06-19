@@ -35,6 +35,10 @@ import {
 import { runStyleDoctor, runSingleCheck } from '../src/ts/style-doctor';
 import {
 	callInitializeRepeatedly,
+	setActiveBlockTaskbotNodeLabelClicks,
+	setActiveCommandPaletteEnabled,
+	setActiveCommandPaletteShortcut,
+	setActiveOpenSidebarShortcut,
 	setCustomPaletteButtonsEnabled,
 	setForceEnglishLocaleEnabled,
 	setPathFinderSlimSidebarEnabled,
@@ -56,6 +60,7 @@ import {
 	getBotExecutionModalPosition,
 	getCommandPaletteEnabled,
 	getCommandPaletteShortcut,
+	getCommandPaletteShortcutLabel,
 	getExtensionLanguage,
 	getForceEnglishLocale,
 	getForceUnsupportedControlRoomStyles,
@@ -83,12 +88,6 @@ import { setRunButtonAnimationEnabled } from '../src/ts/run-button-animation';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
 import { updateCommandPaletteLanguage } from '../src/ts/palette';
-import {
-	setActiveBlockTaskbotNodeLabelClicks,
-	setActiveCommandPaletteEnabled,
-	setActiveCommandPaletteShortcut,
-	setActiveOpenSidebarShortcut,
-} from '../src/ts/utils';
 
 const DEFAULT_LOADING_IMAGE_CSS = `url("${browser.runtime.getURL(
 	'media/loading.gif' as any
@@ -510,7 +509,7 @@ async function handleRuntimeMessage(
 			return { ok: true, message: t('Sidebar import field opened.') };
 		}
 		if (message.type === 'GET_HELP_HTML') {
-			return { ok: true, html: getHelpHtml() };
+			return { ok: true, html: getHelpHtml(getCommandPaletteShortcutLabel(await getCommandPaletteShortcut())) };
 		}
 		if (message.type === 'IMPORT_ACTION_JSON') {
 			await importActionJson(message.json);

@@ -1,64 +1,10 @@
-import { openSidebarCommandPalette, showActions, showVariables } from './commands';
 import { debugWarn } from './debug';
-import { t } from './i18n';
 import { EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR } from './automation-anywhere';
-import * as palette from './palette';
-import {
-	COMMAND_PALETTE_SHORTCUTS,
-	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
-	DEFAULT_COMMAND_PALETTE_ENABLED,
-	DEFAULT_COMMAND_PALETTE_SHORTCUT,
-	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
-	OPEN_SIDEBAR_SHORTCUTS,
-	getOpenSidebarShortcutLabel,
-	type CommandPaletteShortcut,
-	type OpenSidebarShortcut,
-} from './settings';
-import * as ui from './ui';
-
-let activeCommandPaletteShortcut: CommandPaletteShortcut =
-	DEFAULT_COMMAND_PALETTE_SHORTCUT;
-let activeCommandPaletteEnabled = DEFAULT_COMMAND_PALETTE_ENABLED;
-let activeOpenSidebarShortcut: OpenSidebarShortcut =
-	DEFAULT_OPEN_SIDEBAR_SHORTCUT;
-let activeBlockTaskbotNodeLabelClicks = DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS;
-let lastTaskbotLinkClickBlockedToastAt = 0;
-
-const TASKBOT_NODE_LABEL_LINK_SELECTOR =
-	'.taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]';
-const TASKBOT_LINK_CLICK_BLOCKED_TOAST_COOLDOWN_MS = 2000;
 
 interface SelectorDebugOptions {
 	feedback?: boolean;
 	message?: string;
 	source?: string;
-}
-
-export function setActiveCommandPaletteShortcut(shortcut: CommandPaletteShortcut): void {
-	activeCommandPaletteShortcut = shortcut;
-}
-
-export function setActiveCommandPaletteEnabled(value: boolean): void {
-	activeCommandPaletteEnabled = value;
-	if (!value) palette.closeCommandPalette();
-}
-
-export function setActiveOpenSidebarShortcut(shortcut: OpenSidebarShortcut): void {
-	activeOpenSidebarShortcut = shortcut;
-}
-
-export function setActiveBlockTaskbotNodeLabelClicks(value: boolean): void {
-	activeBlockTaskbotNodeLabelClicks = value;
-}
-
-export function getActiveCommandPaletteShortcutLabel(): string {
-	return activeCommandPaletteShortcut === COMMAND_PALETTE_SHORTCUTS.SLASH
-		? '/'
-		: 'Alt + P';
-}
-
-export function getActiveOpenSidebarShortcutLabel(): string {
-	return getOpenSidebarShortcutLabel(activeOpenSidebarShortcut);
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -116,57 +62,6 @@ export function normalizeCommandText(value: unknown): string {
 		.replace(/\s+/g, ' ')
 		.trim()
 		.toLowerCase();
-}
-
-export function isTypingTarget(target: EventTarget | null): boolean {
-	if (!(target instanceof HTMLElement)) return false;
-	const tagName = target.tagName;
-	return (
-		target.isContentEditable ||
-		tagName === 'INPUT' ||
-		tagName === 'TEXTAREA' ||
-		tagName === 'SELECT' ||
-		!!target.closest('[contenteditable="true"]')
-	);
-}
-
-export function isCommandPaletteShortcutPressed(e: KeyboardEvent): boolean {
-	if (activeCommandPaletteShortcut === COMMAND_PALETTE_SHORTCUTS.SLASH) {
-		return (
-			e.key === '/' &&
-			!e.altKey &&
-			!e.ctrlKey &&
-			!e.metaKey &&
-			!isTypingTarget(e.target)
-		);
-	}
-
-	return (
-		e.key.toLowerCase() === 'p' &&
-		e.altKey &&
-		!e.ctrlKey &&
-		!e.metaKey &&
-		!e.shiftKey
-	);
-}
-
-export function isOpenSidebarShortcutPressed(e: KeyboardEvent): boolean {
-	if (isTypingTarget(e.target)) return false;
-
-	const withoutMeta = !e.metaKey;
-	switch (activeOpenSidebarShortcut) {
-		case OPEN_SIDEBAR_SHORTCUTS.CTRL_SHIFT_L:
-			return e.code === 'KeyL' && e.ctrlKey && e.shiftKey && !e.altKey && withoutMeta;
-		case OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_S:
-			return e.code === 'KeyS' && e.altKey && e.shiftKey && !e.ctrlKey && withoutMeta;
-		case OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_O:
-			return e.code === 'KeyO' && e.altKey && e.shiftKey && !e.ctrlKey && withoutMeta;
-		case OPEN_SIDEBAR_SHORTCUTS.CTRL_SHIFT_SPACE:
-			return e.code === 'Space' && e.ctrlKey && e.shiftKey && !e.altKey && withoutMeta;
-		case OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L:
-		default:
-			return e.code === 'KeyL' && e.altKey && e.shiftKey && !e.ctrlKey && withoutMeta;
-	}
 }
 
 export function waitForElement(
@@ -227,94 +122,6 @@ export function getPaletteState(): 'opened' | 'closed' {
 	return paletteElement.offsetWidth <= 8 ? 'closed' : 'opened';
 }
 
-function showTaskbotLinkClickBlockedToast(): void {
-	const now = Date.now();
-	if (
-		now - lastTaskbotLinkClickBlockedToastAt <
-		TASKBOT_LINK_CLICK_BLOCKED_TOAST_COOLDOWN_MS
-	) {
-		return;
-	}
-	lastTaskbotLinkClickBlockedToastAt = now;
-	ui.showNotification(
-		t('Taskbot link click blocked'),
-		t('Use middle-click to open this link.')
-	);
-}
-
-export function registerKeyboardShortcuts(): void {
-	document.addEventListener(
-		'click',
-		(e) => {
-			if (!activeBlockTaskbotNodeLabelClicks) return;
-			const target = e.target as HTMLElement | null;
-			const nodeLink = target?.closest?.(TASKBOT_NODE_LABEL_LINK_SELECTOR);
-			if (!nodeLink || e.button === 1) return;
-			e.preventDefault();
-			e.stopImmediatePropagation();
-			showTaskbotLinkClickBlockedToast();
-		},
-		true
-	);
-
-	document.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape' && palette.isCommandPaletteVisible()) {
-			palette.closeCommandPalette();
-			e.preventDefault();
-		}
-	});
-
-	document.addEventListener('mousedown', (e) => {
-		if (!palette.isCommandPaletteVisible()) return;
-		const commandPalette = palette.getCommandPalette();
-		if (!commandPalette) return;
-		const eventPath = e.composedPath?.();
-		if (eventPath?.includes(commandPalette) || commandPalette.contains(e.target as Node)) {
-			return;
-		}
-		palette.closeCommandPalette();
-	});
-
-	document.addEventListener('keydown', (e) => {
-		if (import.meta.env.FIREFOX) return;
-		if (isOpenSidebarShortcutPressed(e)) {
-			e.preventDefault();
-			openSidebarCommandPalette();
-		}
-	});
-
-	document.addEventListener('keydown', (e) => {
-		if (!activeCommandPaletteEnabled) return;
-		if (isCommandPaletteShortcutPressed(e)) {
-			e.preventDefault();
-			palette.insertCommandPalette();
-			ui.syncCustomEditorPaletteButtons();
-			palette.togglePaletteVisibility();
-		}
-	});
-
-	document.addEventListener('keydown', (e) => {
-		if (e.code === 'KeyA' && e.altKey) {
-			showActions();
-			e.preventDefault();
-		}
-	});
-
-	document.addEventListener('keydown', (e) => {
-		if (e.code === 'KeyV' && e.altKey) {
-			showVariables();
-			e.preventDefault();
-		}
-	});
-
-	document.addEventListener('keydown', (e) => {
-		if (e.ctrlKey && e.code === 'KeyD') {
-			toggleToolbar();
-			e.preventDefault();
-		}
-	});
-}
-
 export function toggleToolbar(): void {
 	void clickIfExists(EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR, 'toggleToolbar');
 }
@@ -341,17 +148,4 @@ export async function clickIfExists(
 		return;
 	}
 	reportSelectorFailure(selector, context, options);
-}
-
-export function ensureEnglishLocale(): void {
-	const lng = localStorage.getItem('i18nextLng');
-	if (lng !== 'en-US') {
-		ui.showNotification(
-			t('Language changed'),
-			t('For correct functioning of this extension, the language will be set to English (en-US). The page will reload.'),
-			3600
-		);
-		localStorage.setItem('i18nextLng', 'en-US');
-		setTimeout(() => window.location.reload(), 1800);
-	}
 }

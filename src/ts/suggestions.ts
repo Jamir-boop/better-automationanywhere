@@ -2,7 +2,6 @@ import * as palette from './palette';
 import { debugInfo } from './debug';
 import { t } from './i18n';
 import * as ui from './ui';
-import { getActiveCommandPaletteShortcutLabel } from './utils';
 
 const TIP_COOLDOWN_MS = 10000;
 
@@ -38,7 +37,7 @@ function getCustomPaletteButtonLabel(target: HTMLElement): string {
 		.toLowerCase() ?? '';
 }
 
-function handleClick(event: MouseEvent): void {
+function handleClick(event: MouseEvent, getShortcutLabel: () => string): void {
 	if (!isTrustedMouseClick(event)) return;
 	const target = event.target instanceof HTMLElement ? event.target : null;
 	if (!target) return;
@@ -77,7 +76,7 @@ function handleClick(event: MouseEvent): void {
 		showTip(
 			'commandPalette',
 			t('Tip: open command palette with {shortcut}.', {
-				shortcut: getActiveCommandPaletteShortcutLabel(),
+				shortcut: getShortcutLabel(),
 			})
 		);
 		return;
@@ -87,14 +86,14 @@ function handleClick(event: MouseEvent): void {
 		showTip(
 			'commandPalette',
 			t('Tip: open command palette with {shortcut}.', {
-				shortcut: getActiveCommandPaletteShortcutLabel(),
+				shortcut: getShortcutLabel(),
 			})
 		);
 	}
 }
 
-export function registerMouseClickSuggestions(): void {
+export function registerMouseClickSuggestions(getShortcutLabel: () => string): void {
 	if (initialized) return;
 	initialized = true;
-	document.addEventListener('click', handleClick, true);
+	document.addEventListener('click', (e) => handleClick(e, getShortcutLabel), true);
 }
