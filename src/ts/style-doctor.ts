@@ -403,15 +403,6 @@ export const CHECKS: StyleDoctorCheck[] = [
 		source: 'entrypoints/content.ts',
 		severity: 'optional',
 	},
-	{
-		id: 'folder-page-title',
-		view: 'folder-navigation',
-		group: 'folder-navigation',
-		label: 'Folder page title',
-		selector: '.pagetitle-label',
-		source: 'src/styl/foldersScrollable.styl',
-		severity: 'optional',
-	},
 ];
 
 function sleep(ms: number): Promise<void> {
