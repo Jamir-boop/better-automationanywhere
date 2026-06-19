@@ -66,6 +66,7 @@ import {
 	getForceUnsupportedControlRoomStyles,
 	getKeepAliveEnabled,
 	getOpenSidebarShortcut,
+	getRunButtonWavesEnabled,
 	getShowSuggestions,
 	getSoundsEnabled,
 	getStyleFeatureValues,
@@ -75,7 +76,7 @@ import {
 	normalizeOpenSidebarShortcut,
 	keepAliveEnabled,
 	openSidebarShortcut,
-	RUN_BUTTON_CLASS,
+	runButtonWaves,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
 	STYLE_CLASS,
@@ -110,6 +111,8 @@ const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
 const KEEP_ALIVE_INTERVAL_MS = 60_000;
 
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
+let activeRunButtonStyleEnabled = false;
+let activeRunButtonWavesEnabled = false;
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -187,12 +190,14 @@ async function getCurrentControlRoomCompatibility(): Promise<ControlRoomCompatib
 }
 
 async function applyStyleClasses(): Promise<void> {
-	const [enabled, styleFeatures, forceUnsupported, compatibility] = await Promise.all([
-		getStylesEnabled(),
-		getStyleFeatureValues(),
-		getForceUnsupportedControlRoomStyles(),
-		getCurrentControlRoomCompatibility(),
-	]);
+	const [enabled, styleFeatures, runButtonWavesEnabled, forceUnsupported, compatibility] =
+		await Promise.all([
+			getStylesEnabled(),
+			getStyleFeatureValues(),
+			getRunButtonWavesEnabled(),
+			getForceUnsupportedControlRoomStyles(),
+			getCurrentControlRoomCompatibility(),
+		]);
 	const effectiveEnabled =
 		enabled &&
 		(compatibility.supported || compatibility.state === 'unknown' || forceUnsupported);
@@ -206,7 +211,9 @@ async function applyStyleClasses(): Promise<void> {
 			styleFeatures[feature.key]
 		);
 	}
-	setRunButtonAnimationEnabled(effectiveEnabled && styleFeatures.runButton);
+	activeRunButtonStyleEnabled = effectiveEnabled && styleFeatures.runButton;
+	activeRunButtonWavesEnabled = runButtonWavesEnabled;
+	setRunButtonAnimationEnabled(activeRunButtonStyleEnabled, activeRunButtonWavesEnabled);
 	setCustomPaletteButtonsEnabled(
 		effectiveEnabled && styleFeatures.customPaletteButtons
 	);
@@ -412,8 +419,22 @@ async function handleRuntimeMessage(
 			return;
 		}
 		if (message.type === 'SET_RUN_BUTTON_STYLE') {
-			document.documentElement.classList.toggle(RUN_BUTTON_CLASS, message.enabled);
-			setRunButtonAnimationEnabled(message.enabled);
+			activeRunButtonStyleEnabled =
+				document.documentElement.classList.contains(STYLE_CLASS) &&
+				document.documentElement.classList.contains(TASKBOT_ROUTE_CLASS) &&
+				message.enabled;
+			setRunButtonAnimationEnabled(
+				activeRunButtonStyleEnabled,
+				activeRunButtonWavesEnabled
+			);
+			return;
+		}
+		if (message.type === 'SET_RUN_BUTTON_WAVES') {
+			activeRunButtonWavesEnabled = message.enabled;
+			setRunButtonAnimationEnabled(
+				activeRunButtonStyleEnabled,
+				activeRunButtonWavesEnabled
+			);
 			return;
 		}
 		if (message.type === 'SET_SOUNDS_ENABLED') {
@@ -544,6 +565,9 @@ export default defineContentScript({
 			void applyStyleClasses();
 		});
 		styleFeatureItems.runButton.watch(() => {
+			void applyStyleClasses();
+		});
+		runButtonWaves.watch(() => {
 			void applyStyleClasses();
 		});
 		showSuggestions.watch((value) => {

@@ -49,6 +49,7 @@ import {
 	DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES,
 	DEFAULT_KEEP_ALIVE_ENABLED,
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
+	DEFAULT_RUN_BUTTON_WAVES,
 	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
 	DEFAULT_STYLES_ENABLED,
@@ -76,6 +77,7 @@ import {
 	getKeepAliveEnabled,
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
+	getRunButtonWavesEnabled,
 	getShowSuggestions,
 	getSoundsEnabled,
 	getStyleFeatureValues,
@@ -86,6 +88,7 @@ import {
 	normalizeOpenSidebarShortcut,
 	keepAliveEnabled,
 	openSidebarShortcut,
+	runButtonWaves,
 	showSuggestions,
 	soundsEnabled,
 	styleFeatureItems,
@@ -305,6 +308,18 @@ function renderUniversalClipboardSection(): string {
 	`;
 }
 
+function renderRunButtonWavesControl(): string {
+	return `
+		<label class="setting-row userstyle-dependent style-subsetting run-button-waves-dependent">
+			<span>
+				<strong>${t('Wave rings')}</strong>
+				<small>${t('Play wave rings on Run hover.')}</small>
+			</span>
+			<input id="runButtonWaves" type="checkbox">
+		</label>
+	`;
+}
+
 function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): string {
 	return `
 		<label class="setting-row userstyle-dependent">
@@ -314,6 +329,7 @@ function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): st
 			</span>
 			<input id="styleFeature-${feature.key}" type="checkbox">
 		</label>
+		${feature.key === 'runButton' ? renderRunButtonWavesControl() : ''}
 		${feature.key === 'minimizeBotModal' ? renderBotExecutionModalPositionControl() : ''}
 	`;
 }
@@ -582,6 +598,9 @@ app.innerHTML = `
 `;
 
 const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
+const runButtonWavesInput = document.querySelector<HTMLInputElement>('#runButtonWaves')!;
+const runButtonWavesRow =
+	runButtonWavesInput.closest<HTMLElement>('.run-button-waves-dependent')!;
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const showSuggestionsInput =
 	document.querySelector<HTMLInputElement>('#showSuggestions')!;
@@ -1424,6 +1443,7 @@ function isUserstyleAtDefault(): boolean {
 	if (botExecutionModalPositionSelect.value !== DEFAULT_BOT_EXECUTION_MODAL_POSITION) {
 		return false;
 	}
+	if (runButtonWavesInput.checked !== DEFAULT_RUN_BUTTON_WAVES) return false;
 	for (const feature of STYLE_FEATURES) {
 		if (getStyleFeatureInput(feature.key).checked !== feature.defaultValue) {
 			return false;
@@ -1469,7 +1489,14 @@ function updateUserstyleDependentState(): void {
 		});
 	});
 	updateBotExecutionModalPositionState();
+	updateRunButtonWavesState();
 	updateRestoreDefaultsButton();
+}
+
+function updateRunButtonWavesState(): void {
+	const disabled = !stylesInput.checked || !getStyleFeatureInput('runButton').checked;
+	runButtonWavesRow.classList.toggle('is-disabled', disabled);
+	runButtonWavesInput.disabled = disabled;
 }
 
 function updateBotExecutionModalPositionState(): void {
@@ -1538,6 +1565,7 @@ async function loadState(): Promise<void> {
 		shortcut,
 		sidebarShortcut,
 		botModalPosition,
+		waves,
 		styleFeatures,
 		styleValues,
 	] = await Promise.all([
@@ -1554,6 +1582,7 @@ async function loadState(): Promise<void> {
 		getCommandPaletteShortcut(),
 		getOpenSidebarShortcut(),
 		getBotExecutionModalPosition(),
+		getRunButtonWavesEnabled(),
 		getStyleFeatureValues(),
 		getStyleValues(),
 	]);
@@ -1585,6 +1614,7 @@ async function loadState(): Promise<void> {
 	currentOpenSidebarShortcut = sidebarShortcut;
 	updateOpenSidebarShortcutLabel(sidebarShortcut);
 	botExecutionModalPositionSelect.value = botModalPosition;
+	runButtonWavesInput.checked = waves;
 	await refreshExtensionShortcuts();
 	renderStaticAboutHelp(shortcut);
 
@@ -1916,6 +1946,7 @@ botExecutionModalPositionSelect.addEventListener('change', () => {
 STYLE_FEATURES.forEach((feature) => {
 	getStyleFeatureInput(feature.key).addEventListener('change', (event) => {
 		const input = event.currentTarget as HTMLInputElement;
+		if (feature.key === 'runButton') updateRunButtonWavesState();
 		if (feature.key === 'minimizeBotModal') updateBotExecutionModalPositionState();
 		updateRestoreDefaultsButton();
 		void sendBackgroundMessage({
@@ -1923,6 +1954,14 @@ STYLE_FEATURES.forEach((feature) => {
 			key: feature.key,
 			enabled: input.checked,
 		});
+	});
+});
+
+runButtonWavesInput.addEventListener('change', () => {
+	updateRestoreDefaultsButton();
+	void sendBackgroundMessage({
+		type: 'SET_RUN_BUTTON_WAVES',
+		enabled: runButtonWavesInput.checked,
 	});
 });
 
@@ -2041,6 +2080,7 @@ restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 	forceUnsupportedControlRoomStylesInput.checked =
 		DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES;
 	botExecutionModalPositionSelect.value = DEFAULT_BOT_EXECUTION_MODAL_POSITION;
+	runButtonWavesInput.checked = DEFAULT_RUN_BUTTON_WAVES;
 	STYLE_FEATURES.forEach((feature) => {
 		getStyleFeatureInput(feature.key).checked = feature.defaultValue;
 	});
@@ -2061,6 +2101,10 @@ restoreUserstyleDefaultsButton.addEventListener('click', async () => {
 		sendBackgroundMessage({
 			type: 'SET_BOT_EXECUTION_MODAL_POSITION',
 			position: DEFAULT_BOT_EXECUTION_MODAL_POSITION,
+		}),
+		sendBackgroundMessage({
+			type: 'SET_RUN_BUTTON_WAVES',
+			enabled: DEFAULT_RUN_BUTTON_WAVES,
 		}),
 		...STYLE_FEATURES.map((feature) =>
 			sendBackgroundMessage({
@@ -2250,9 +2294,15 @@ botExecutionModalPosition.watch((value) => {
 	botExecutionModalPositionSelect.value = normalizeBotExecutionModalPosition(value);
 	updateRestoreDefaultsButton();
 });
+runButtonWaves.watch((value) => {
+	runButtonWavesInput.checked = value ?? DEFAULT_RUN_BUTTON_WAVES;
+	updateRunButtonWavesState();
+	updateRestoreDefaultsButton();
+});
 STYLE_FEATURES.forEach((feature) => {
 	styleFeatureItems[feature.key].watch((value) => {
 		getStyleFeatureInput(feature.key).checked = value ?? feature.defaultValue;
+		if (feature.key === 'runButton') updateRunButtonWavesState();
 		if (feature.key === 'minimizeBotModal') updateBotExecutionModalPositionState();
 		updateRestoreDefaultsButton();
 	});

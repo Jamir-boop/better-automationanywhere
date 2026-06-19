@@ -45,6 +45,7 @@ export type AutomationAnywhereApiResponse =
 export type SettingsBackgroundMessage =
 	| { type: 'TOGGLE_STYLES'; enabled?: boolean }
 	| { type: 'SET_RUN_BUTTON_STYLE'; enabled: boolean }
+	| { type: 'SET_RUN_BUTTON_WAVES'; enabled: boolean }
 	| { type: 'SET_SOUNDS_ENABLED'; enabled: boolean }
 	| { type: 'SET_SHOW_SUGGESTIONS'; enabled: boolean }
 	| { type: 'SET_DEBUG_ENABLED'; enabled: boolean }

@@ -34,6 +34,7 @@ export type BotExecutionModalPosition =
 
 export const stylesEnabled = storage.defineItem<boolean>('local:stylesEnabled');
 export const runButton = storage.defineItem<boolean>('local:runButton');
+export const runButtonWaves = storage.defineItem<boolean>('local:runButtonWaves');
 export const soundsEnabled = storage.defineItem<boolean>('local:soundsEnabled');
 export const showSuggestions = storage.defineItem<boolean>('local:showSuggestions');
 export const debugEnabled = storage.defineItem<boolean>('local:debugEnabled');
@@ -65,6 +66,7 @@ export const styleDoctorLastResults = storage.defineItem<Record<string, import('
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;
+export const DEFAULT_RUN_BUTTON_WAVES = true;
 export const DEFAULT_SOUNDS_ENABLED = false;
 export const DEFAULT_SHOW_SUGGESTIONS = true;
 export const DEFAULT_DEBUG_ENABLED = false;
@@ -264,6 +266,10 @@ export async function getStylesEnabled(): Promise<boolean> {
 
 export async function getRunButtonEnabled(): Promise<boolean> {
 	return (await runButton.getValue()) ?? DEFAULT_RUN_BUTTON;
+}
+
+export async function getRunButtonWavesEnabled(): Promise<boolean> {
+	return (await runButtonWaves.getValue()) ?? DEFAULT_RUN_BUTTON_WAVES;
 }
 
 export async function getSoundsEnabled(): Promise<boolean> {

@@ -125,6 +125,9 @@ const ES: Record<string, string> = {
 		'Usa un diseno compacto para Acciones, Variables y Disparadores.',
 	'Run button style': 'Estilo del boton Ejecutar',
 	'Animate and emphasize Run.': 'Anima y resalta Ejecutar.',
+	'Wave rings': 'Anillos de onda',
+	'Play wave rings on Run hover.':
+		'Reproduce anillos de onda al pasar sobre Ejecutar.',
 	'Hide editor tabs': 'Ocultar pestanas del editor',
 	'Hide Flow, List, and Dual tabs button group.':
 		'Oculta el grupo de botones Flujo, Lista y Dual.',

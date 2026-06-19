@@ -172,6 +172,7 @@ function injectStyles(): void {
 				background 160ms ease,
 				color 160ms ease,
 				box-shadow 160ms ease !important;
+			background: #ffffff !important;
 			border-color: #3b82f6 !important;
 			box-shadow:
 				0 0 0 1px rgba(59, 130, 246, 0.18),
@@ -216,11 +217,7 @@ function injectStyles(): void {
 			z-index: 0 !important;
 			pointer-events: none !important;
 			opacity: 0;
-			background:
-				radial-gradient(circle at 20% 50%, rgba(37, 99, 235, 0.22), transparent 36%),
-				radial-gradient(circle at 78% 48%, rgba(14, 165, 233, 0.22), transparent 38%),
-				radial-gradient(circle at 50% 120%, rgba(139, 92, 246, 0.18), transparent 45%),
-				linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(20, 184, 166, 0.12)) !important;
+			background: rgba(255, 255, 255, 0.18) !important;
 		}
 
 		/* ── Lift + glow on hover/focus ── */
@@ -229,6 +226,7 @@ function injectStyles(): void {
 		button[aria-label="Run"][name="run"]:focus-visible,
 		button[name="run"]:focus-visible {
 			transform: translateY(-1px) !important;
+			background: #ffffff !important;
 			border-color: #3b82f6 !important;
 			box-shadow:
 				0 0 0 1px rgba(59, 130, 246, 0.28),
@@ -327,7 +325,8 @@ let pulseLayer: HTMLElement | null = null;
 let pulseInterval: number | null = null;
 let pulseTimeouts: number[] = [];
 let delegatedHandler: ((event: Event) => void) | null = null;
-let animationEnabled = false;
+let currentStyleEnabled = false;
+let currentWavesEnabled = false;
 
 function getRunButtonHost(button: HTMLButtonElement): HTMLElement | null {
 	return button.closest<HTMLElement>('.icon-button, [data-path="IconButton"]');
@@ -363,65 +362,84 @@ function stopPulse(): void {
 	clearPulseTimeouts(pulseTimeouts);
 }
 
-export function setRunButtonAnimationEnabled(enabled: boolean): void {
-	if (animationEnabled === enabled) return;
-	animationEnabled = enabled;
+function handleWaveEvent(event: Event): void {
+	const target = event.target as Element | null;
+	if (!target) return;
 
-	if (enabled) {
+	const matchedButton = target.matches(RUN_BUTTON_SELECTOR)
+		? target
+		: target.closest(RUN_BUTTON_SELECTOR);
+
+	if (!(matchedButton instanceof HTMLButtonElement)) return;
+	if (
+		!matchedButton.matches(
+			'button[aria-label="Run"][name="run"], button[name="run"]'
+		)
+	)
+		return;
+
+	if (activeButton !== matchedButton) {
+		stopPulse();
+		setActiveRunButton(matchedButton);
+	}
+
+	if (event.type === 'pointerover') {
+		startPulse();
+		return;
+	}
+
+	if (
+		event instanceof PointerEvent &&
+		event.relatedTarget instanceof Node &&
+		matchedButton.contains(event.relatedTarget)
+	) {
+		return;
+	}
+	stopPulse();
+}
+
+export function setRunButtonAnimationEnabled(
+	nextStyleEnabled: boolean,
+	nextWavesEnabled: boolean
+): void {
+	if (
+		currentStyleEnabled === nextStyleEnabled &&
+		currentWavesEnabled === nextWavesEnabled
+	)
+		return;
+
+	if (nextStyleEnabled) {
 		injectStyles();
-		pulseLayer = ensurePulseLayer();
-
-		delegatedHandler = (event: Event): void => {
-			const target = event.target as Element | null;
-			if (!target) return;
-
-			const matchedButton = target.matches(RUN_BUTTON_SELECTOR)
-				? target
-				: target.closest(RUN_BUTTON_SELECTOR);
-
-			if (!(matchedButton instanceof HTMLButtonElement)) return;
-			if (
-				!matchedButton.matches(
-					'button[aria-label="Run"][name="run"], button[name="run"]'
-				)
-			)
-				return;
-
-			if (activeButton !== matchedButton) {
-				stopPulse();
-				setActiveRunButton(matchedButton);
+		if (nextWavesEnabled) {
+			pulseLayer = ensurePulseLayer();
+			if (!delegatedHandler) {
+				delegatedHandler = handleWaveEvent;
+				document.addEventListener('pointerover', delegatedHandler, true);
+				document.addEventListener('pointerout', delegatedHandler, true);
 			}
-
-			switch (event.type) {
-				case 'pointerover':
-					startPulse();
-					break;
-				case 'pointerout':
-					if (
-						event instanceof PointerEvent &&
-						event.relatedTarget instanceof Node &&
-						matchedButton.contains(event.relatedTarget)
-					) {
-						return;
-					}
-					stopPulse();
-					break;
+		} else {
+			if (delegatedHandler) {
+				document.removeEventListener('pointerover', delegatedHandler, true);
+				document.removeEventListener('pointerout', delegatedHandler, true);
+				delegatedHandler = null;
 			}
-		};
-
-		document.addEventListener('pointerover', delegatedHandler, true);
-		document.addEventListener('pointerout', delegatedHandler, true);
+			stopPulse();
+			removePulseLayer();
+			pulseLayer = null;
+		}
 	} else {
 		if (delegatedHandler) {
 			document.removeEventListener('pointerover', delegatedHandler, true);
 			document.removeEventListener('pointerout', delegatedHandler, true);
 			delegatedHandler = null;
 		}
-
 		stopPulse();
-		setActiveRunButton(null);
 		removePulseLayer();
 		pulseLayer = null;
+		setActiveRunButton(null);
 		removeStyles();
 	}
+
+	currentStyleEnabled = nextStyleEnabled;
+	currentWavesEnabled = nextWavesEnabled;
 }
