@@ -54,7 +54,6 @@ import {
 	DEFAULT_SHOW_SUGGESTIONS,
 	DEFAULT_STYLES_ENABLED,
 	EXTENSION_LANGUAGE_OPTIONS,
-	EXTENSION_VERSION,
 	OPEN_SIDEBAR_SHORTCUT_OPTIONS,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
@@ -145,7 +144,7 @@ function cacheExtensionLanguage(language: LanguagePreference): void {
 
 setActiveLanguagePreference(getCachedExtensionLanguage());
 
-const extensionVersion = browser.runtime.getManifest().version || EXTENSION_VERSION;
+const extensionVersion = browser.runtime.getManifest().version;
 const defaultLoadingImageCss = `url("${browser.runtime.getURL('media/loading.gif' as any)}")`;
 const MAX_BACKGROUND_UPLOAD_BYTES = 3 * 1024 * 1024;
 const ALLOWED_BACKGROUND_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif']);

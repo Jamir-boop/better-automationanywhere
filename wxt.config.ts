@@ -1,6 +1,10 @@
 import { defineConfig } from 'wxt';
+import { createRequire } from 'node:module';
 import { AUTOMATION_ANYWHERE_MATCHES } from './src/ts/automation-anywhere';
 
+const { version } = createRequire(import.meta.url)('./package.json') as {
+	version: string;
+};
 const automationAnywhereMatches = [...AUTOMATION_ANYWHERE_MATCHES];
 const webAccessibleResources = ['media/loading.gif', 'sounds/*'];
 
@@ -15,7 +19,7 @@ export default defineConfig({
 	},
 	manifest: ({ browser }) => ({
 		name: '__MSG_extensionName__',
-		version: '1.10.5',
+		version,
 		description: '__MSG_extensionDescription__',
 		default_locale: 'en',
 		author: 'jamir-boop',
