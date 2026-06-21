@@ -83,8 +83,8 @@ async function saveGlobalClipboardValueToDefaultSlot(
 		ui.showNotification(
 			source === 'watcher' ? t('Universal clipboard updated') : t('Copied'),
 			source === 'watcher'
-				? t('Default slot saved from Automation Anywhere copy.')
-				: t('Saved current Automation Anywhere clipboard to default slot.')
+				? t('Auto slot saved from Automation Anywhere copy.')
+				: t('Saved current Automation Anywhere clipboard to auto slot.')
 		);
 		return serialized;
 	} catch (error) {

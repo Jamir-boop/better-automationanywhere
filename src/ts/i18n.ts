@@ -65,7 +65,7 @@ const ES: Record<string, string> = {
 	'Export JSON': 'Exportar JSON',
 	'Download textarea JSON as a .json file.':
 		'Descarga el JSON del campo como archivo .json.',
-	Default: 'Predeterminado',
+	Auto: 'Predeterminado',
 	'Slot {slot}': 'Espacio {slot}',
 	'Load {label}': 'Cargar {label}',
 	Empty: 'Vacio',
@@ -283,9 +283,9 @@ const ES: Record<string, string> = {
 	'Open the dialog to select and delete unused variables.':
 		'Abre el dialogo para seleccionar y eliminar variables sin uso.',
 	'Show help for available commands.': 'Muestra ayuda de comandos disponibles.',
-	'Save current Automation Anywhere clipboard to default slot.':
+	'Save current Automation Anywhere clipboard to auto slot.':
 		'Guarda el portapapeles actual de Automation Anywhere en el espacio predeterminado.',
-	'Paste default slot through Automation Anywhere shared paste.':
+	'Paste auto slot through Automation Anywhere shared paste.':
 		'Pega el espacio predeterminado usando el pegado compartido de Automation Anywhere.',
 	'Export the currently copied action as JSON to your clipboard.':
 		'Exporta la accion copiada como JSON al portapapeles.',
@@ -314,7 +314,7 @@ const ES: Record<string, string> = {
 		'Abrir panel; configurable en el panel de la extension.',
 	'Show variables': 'Mostrar variables',
 	'Show actions': 'Mostrar acciones',
-	'Native Automation Anywhere shared copy auto-saves default slot. Use sidepanel controls for slots.':
+	'Native Automation Anywhere shared copy auto-saves auto slot. Use sidepanel controls for slots.':
 		'La copia compartida nativa de Automation Anywhere guarda automaticamente el espacio predeterminado. Usa los controles del panel para espacios.',
 	'Scrolls to a specific line number (e.g. {example})':
 		'Desplaza a un numero de linea especifico (ej. {example})',
@@ -332,9 +332,9 @@ const ES: Record<string, string> = {
 		'El portapapeles de Automation Anywhere esta vacio.',
 	'Universal clipboard updated': 'Portapapeles universal actualizado',
 	Copied: 'Copiado',
-	'Default slot saved from Automation Anywhere copy.':
+	'Auto slot saved from Automation Anywhere copy.':
 		'Espacio predeterminado guardado desde la copia de Automation Anywhere.',
-	'Saved current Automation Anywhere clipboard to default slot.':
+	'Saved current Automation Anywhere clipboard to auto slot.':
 		'Portapapeles actual de Automation Anywhere guardado en el espacio predeterminado.',
 	'Could not read current clipboard JSON.':
 		'No se pudo leer el JSON del portapapeles actual.',

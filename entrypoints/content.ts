@@ -418,17 +418,6 @@ async function handleRuntimeMessage(
 			await applyStyleClasses();
 			return;
 		}
-		if (message.type === 'SET_RUN_BUTTON_STYLE') {
-			activeRunButtonStyleEnabled =
-				document.documentElement.classList.contains(STYLE_CLASS) &&
-				document.documentElement.classList.contains(TASKBOT_ROUTE_CLASS) &&
-				message.enabled;
-			setRunButtonAnimationEnabled(
-				activeRunButtonStyleEnabled,
-				activeRunButtonWavesEnabled
-			);
-			return;
-		}
 		if (message.type === 'SET_RUN_BUTTON_WAVES') {
 			activeRunButtonWavesEnabled = message.enabled;
 			setRunButtonAnimationEnabled(

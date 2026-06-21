@@ -190,7 +190,7 @@ let controlRoomCompatibilityRequestId = 0;
 
 function getClipboardSlotLabel(slot: number): string {
 	return slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
-		? t('Default')
+		? t('Auto')
 		: t('Slot {slot}', { slot });
 }
 

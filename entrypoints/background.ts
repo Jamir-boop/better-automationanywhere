@@ -46,7 +46,6 @@ import {
 	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
 	openSidebarShortcut,
-	runButton,
 	runButtonWaves,
 	showSuggestions,
 	soundsEnabled,
@@ -350,14 +349,6 @@ async function handleSettingsMessage(message: SettingsBackgroundMessage): Promis
 		void debugInfo('userstyle', 'Styles toggle saved.', { enabled });
 		await broadcastToAutomationTabs({ type: 'TOGGLE_STYLES', enabled });
 	}
-	if (message.type === 'SET_RUN_BUTTON_STYLE') {
-		await runButton.setValue(message.enabled);
-		void debugInfo('userstyle', 'Style feature saved.', {
-			key: 'runButton',
-			enabled: message.enabled,
-		});
-		await broadcastToAutomationTabs(message);
-	}
 	if (message.type === 'SET_RUN_BUTTON_WAVES') {
 		await runButtonWaves.setValue(message.enabled);
 		void debugInfo('userstyle', 'Style feature saved.', {
@@ -491,7 +482,6 @@ function isSettingsBackgroundMessage(message: RuntimeMessage): message is Settin
 	return (
 		message.type === 'OPEN_SIDEBAR' ||
 		message.type === 'TOGGLE_STYLES' ||
-		message.type === 'SET_RUN_BUTTON_STYLE' ||
 		message.type === 'SET_RUN_BUTTON_WAVES' ||
 		message.type === 'SET_SOUNDS_ENABLED' ||
 		message.type === 'SET_SHOW_SUGGESTIONS' ||

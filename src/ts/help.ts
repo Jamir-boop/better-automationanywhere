@@ -45,11 +45,11 @@ export function getCommandHelp(): Record<string, HelpCommandInfo> {
 		},
 		universalCopy: {
 			aliases: aliases(['universal copy', 'copy universal'], ['copia universal', 'copiar universal']),
-			description: t('Save current Automation Anywhere clipboard to default slot.'),
+			description: t('Save current Automation Anywhere clipboard to auto slot.'),
 		},
 		universalPaste: {
 			aliases: aliases(['universal paste', 'paste universal'], ['pegado universal', 'pegar universal']),
-			description: t('Paste default slot through Automation Anywhere shared paste.'),
+			description: t('Paste auto slot through Automation Anywhere shared paste.'),
 		},
 		exportActionToClipboard: {
 			aliases: aliases(
@@ -119,7 +119,7 @@ export function renderHelpHtml(options: {
 		</ul>
 		<h4>${escapeHelpHtml(t('Clipboard Slots:'))}</h4>
 		<ul>
-			<li>${escapeHelpHtml(t('Native Automation Anywhere shared copy auto-saves default slot. Use sidepanel controls for slots.'))}</li>
+			<li>${escapeHelpHtml(t('Native Automation Anywhere shared copy auto-saves auto slot. Use sidepanel controls for slots.'))}</li>
 		</ul>
 	`;
 
