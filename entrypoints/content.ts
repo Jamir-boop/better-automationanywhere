@@ -23,8 +23,12 @@ import {
 	getHelpHtml,
 	importActionFromJson,
 } from '../src/ts/commands';
-import { debugError, debugInfo } from '../src/ts/debug';
-import { readAutomationAnywhereAuthTokenFromLocalStorage } from '../src/ts/automation-anywhere-api';
+import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
+import {
+	AutomationAnywhereApi,
+	parseAutomationAnywherePageContext,
+	readAutomationAnywhereAuthTokenFromLocalStorage,
+} from '../src/ts/automation-anywhere-api';
 import { setScrollableFoldersAutoScrollEnabled } from '../src/ts/folders';
 import { setActiveLanguagePreference, t } from '../src/ts/i18n';
 import {
@@ -89,6 +93,11 @@ import { setRunButtonAnimationEnabled } from '../src/ts/run-button-animation';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
 import { updateCommandPaletteLanguage } from '../src/ts/palette';
+import {
+	extractVariableMetadataLookup,
+	findVariableMetadata,
+	type VariableMetadataLookup,
+} from '../src/ts/variable-metadata';
 
 const DEFAULT_LOADING_IMAGE_CSS = `url("${browser.runtime.getURL(
 	'media/loading.gif' as any
@@ -109,10 +118,21 @@ const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
 const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
 const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
 const KEEP_ALIVE_INTERVAL_MS = 60_000;
+const VARIABLES_BUTTON_SELECTOR =
+	'button[data-path="EditorPalette.section.button"][aria-label="Variables"]';
+const VARIABLE_ROW_SELECTOR = '.editor-palette-item[data-item-name]';
+const VARIABLE_LABEL_SELECTOR =
+	'.editor-palette-item__child-label[data-path="ClippedText"]';
+const LABEL_TEXT_SELECTOR = '.clipped-text__string--for_presentation';
+const VARIABLE_METADATA_ORIGINAL_TEXT_ATTR = 'data-better-aa-original-text';
 
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
 let activeRunButtonStyleEnabled = false;
 let activeRunButtonWavesEnabled = false;
+let variableMetadataObserver: MutationObserver | null = null;
+let variableMetadataScheduled = false;
+let variableMetadataCurrentFileId: string | null = null;
+const variableMetadataCache = new Map<string, Promise<VariableMetadataLookup | null>>();
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -128,6 +148,7 @@ function applyRouteClasses(): void {
 	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
+	scheduleVariableMetadataSync();
 }
 
 function syncScrollableFoldersAutoScroll(): void {
@@ -220,6 +241,177 @@ async function applyStyleClasses(): Promise<void> {
 	setPathFinderSlimSidebarEnabled(effectiveEnabled && styleFeatures.pathFinder);
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
+	scheduleVariableMetadataSync();
+}
+
+function getLabelTextElement(label: HTMLElement): HTMLElement {
+	return label.querySelector<HTMLElement>(LABEL_TEXT_SELECTOR) ?? label;
+}
+
+function restoreVariableMetadataLabel(label: HTMLElement): void {
+	const originalText = label.getAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR);
+	if (originalText === null) return;
+
+	getLabelTextElement(label).textContent = originalText;
+	label.setAttribute('data-text', originalText);
+	label.setAttribute('title', originalText);
+	label.removeAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR);
+	label.classList.remove('better-aa-variable-metadata-label');
+	label.closest(VARIABLE_ROW_SELECTOR)?.classList.remove('better-aa-variable-metadata-row');
+}
+
+function restoreVariableMetadataLabels(root: ParentNode = document): void {
+	root
+		.querySelectorAll<HTMLElement>(
+			`[${VARIABLE_METADATA_ORIGINAL_TEXT_ATTR}]`
+		)
+		.forEach(restoreVariableMetadataLabel);
+}
+
+function getActiveVariablesSection(): HTMLElement | null {
+	const button = document.querySelector<HTMLButtonElement>(VARIABLES_BUTTON_SELECTOR);
+	const section = button?.closest<HTMLElement>('[data-path="EditorPalette.section"]');
+	if (!button || !section) return null;
+	if (!button.closest('.editor-palette__accordion--is_active')) return null;
+	if (
+		!section.querySelector(
+			'.editor-palette-section__header--is_active'
+		)
+	) {
+		return null;
+	}
+	return section;
+}
+
+function getVariableMetadataContext(): {
+	baseUrl: string;
+	fileId: string;
+	section: HTMLElement;
+} | null {
+	if (!document.documentElement.classList.contains(STYLE_CLASS)) return null;
+	const context = parseAutomationAnywherePageContext(location.href);
+	if (
+		(context.pageType !== 'private-taskbot' &&
+			context.pageType !== 'public-taskbot') ||
+		!context.baseUrl ||
+		!context.fileId
+	) {
+		return null;
+	}
+	const section = getActiveVariablesSection();
+	if (!section) return null;
+	return { baseUrl: context.baseUrl, fileId: context.fileId, section };
+}
+
+function scheduleVariableMetadataSync(): void {
+	if (variableMetadataScheduled) return;
+	variableMetadataScheduled = true;
+	requestAnimationFrame(() => {
+		variableMetadataScheduled = false;
+		void syncVariableMetadataLabels();
+	});
+}
+
+async function loadVariableMetadata(
+	fileId: string,
+	baseUrl: string
+): Promise<VariableMetadataLookup | null> {
+	const existing = variableMetadataCache.get(fileId);
+	if (existing) return existing;
+
+	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
+	if (!authToken) {
+		void debugWarn('variable-metadata', 'Automation Anywhere auth token not found.');
+		return null;
+	}
+
+	const promise = new AutomationAnywhereApi(baseUrl, authToken)
+		.getBotContent(fileId)
+		.then((content) => extractVariableMetadataLookup(content))
+		.catch((error) => {
+			variableMetadataCache.delete(fileId);
+			void debugWarn('variable-metadata', 'Variable metadata load failed.', { error });
+			return null;
+		})
+		.finally(scheduleVariableMetadataSync);
+
+	variableMetadataCache.set(fileId, promise);
+	return promise;
+}
+
+function applyVariableMetadataLabels(
+	section: HTMLElement,
+	lookup: VariableMetadataLookup
+): void {
+	section.querySelectorAll<HTMLElement>(VARIABLE_ROW_SELECTOR).forEach((row) => {
+		const label = row.querySelector<HTMLElement>(VARIABLE_LABEL_SELECTOR);
+		if (!label) return;
+
+		const metadata = findVariableMetadata(lookup, row.dataset.itemName);
+		if (!metadata) {
+			restoreVariableMetadataLabel(label);
+			return;
+		}
+
+		if (!label.hasAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR)) {
+			label.setAttribute(
+				VARIABLE_METADATA_ORIGINAL_TEXT_ATTR,
+				getLabelTextElement(label).textContent ?? ''
+			);
+		}
+
+		const textElement = getLabelTextElement(label);
+		if (textElement.textContent !== metadata.label) {
+			textElement.textContent = metadata.label;
+		}
+		if (label.getAttribute('data-text') !== metadata.label) {
+			label.setAttribute('data-text', metadata.label);
+		}
+		if (label.getAttribute('title') !== metadata.title) {
+			label.setAttribute('title', metadata.title);
+		}
+		label.classList.add('better-aa-variable-metadata-label');
+		row.classList.add('better-aa-variable-metadata-row');
+	});
+}
+
+async function syncVariableMetadataLabels(): Promise<void> {
+	const context = getVariableMetadataContext();
+	if (!context) {
+		if (variableMetadataCurrentFileId !== null) {
+			variableMetadataCurrentFileId = null;
+			restoreVariableMetadataLabels();
+		}
+		return;
+	}
+
+	if (context.fileId !== variableMetadataCurrentFileId) {
+		restoreVariableMetadataLabels();
+		variableMetadataCurrentFileId = context.fileId;
+	}
+
+	const lookup = await loadVariableMetadata(context.fileId, context.baseUrl);
+	const latestContext = getVariableMetadataContext();
+	if (
+		!lookup ||
+		!latestContext ||
+		latestContext.fileId !== context.fileId ||
+		latestContext.section !== context.section
+	) {
+		return;
+	}
+	applyVariableMetadataLabels(context.section, lookup);
+}
+
+function installVariableMetadataObserver(): void {
+	if (variableMetadataObserver || !document.body) return;
+	variableMetadataObserver = new MutationObserver(scheduleVariableMetadataSync);
+	variableMetadataObserver.observe(document.body, {
+		childList: true,
+		subtree: true,
+	});
+	document.addEventListener('click', scheduleVariableMetadataSync, true);
+	scheduleVariableMetadataSync();
 }
 
 function setStyleValue(key: string, value: string): void {
@@ -605,6 +797,7 @@ export default defineContentScript({
 
 		runOnReady(() => {
 			insertOpenSidebarButton();
+			installVariableMetadataObserver();
 			callInitializeRepeatedly();
 		});
 	},

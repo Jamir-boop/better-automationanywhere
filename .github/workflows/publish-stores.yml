@@ -1,0 +1,57 @@
+name: Publish Stores
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Check auth without uploading packages
+        type: boolean
+        default: true
+      chrome_skip_submit_review:
+        description: Upload Chrome package without submitting for review
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-stores
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      CHROME_PUBLISH_TARGET: default
+      CHROME_SKIP_SUBMIT_REVIEW: ${{ inputs.chrome_skip_submit_review }}
+      FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+      FIREFOX_CHANNEL: listed
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:maintenance
+
+      - name: Submit dry run
+        if: ${{ inputs.dry_run }}
+        run: pnpm submit:dry-run
+
+      - name: Submit to stores
+        if: ${{ !inputs.dry_run }}
+        run: pnpm submit:stores
