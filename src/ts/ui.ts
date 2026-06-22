@@ -1,7 +1,6 @@
 import * as commands from './commands';
 import { debugWarn } from './debug';
 import { t } from './i18n';
-import { escapeHtml } from './utils';
 
 const NOTIFICATION_MIN_DURATION_MS = 8000;
 const PATHFINDER_EXPANDER_SELECTOR =
@@ -396,13 +395,16 @@ function getNotificationTray(): Element {
 	if (!host) {
 		host = document.createElement('div');
 		host.id = 'better-aa-toast-host';
-		host.innerHTML = `
-			<div class="main-layout__toast-tray">
-				<div class="mainlayouttoasttray">
-					<div class="toasttray" data-path="ToastTray"></div>
-				</div>
-			</div>
-		`;
+		const trayOuter = document.createElement('div');
+		trayOuter.className = 'main-layout__toast-tray';
+		const trayMiddle = document.createElement('div');
+		trayMiddle.className = 'mainlayouttoasttray';
+		const tray = document.createElement('div');
+		tray.className = 'toasttray';
+		tray.dataset.path = 'ToastTray';
+		trayMiddle.appendChild(tray);
+		trayOuter.appendChild(trayMiddle);
+		host.appendChild(trayOuter);
 		document.body.appendChild(host);
 	}
 	return host.querySelector('.toasttray') ?? host;
@@ -418,15 +420,33 @@ export function showNotification(
 	const tray = getNotificationTray();
 	const toastWrapper = document.createElement('div');
 	toastWrapper.className = 'toasttray-toast';
-	toastWrapper.innerHTML = `
-		<div data-path="Toast" class="toast g-reset-element g-box-sizing_border-box toast--closable">
-			<div class="toast-content">
-				${title ? `<div class="toast-title">${escapeHtml(title)}</div>` : ''}
-				${message ? `<div class="toast-message">${escapeHtml(message)}</div>` : ''}
-			</div>
-			<button type="button" aria-label="${escapeHtml(t('Close notification'))}" class="toast-close">&times;</button>
-		</div>
-	`;
+	const toast = document.createElement('div');
+	toast.dataset.path = 'Toast';
+	toast.className = 'toast g-reset-element g-box-sizing_border-box toast--closable';
+	const content = document.createElement('div');
+	content.className = 'toast-content';
+
+	if (title) {
+		const titleEl = document.createElement('div');
+		titleEl.className = 'toast-title';
+		titleEl.textContent = title;
+		content.appendChild(titleEl);
+	}
+
+	if (message) {
+		const messageEl = document.createElement('div');
+		messageEl.className = 'toast-message';
+		messageEl.textContent = message;
+		content.appendChild(messageEl);
+	}
+
+	const closeButton = document.createElement('button');
+	closeButton.type = 'button';
+	closeButton.setAttribute('aria-label', t('Close notification'));
+	closeButton.className = 'toast-close';
+	closeButton.textContent = '\u00d7';
+	toast.append(content, closeButton);
+	toastWrapper.appendChild(toast);
 
 	let closeTimer: ReturnType<typeof setTimeout> | null = null;
 	const close = () => {
@@ -447,10 +467,9 @@ export function showNotification(
 		closeTimer = setTimeout(close, Math.max(duration, NOTIFICATION_MIN_DURATION_MS));
 	};
 
-	toastWrapper.querySelector('.toast-close')?.addEventListener('click', close);
-	const toast = toastWrapper.querySelector('.toast');
-	toast?.addEventListener('mouseenter', clearCloseTimer);
-	toast?.addEventListener('mouseleave', close);
+	closeButton.addEventListener('click', close);
+	toast.addEventListener('mouseenter', clearCloseTimer);
+	toast.addEventListener('mouseleave', close);
 	tray.prepend(toastWrapper);
 	scheduleClose();
 }

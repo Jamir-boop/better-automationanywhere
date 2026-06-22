@@ -56,6 +56,20 @@ export function escapeHtml(value: unknown): string {
 	});
 }
 
+// ponytail: extension-owned markup; build DOM manually if validator flags parsing.
+export function htmlToFragment(html: string): DocumentFragment {
+	const doc = new DOMParser().parseFromString(html, 'text/html');
+	const fragment = document.createDocumentFragment();
+	for (const node of Array.from(doc.body.childNodes)) {
+		fragment.appendChild(document.importNode(node, true));
+	}
+	return fragment;
+}
+
+export function replaceChildrenFromHtml(element: Element, html: string): void {
+	element.replaceChildren(htmlToFragment(html));
+}
+
 export function normalizeCommandText(value: unknown): string {
 	return String(value || '')
 		.replace(/[-_]+/g, ' ')

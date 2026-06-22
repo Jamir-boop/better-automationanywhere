@@ -17,10 +17,18 @@ export function insertCommandPalette(retryCount = 0): void {
 	containerDiv.hidden = true;
 	containerDiv.style.display = 'none';
 	containerDiv.setAttribute('aria-hidden', 'true');
-	containerDiv.innerHTML = `
-		<input type="text" id="commandInput" placeholder="${utils.escapeHtml(t('Search commands...'))}" aria-label="${utils.escapeHtml(t('Search commands'))}">
-		<div id="commandPredictions" class="command_predictions" role="listbox"></div>
-	`;
+
+	const input = document.createElement('input');
+	input.type = 'text';
+	input.id = 'commandInput';
+	input.placeholder = t('Search commands...');
+	input.setAttribute('aria-label', t('Search commands'));
+
+	const predictions = document.createElement('div');
+	predictions.id = 'commandPredictions';
+	predictions.className = 'command_predictions';
+	predictions.setAttribute('role', 'listbox');
+	containerDiv.append(input, predictions);
 
 	if (!document.getElementById('commandPalette-style')) {
 		const style = document.createElement('style');
@@ -214,7 +222,7 @@ export function closeCommandPalette(): void {
 
 export function clearPredictions(): void {
 	const predictions = getCommandPredictions();
-	if (predictions) predictions.innerHTML = '';
+	predictions?.replaceChildren();
 }
 
 function createPredictionItem(options: {
@@ -228,13 +236,23 @@ function createPredictionItem(options: {
 	predictionItem.className = 'command_prediction-item';
 	predictionItem.setAttribute('role', 'option');
 	const aliasText = options.aliases?.length ? options.aliases.join(', ') : '';
-	predictionItem.innerHTML = `
-		<span>
-			<strong>${utils.escapeHtml(options.title)}</strong>
-			<span class="command_prediction-description">${utils.escapeHtml(options.description)}</span>
-		</span>
-		${aliasText ? `<span class="command_prediction-aliases">${utils.escapeHtml(aliasText)}</span>` : ''}
-	`;
+
+	const text = document.createElement('span');
+	const title = document.createElement('strong');
+	title.textContent = options.title;
+	const description = document.createElement('span');
+	description.className = 'command_prediction-description';
+	description.textContent = options.description;
+	text.append(title, description);
+	predictionItem.appendChild(text);
+
+	if (aliasText) {
+		const aliases = document.createElement('span');
+		aliases.className = 'command_prediction-aliases';
+		aliases.textContent = aliasText;
+		predictionItem.appendChild(aliases);
+	}
+
 	utils.safeAddClick(predictionItem, options.action);
 	return predictionItem;
 }

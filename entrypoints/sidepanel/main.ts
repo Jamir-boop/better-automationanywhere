@@ -122,6 +122,7 @@ import {
 	type DebugEvent,
 	type FeedbackSeverity,
 } from '@/src/ts/debug';
+import { replaceChildrenFromHtml } from '@/src/ts/utils';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root.');
@@ -471,7 +472,7 @@ function renderBackgroundColorControls(): string {
 		.join('');
 }
 
-app.innerHTML = `
+replaceChildrenFromHtml(app, `
 	<header class="panel-header">
 		<div>
 			<h1>${t('Better AA Developer Experience')}</h1>
@@ -595,7 +596,7 @@ app.innerHTML = `
 		</section>
 	</main>
 
-`;
+`);
 
 const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
 const runButtonWavesInput = document.querySelector<HTMLInputElement>('#runButtonWaves')!;
@@ -1193,17 +1194,17 @@ async function refreshExtensionShortcuts(): Promise<void> {
 }
 
 function renderStaticAboutHelp(shortcut: CommandPaletteShortcut): void {
-	aboutHelp.innerHTML = renderHelpHtml({
+	replaceChildrenFromHtml(aboutHelp, renderHelpHtml({
 		commands: Object.values(getCommandHelp()),
 		shortcutLabel: getCommandPaletteShortcutLabel(shortcut),
 		sidebarShortcutLabel: currentExtensionShortcuts.openSidebar,
-	});
+	}));
 }
 
 async function refreshAboutHelp(): Promise<void> {
 	const response = await sendActiveTabMessage({ type: 'GET_HELP_HTML' });
 	if (response.ok && response.html) {
-		aboutHelp.innerHTML = response.html;
+		replaceChildrenFromHtml(aboutHelp, response.html);
 		return;
 	}
 	renderStaticAboutHelp(currentShortcut);

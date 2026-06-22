@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 import { AUTOMATION_ANYWHERE_MATCHES } from './src/ts/automation-anywhere';
 
 const { version } = createRequire(import.meta.url)('./package.json') as {
@@ -10,6 +11,15 @@ const webAccessibleResources = ['media/loading.gif', 'sounds/*'];
 
 export default defineConfig({
 	targetBrowsers: ['chrome', 'firefox'],
+	vite: () => ({
+		resolve: {
+			alias: {
+				jszip: resolve('node_modules/jszip/lib/index.js'),
+				setimmediate: resolve('src/ts/setimmediate-shim.ts'),
+				stream: resolve('src/ts/stream-shim.ts'),
+			},
+		},
+	}),
 	hooks: {
 		'build:manifestGenerated': (_wxt, manifest) => {
 			if (manifest.sidebar_action) {

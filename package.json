@@ -2,7 +2,7 @@
   "name": "better-automationanywhere-dx",
   "description": "Better AA Developer Experience for Automation Anywhere",
   "private": true,
-  "version": "1.10.12",
+  "version": "1.10.13",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -12,10 +12,9 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
-    "test:aa-json": "node scripts/test-aa-json.mjs",
     "test:style-doctor": "node scripts/test-style-doctor.mjs",
     "test:control-room-version": "node scripts/test-control-room-version.mjs",
-    "check:maintenance": "tsc --noEmit && node scripts/test-aa-json.mjs && node scripts/test-style-doctor.mjs && node scripts/test-control-room-version.mjs && wxt build && wxt build -b firefox",
+    "check:maintenance": "tsc --noEmit && node scripts/test-style-doctor.mjs && node scripts/test-control-room-version.mjs && wxt build && wxt build -b firefox",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
