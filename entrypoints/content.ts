@@ -14,6 +14,7 @@ import {
 	isTaskEditorUrl,
 	isTextFileUrl,
 } from '../src/ts/automation-anywhere';
+import { clampBackgroundColorValue } from '../src/ts/background-colors';
 import {
 	setBotExecutionModalEnabled,
 	setBotExecutionModalPosition,
@@ -424,7 +425,9 @@ function setStyleValue(key: string, value: string): void {
 	}
 	document.documentElement.style.setProperty(
 		field.cssVar,
-		normalizedValue || field.defaultValue
+		field.type === 'color'
+			? clampBackgroundColorValue(normalizedValue || field.defaultValue)
+			: normalizedValue || field.defaultValue
 	);
 }
 

@@ -38,6 +38,14 @@ import {
 	summarizeAutomationAnywhereJson,
 } from '@/src/ts/automation-anywhere-json';
 import {
+	clampBackgroundColorValue,
+	formatAlpha,
+	formatRgba,
+	hexToRgb,
+	parseCssColorValue,
+	toHex,
+} from '@/src/ts/background-colors';
+import {
 	COMMAND_PALETTE_SHORTCUTS,
 	BOT_EXECUTION_MODAL_POSITION_OPTIONS,
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
@@ -161,7 +169,6 @@ let currentShortcut: CommandPaletteShortcut = COMMAND_PALETTE_SHORTCUTS.ALT_P;
 let currentOpenSidebarShortcut: OpenSidebarShortcut = DEFAULT_OPEN_SIDEBAR_SHORTCUT;
 const BACKGROUND_COLOR_KEYS = [
 	'backgroundColor1',
-	'backgroundColor2',
 	'backgroundColor3',
 ] as const satisfies readonly StyleValueKey[];
 const STYLE_FEATURE_GROUPS = [
@@ -1331,65 +1338,22 @@ function isColorField(key: StyleValueKey): boolean {
 	return STYLE_VALUE_FIELDS.some((field) => field.key === key && field.type === 'color');
 }
 
-function clamp(value: number, min: number, max: number): number {
-	return Math.min(max, Math.max(min, value));
-}
-
-function toHex(value: number): string {
-	return clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0');
-}
-
 function parseColorValue(value: string): { hex: string; alpha: number } {
-	const normalized = value.trim();
-	const hexMatch = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-	if (hexMatch) {
-		const hex = hexMatch[1];
-		const expanded =
-			hex.length === 3
-				? hex
-						.split('')
-						.map((char) => `${char}${char}`)
-						.join('')
-				: hex;
-		return { hex: `#${expanded.toLowerCase()}`, alpha: 1 };
-	}
-
-	const rgbaMatch = normalized.match(
-		/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([0-9.]+))?\s*\)$/i
-	);
-	if (rgbaMatch) {
-		const red = Number(rgbaMatch[1]);
-		const green = Number(rgbaMatch[2]);
-		const blue = Number(rgbaMatch[3]);
-		const alpha = rgbaMatch[4] === undefined ? 1 : Number(rgbaMatch[4]);
-		return {
-			hex: `#${toHex(red)}${toHex(green)}${toHex(blue)}`,
-			alpha: clamp(Number.isFinite(alpha) ? alpha : 1, 0, 1),
-		};
+	const parsed = parseCssColorValue(clampBackgroundColorValue(value));
+	if (parsed) {
+		const { red, green, blue } = parsed.rgb;
+		return { hex: `#${toHex(red)}${toHex(green)}${toHex(blue)}`, alpha: parsed.alpha };
 	}
 
 	return { hex: '#a0a0a0', alpha: 1 };
 }
 
-function hexToRgb(hex: string): { red: number; green: number; blue: number } {
-	const normalized = hex.replace('#', '');
-	return {
-		red: Number.parseInt(normalized.slice(0, 2), 16),
-		green: Number.parseInt(normalized.slice(2, 4), 16),
-		blue: Number.parseInt(normalized.slice(4, 6), 16),
-	};
-}
-
-function formatAlpha(alpha: number): string {
-	return String(Math.round(clamp(alpha, 0, 1) * 100) / 100);
-}
-
 function colorControlsToRgba(key: StyleValueKey): string {
 	const colorInput = getStyleValueInput(key) as HTMLInputElement;
 	const opacityInput = getStyleOpacityInput(key);
-	const { red, green, blue } = hexToRgb(colorInput.value);
+	const rgb = hexToRgb(colorInput.value);
 	const alpha = Number(opacityInput.value);
-	return `rgba(${red}, ${green}, ${blue}, ${formatAlpha(alpha)})`;
+	return clampBackgroundColorValue(formatRgba(rgb, alpha));
 }
 
 function setColorControls(key: StyleValueKey, value: string): void {

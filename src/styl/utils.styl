@@ -28,16 +28,14 @@ darkGradientBackground()
 customGradientBackground()
 	background:
 		radial-gradient(circle, var(--better-aa-background-color-1, rgba(182, 182, 182, .2)) 20%, transparent 20%),
-		radial-gradient(circle, var(--better-aa-background-color-2, rgba(253, 237, 211, .0)) 20%, transparent 20%),
 		radial-gradient(circle, var(--better-aa-background-color-3, rgba(182, 182, 182, .0)) 20%, transparent 20%),
 		linear-gradient(
-			45deg,
-			var(--better-aa-background-color-1, rgba(182, 182, 182, .2)) 0%,
-			var(--better-aa-background-color-2, rgba(253, 237, 211, .0)) 50%,
-			var(--better-aa-background-color-3, rgba(182, 182, 182, .0)) 100%
+			to bottom left,
+			var(--better-aa-background-color-1, rgba(182, 182, 182, .0)) 0%,
+			var(--better-aa-background-color-3, rgba(182, 182, 182, .1)) 100%
 		) !important
-	background-size: 10px 10px, 10px 10px, 10px 10px, auto !important
-	background-position: 0 0, 5px 5px, 2.5px 2.5px, 0 0 !important
+	background-size: 10px 10px, 10px 10px, auto !important
+	background-position: 0 0, 5px 5px, 0 0 !important
 
 
 cursiveCascadiaFont()
