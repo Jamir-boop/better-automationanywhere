@@ -289,6 +289,18 @@ function openChromeSidePanelFromUserAction(request?: SidebarOpenRequest): void {
 	);
 }
 
+function openFirefoxSidebarFromUserAction(request?: SidebarOpenRequest): void {
+	try {
+		const result = (browser as any).sidebarAction?.open?.();
+		void Promise.resolve(result).catch((error) => {
+			reportSidebarOpenBlocked(error, request ? 'OPEN_SIDEBAR' : 'open-sidebar');
+		});
+	} catch (error) {
+		reportSidebarOpenBlocked(error, request ? 'OPEN_SIDEBAR' : 'open-sidebar');
+	}
+	queueSidepanelRequest(request);
+}
+
 async function openSidebar(request?: SidebarOpenRequest): Promise<void> {
 	if (import.meta.env.CHROME) {
 		const activeTabs = await browser.tabs.query({ active: true, currentWindow: true });
@@ -302,15 +314,12 @@ async function openSidebar(request?: SidebarOpenRequest): Promise<void> {
 		return;
 	}
 
-	await writeSidepanelRequest(request);
-	if (!request?.userAction) return;
-
-	const sidebarAction = (browser as any).sidebarAction;
-	try {
-		await sidebarAction?.toggle?.();
-	} catch (error) {
-		reportSidebarOpenBlocked(error, request ? 'OPEN_SIDEBAR' : 'open-sidebar');
+	if (request?.userAction) {
+		openFirefoxSidebarFromUserAction(request);
+		return;
 	}
+
+	await writeSidepanelRequest(request);
 }
 
 async function handleFirefoxOpenSidebarMessage(
@@ -334,7 +343,7 @@ async function setPanelActionBehavior(): Promise<void> {
 
 	const action = (browser as any).action ?? (browser as any).browserAction;
 	action?.onClicked?.addListener(() => {
-		void openSidebar({ userAction: true });
+		openFirefoxSidebarFromUserAction({ userAction: true });
 	});
 }
 
@@ -650,7 +659,7 @@ export default defineBackground(() => {
 			if (import.meta.env.CHROME) {
 				openChromeSidePanelFromUserAction({ userAction: true });
 			} else {
-				void openSidebar({ userAction: true });
+				openFirefoxSidebarFromUserAction({ userAction: true });
 			}
 		}
 		if (command === 'toggle-styles') {
