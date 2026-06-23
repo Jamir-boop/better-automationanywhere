@@ -3,7 +3,7 @@ import type {
 	AutomationAnywhereApiResponse,
 	ContentActionResponse,
 } from './messages';
-import { AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE } from './automation-anywhere';
+import { parseAutomationAnywhereTaskEditorRoute } from './automation-anywhere';
 
 export const AUTOMATION_ANYWHERE_TASKBOT_TYPE = 'application/vnd.aa.taskbot';
 const AUTOMATION_ANYWHERE_DIRECTORY_TYPES = new Set([
@@ -124,14 +124,15 @@ export function parseAutomationAnywherePageContext(
 		};
 	}
 
-	const taskbot = route.match(AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE);
+	const taskbot = parseAutomationAnywhereTaskEditorRoute(route);
 	if (taskbot) {
 		return {
 			url,
 			baseUrl: parsed.origin,
 			hostname: parsed.hostname,
-			pageType: taskbot[1].toLowerCase() === 'public' ? 'public-taskbot' : 'private-taskbot',
-			fileId: decodeRouteId(taskbot[2]),
+			pageType: taskbot.workspace === 'public' ? 'public-taskbot' : 'private-taskbot',
+			folderId: taskbot.folderId,
+			fileId: taskbot.fileId,
 		};
 	}
 

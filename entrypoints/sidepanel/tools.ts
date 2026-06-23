@@ -25,19 +25,18 @@ import {
 	type JsonWorkbench,
 } from './json-workbench';
 import { t } from '@/src/ts/i18n';
+import {
+	getAvailableAutomationAnywhereTools,
+	getDefaultTaskbotTool,
+	type AutomationAnywhereToolId,
+} from '@/src/ts/automation-anywhere-tools';
 import type {
 	ContentActionResponse,
 	RuntimeMessage,
 	ToolCapabilities,
 } from '@/src/ts/messages';
 type FeedbackSeverity = 'info' | 'warn' | 'error';
-type ToolId =
-	| 'universal-clipboard'
-	| 'copy-files'
-	| 'update-packages'
-	| 'export-bots'
-	| 'download-packages'
-	| 'taskbot-json';
+type ToolId = AutomationAnywhereToolId;
 type ToolListItem = AutomationAnywhereFile | AutomationAnywherePackage;
 type ExportFormat = 'zip' | 'separate';
 
@@ -126,6 +125,7 @@ interface ToolRunState {
 const PAGE_LENGTH = 200;
 const EXPORT_BATCH_SIZE = 20;
 const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
+const CURRENT_TASKBOT_FALLBACK_NAME = 'Current bot';
 const EXPORT_BOTS_LEGACY_MODE_KEY = 'exportBotsLegacyMode';
 const EMPTY_TOOL_CAPABILITIES: ToolCapabilities = {
 	universalClipboard: false,
@@ -165,6 +165,7 @@ let refreshToolsContextTimer: ReturnType<typeof setTimeout> | null = null;
 
 let contextText: HTMLElement;
 let toolsClipboardStatus: HTMLElement;
+let toolsHelpMatrix: HTMLElement;
 let availabilityDot: HTMLElement;
 let refreshButton: HTMLButtonElement;
 let actionsContainer: HTMLElement;
@@ -222,6 +223,23 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				<p class="inline-hint">${t('Open an Automation Anywhere folder, taskbot, or Packages page, then refresh.')}</p>
 				<p id="toolsClipboardStatus" class="tools-clipboard-status" hidden></p>
 				<div id="toolsActions" class="tool-action-grid"></div>
+				<div id="toolsHelpMatrix" class="tools-help-matrix" hidden>
+					<p class="inline-hint">${t('Tools appear when the active tab is on a supported Automation Anywhere page.')}</p>
+					<dl>
+						<div>
+							<dt>${t('Taskbot editor')}</dt>
+							<dd>${t('Universal Clipboard, Taskbot JSON, Update Packages, Export Bots')}</dd>
+						</div>
+						<div>
+							<dt>${t('Folder view')}</dt>
+							<dd>${t('Copy Files, Update Packages, Export Bots')}</dd>
+						</div>
+						<div>
+							<dt>${t('Packages page')}</dt>
+							<dd>${t('Download Packages')}</dd>
+						</div>
+					</dl>
+				</div>
 			</section>
 
 			<section id="universalClipboardSection" class="panel-section" hidden>
@@ -307,7 +325,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 							exportLabel: 'Export JSON',
 							exportHelp: 'Download textarea JSON as a .json file.',
 						})}
-						<button id="taskbotSaveJson" type="button">${t('Save JSON')}</button>
+						<button id="taskbotSaveJson" type="button">${t('Import JSON to control room')}</button>
 					</div>
 				</div>
 			</section>
@@ -320,6 +338,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	options = initOptions;
 	contextText = getRequiredElement('#toolsContext');
 	toolsClipboardStatus = getRequiredElement('#toolsClipboardStatus');
+	toolsHelpMatrix = getRequiredElement('#toolsHelpMatrix');
 	availabilityDot = getRequiredElement('#toolsAvailabilityDot');
 	refreshButton = getRequiredElement<HTMLButtonElement>('#toolsRefresh');
 	actionsContainer = getRequiredElement('#toolsActions');
@@ -676,10 +695,21 @@ function updateAvailabilityDot(hasTools: boolean): void {
 	refreshButton.dataset.hasTools = String(hasTools);
 }
 
+function setToolsHelpMatrixVisible(visible: boolean): void {
+	toolsHelpMatrix.hidden = !visible;
+	toolsHelpMatrix.setAttribute('aria-hidden', String(!visible));
+}
+
 function isFolderTool(
 	tool: ToolId | null
 ): tool is 'copy-files' | 'update-packages' | 'export-bots' {
 	return tool === 'copy-files' || tool === 'update-packages' || tool === 'export-bots';
+}
+
+function isCurrentTaskbotTool(
+	tool: ToolId | null
+): tool is 'update-packages' | 'export-bots' {
+	return tool === 'update-packages' || tool === 'export-bots';
 }
 
 function isListTool(
@@ -709,6 +739,7 @@ async function refreshToolsContext(): Promise<void> {
 	taskbotJsonBaseline = null;
 	updateCopiedFilesStatus();
 	updateAvailabilityDot(false);
+	setToolsHelpMatrixVisible(false);
 
 	try {
 		const active = await getActiveAutomationAnywhereContext();
@@ -719,6 +750,7 @@ async function refreshToolsContext(): Promise<void> {
 				t('Unsupported page. Open Automation Anywhere folder, taskbot, or packages page.');
 			setSelectedToolPanel(null);
 			renderActionButtons();
+			setToolsHelpMatrixVisible(true);
 			return;
 		}
 
@@ -732,6 +764,7 @@ async function refreshToolsContext(): Promise<void> {
 		contextText.textContent = getContextLabel(active.context);
 		const tools = getAvailableTools(active.context, capabilities);
 		updateAvailabilityDot(tools.length > 0);
+		setToolsHelpMatrixVisible(tools.length === 0);
 
 		if (isFolderContext(active.context)) {
 			const shouldSuggestPaste = canPasteCopiedFilesInContext(active.context);
@@ -746,6 +779,17 @@ async function refreshToolsContext(): Promise<void> {
 					})
 				);
 			}
+			return;
+		}
+
+		if (isTaskbotContext(active.context)) {
+			currentTool = getDefaultTaskbotTool(active.context, capabilities);
+			if (!currentTool) return;
+			if (currentTool === 'export-bots') resetExportFormatToDefault();
+			setSelectedToolPanel(currentTool);
+			renderActionButtons();
+			if (currentTool === 'taskbot-json') await loadTaskbotJson();
+			else if (currentTool !== 'universal-clipboard') await loadListPage(true);
 			return;
 		}
 
@@ -810,29 +854,19 @@ function isFolderContext(context: AutomationAnywherePageContext): boolean {
 	return context.pageType === 'private-folder' || context.pageType === 'public-folder';
 }
 
+function isTaskbotContext(context: AutomationAnywherePageContext | undefined): boolean {
+	return context?.pageType === 'private-taskbot' || context?.pageType === 'public-taskbot';
+}
+
+function isCurrentTaskbotMode(): boolean {
+	return Boolean(runtime && isTaskbotContext(runtime.context) && isCurrentTaskbotTool(currentTool));
+}
+
 function getAvailableTools(
 	context: AutomationAnywherePageContext,
 	capabilities: ToolCapabilities = runtime?.capabilities ?? EMPTY_TOOL_CAPABILITIES
 ): ToolId[] {
-	const tools: ToolId[] = [];
-	if (capabilities.universalClipboard) tools.push('universal-clipboard');
-	if (context.pageType === 'private-folder') {
-		tools.push('copy-files', 'update-packages', 'export-bots');
-		return tools;
-	}
-	if (context.pageType === 'public-folder') {
-		tools.push('export-bots');
-		return tools;
-	}
-	if (context.pageType === 'private-taskbot' || context.pageType === 'public-taskbot') {
-		tools.push('taskbot-json');
-		return tools;
-	}
-	if (context.pageType === 'packages') {
-		tools.push('download-packages');
-		return tools;
-	}
-	return tools;
+	return getAvailableAutomationAnywhereTools(context, capabilities);
 }
 
 function getToolLabel(tool: ToolId): string {
@@ -922,6 +956,10 @@ async function loadListPage(reset: boolean): Promise<void> {
 		await loadPackagePage(reset);
 		return;
 	}
+	if (isCurrentTaskbotMode()) {
+		await loadCurrentTaskbotPage(reset);
+		return;
+	}
 	await loadFolderPage(reset);
 }
 
@@ -978,6 +1016,91 @@ async function loadFolderPage(reset: boolean): Promise<void> {
 		setToolStatus(
 			error instanceof Error ? error.message : t('Folder list failed.'),
 			'error'
+		);
+	} finally {
+		if (runtime === activeRuntime && currentTool === selectedTool) {
+			setBusy(loadMoreButton, false, t('Load more'));
+		}
+	}
+}
+
+function createCurrentTaskbotFallback(fileId: string): AutomationAnywhereFile {
+	return {
+		id: fileId,
+		name: CURRENT_TASKBOT_FALLBACK_NAME,
+		mimeType: AUTOMATION_ANYWHERE_TASKBOT_TYPE,
+	};
+}
+
+async function findCurrentTaskbotInFolder(
+	activeRuntime: ToolsRuntime,
+	folderId: string,
+	fileId: string
+): Promise<AutomationAnywhereFile | null> {
+	for (let offset = 0; ; offset += PAGE_LENGTH) {
+		const response = await activeRuntime.api.listFolderContents({
+			folderId,
+			offset,
+			length: PAGE_LENGTH,
+			filesOnly: true,
+		});
+		const list = response.list ?? [];
+		const match = list.find((item) => getAutomationAnywhereFileId(item) === fileId);
+		if (match) return match;
+		if (list.length < PAGE_LENGTH) return null;
+	}
+}
+
+async function loadCurrentTaskbotPage(reset: boolean): Promise<void> {
+	const activeRuntime = runtime;
+	const context = activeRuntime?.context;
+	const fileId = context?.fileId;
+	const selectedTool = currentTool;
+	if (!activeRuntime || !context || !fileId || !isCurrentTaskbotTool(selectedTool)) return;
+
+	setBusy(loadMoreButton, true, t('Loading current bot...'));
+	if (reset) {
+		loadedItems = [];
+		selectedIds = new Set<string>();
+		loadedOffset = 0;
+		loadedTotal = 0;
+		lastRawPageLength = 0;
+		searchInput.value = '';
+	}
+
+	try {
+		const folderId = context.folderId ? String(context.folderId) : null;
+		const resolved = folderId
+			? await findCurrentTaskbotInFolder(activeRuntime, folderId, fileId)
+			: null;
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+
+		const item = resolved ?? createCurrentTaskbotFallback(fileId);
+		loadedItems = [item];
+		selectedIds = new Set([getAutomationAnywhereFileId(item)]);
+		loadedOffset = 1;
+		loadedTotal = 1;
+		lastRawPageLength = 1;
+		renderFileList();
+		setSelectedToolPanel(selectedTool);
+		setToolStatus(
+			resolved ? t('Current bot loaded.') : t('Current bot loaded from ID fallback.')
+		);
+	} catch (error) {
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		const item = createCurrentTaskbotFallback(fileId);
+		loadedItems = [item];
+		selectedIds = new Set([getAutomationAnywhereFileId(item)]);
+		loadedOffset = 1;
+		loadedTotal = 1;
+		lastRawPageLength = 1;
+		renderFileList();
+		setSelectedToolPanel(selectedTool);
+		setToolStatus(
+			error instanceof Error
+				? t('Current bot loaded from ID fallback: {message}', { message: error.message })
+				: t('Current bot loaded from ID fallback.'),
+			'warn'
 		);
 	} finally {
 		if (runtime === activeRuntime && currentTool === selectedTool) {
@@ -1102,6 +1225,9 @@ function getToolItemSearchText(item: ToolListItem): string {
 }
 
 function getToolItemMeta(item: ToolListItem): string {
+	if (isCurrentTaskbotMode() && !isAutomationAnywherePackageItem(item)) {
+		return t('ID: {fileId}', { fileId: getAutomationAnywhereFileId(item) });
+	}
 	if (!isAutomationAnywherePackageItem(item)) return getItemMeta(item);
 	const version = getAutomationAnywherePackageVersion(item) || t('unknown');
 	const hasDownloadUrl = Boolean(getAutomationAnywherePackageDownloadUrl(item));
@@ -1116,31 +1242,43 @@ function pruneSelection(): void {
 }
 
 function renderFileList(): void {
-	const search = searchInput.value.trim().toLowerCase();
-	const visible = loadedItems.filter((item) =>
-		getToolItemSearchText(item).toLowerCase().includes(search)
-	);
+	const currentTaskbotMode = isCurrentTaskbotMode();
+	const search = currentTaskbotMode ? '' : searchInput.value.trim().toLowerCase();
+	const visible = currentTaskbotMode
+		? loadedItems
+		: loadedItems.filter((item) =>
+				getToolItemSearchText(item).toLowerCase().includes(search)
+			);
 	searchInput.placeholder =
 		currentTool === 'download-packages' ? t('Search packages') : t('Search files');
+	searchInput.hidden = currentTaskbotMode;
+	const selectAllLabel = selectAllInput.closest<HTMLElement>('.tools-select-all');
+	if (selectAllLabel) selectAllLabel.hidden = currentTaskbotMode;
 
 	listTitle.textContent =
-		currentTool === 'copy-files'
+		currentTaskbotMode
+			? t('Current bot')
+			: currentTool === 'copy-files'
 			? t('Copy Files')
 			: currentTool === 'update-packages'
 				? t('Update Packages')
 				: currentTool === 'export-bots'
 					? t('Export Bots')
 					: t('Download Packages');
-	selectedCountText.textContent = t('{selected} selected / {loaded} loaded', {
-		selected: selectedIds.size,
-		loaded: loadedItems.length,
-	});
+	selectedCountText.textContent = currentTaskbotMode
+		? t('Current bot selected')
+		: t('{selected} selected / {loaded} loaded', {
+				selected: selectedIds.size,
+				loaded: loadedItems.length,
+			});
 	fileList.textContent = '';
 
 	if (!visible.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-empty';
-		empty.textContent = loadedItems.length
+		empty.textContent = currentTaskbotMode
+			? t('Current bot not found.')
+			: loadedItems.length
 			? t('No matches.')
 			: currentTool === 'download-packages'
 				? t('No packages found.')
@@ -1150,8 +1288,9 @@ function renderFileList(): void {
 
 	for (const item of visible) {
 		const id = getToolItemId(item);
-		const row = document.createElement('label');
+		const row = document.createElement(currentTaskbotMode ? 'div' : 'label');
 		row.className = 'tool-file-row';
+		row.classList.toggle('is-current-taskbot', currentTaskbotMode);
 		const checkbox = document.createElement('input');
 		checkbox.type = 'checkbox';
 		checkbox.checked = selectedIds.has(id);
@@ -1167,7 +1306,8 @@ function renderFileList(): void {
 		const text = document.createElement('span');
 		text.className = 'tool-file-text';
 		text.append(name, meta);
-		row.append(checkbox, text);
+		if (currentTaskbotMode) row.append(text);
+		else row.append(checkbox, text);
 		fileList.appendChild(row);
 	}
 
@@ -1200,10 +1340,19 @@ function toggleVisibleSelection(): void {
 
 function updateActionBar(): void {
 	const count = selectedIds.size;
+	const currentTaskbotMode = isCurrentTaskbotMode();
 	primaryActionButton.disabled = count === 0;
 	if (currentTool === 'copy-files') primaryActionButton.textContent = t('Copy {count} file(s)', { count });
-	if (currentTool === 'update-packages') primaryActionButton.textContent = t('Update {count} bot(s)', { count });
-	if (currentTool === 'export-bots') primaryActionButton.textContent = t('Export {count} file(s)', { count });
+	if (currentTool === 'update-packages') {
+		primaryActionButton.textContent = currentTaskbotMode
+			? t('Update current bot')
+			: t('Update {count} bot(s)', { count });
+	}
+	if (currentTool === 'export-bots') {
+		primaryActionButton.textContent = currentTaskbotMode
+			? t('Export current bot')
+			: t('Export {count} file(s)', { count });
+	}
 	if (currentTool === 'download-packages') {
 		primaryActionButton.textContent = t('Download {count} package(s)', { count });
 	}
@@ -1221,7 +1370,7 @@ function updateActionBar(): void {
 		count: copiedFiles.length,
 	});
 
-	loadMoreButton.hidden = !hasMoreItems();
+	loadMoreButton.hidden = currentTaskbotMode || !hasMoreItems();
 }
 
 function hasMoreItems(): boolean {
@@ -1787,7 +1936,7 @@ async function saveTaskbotJson(): Promise<void> {
 			const remoteBaseline = normalizeTaskbotJsonContent(remoteContent);
 			if (remoteBaseline !== taskbotJsonBaseline) {
 				setToolStatus(
-					t('Taskbot JSON changed in Control Room. Reload before saving.'),
+					t('Taskbot JSON changed in Control Room. Reload before importing.'),
 					'error'
 				);
 				return;
@@ -1800,7 +1949,7 @@ async function saveTaskbotJson(): Promise<void> {
 				: t('changed');
 		if (
 			!window.confirm(
-				t('Save JSON for file {fileId}? Status: {status}.', {
+				t('Import JSON to Control Room for file {fileId}? Status: {status}.', {
 					fileId,
 					status: changeStatus,
 				})
@@ -1813,9 +1962,9 @@ async function saveTaskbotJson(): Promise<void> {
 		taskbotJsonBaseline = normalizeTaskbotJsonContent(parsed);
 		const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
 		if (tab?.id) await browser.tabs.reload(tab.id);
-		setToolStatus(t('Taskbot JSON saved.'));
+		setToolStatus(t('Taskbot JSON imported to Control Room.'));
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : t('Taskbot JSON save failed.'), 'error');
+		setToolStatus(error instanceof Error ? error.message : t('Taskbot JSON import failed.'), 'error');
 	}
 }
 

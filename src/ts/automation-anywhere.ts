@@ -8,6 +8,9 @@ export const AUTOMATION_ANYWHERE_MATCHES = [
 export const AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE =
 	/\/(?:bots\/repository\/)?(private|public)\/(?:folders\/[^/?#]+\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
 
+const AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_DETAILS_RE =
+	/\/(?:bots\/repository\/)?(private|public)\/(?:folders\/([^/?#]+)\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
+
 const AUTOMATION_ANYWHERE_FOLDER_ROUTE_RE =
 	/\/bots\/repository\/(private|public)\/folders\/([^/?#]+)\/?(?:[?#].*)?$/i;
 
@@ -34,6 +37,32 @@ function getAutomationAnywhereRoute(url: string): string {
 	} catch {
 		return url;
 	}
+}
+
+export interface AutomationAnywhereTaskEditorRoute {
+	workspace: 'private' | 'public';
+	folderId?: string;
+	fileId: string;
+}
+
+function decodeAutomationAnywhereRoutePart(value: string | undefined): string | undefined {
+	return value ? decodeURIComponent(value) : undefined;
+}
+
+export function parseAutomationAnywhereTaskEditorRoute(
+	url: string
+): AutomationAnywhereTaskEditorRoute | null {
+	const match = getAutomationAnywhereRoute(url).match(
+		AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_DETAILS_RE
+	);
+	if (!match) return null;
+	const fileId = decodeAutomationAnywhereRoutePart(match[3]);
+	if (!fileId) return null;
+	return {
+		workspace: match[1].toLowerCase() === 'public' ? 'public' : 'private',
+		folderId: decodeAutomationAnywhereRoutePart(match[2]),
+		fileId,
+	};
 }
 
 export function isFolderRepositoryUrl(url: string): boolean {

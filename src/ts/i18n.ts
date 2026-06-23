@@ -378,6 +378,15 @@ const ES: Record<string, string> = {
 		'Abre una carpeta, taskbot o pagina de paquetes de Automation Anywhere.',
 	'Open an Automation Anywhere folder, taskbot, or Packages page, then refresh.':
 		'Abre una carpeta, taskbot o pagina de Paquetes de Automation Anywhere y actualiza.',
+	'Tools appear when the active tab is on a supported Automation Anywhere page.':
+		'Las herramientas aparecen cuando la pestana activa esta en una pagina compatible de Automation Anywhere.',
+	'Taskbot editor': 'Editor de taskbot',
+	'Folder view': 'Vista de carpeta',
+	'Packages page': 'Pagina de paquetes',
+	'Universal Clipboard, Taskbot JSON, Update Packages, Export Bots':
+		'Portapapeles universal, JSON de taskbot, Actualizar paquetes, Exportar bots',
+	'Copy Files, Update Packages, Export Bots':
+		'Copiar archivos, Actualizar paquetes, Exportar bots',
 	Files: 'Archivos',
 	'{count} selected': '{count} seleccionados',
 	'0 selected': '0 seleccionados',
@@ -455,9 +464,21 @@ const ES: Record<string, string> = {
 	'No actions found.': 'No se encontraron acciones.',
 	'No variables found.': 'No se encontraron variables.',
 	'No files found.': 'No se encontraron archivos.',
+	'Current bot': 'Bot actual',
+	'Current bot selected': 'Bot actual seleccionado',
+	'Current bot not found.': 'No se encontro el bot actual.',
+	'Current bot loaded.': 'Bot actual cargado.',
+	'Current bot loaded from ID fallback.':
+		'Bot actual cargado desde respaldo de ID.',
+	'Current bot loaded from ID fallback: {message}':
+		'Bot actual cargado desde respaldo de ID: {message}',
+	'Loading current bot...': 'Cargando bot actual...',
+	'ID: {fileId}': 'ID: {fileId}',
 	'Copy {count} file(s)': 'Copiar {count} archivo(s)',
 	'Update {count} bot(s)': 'Actualizar {count} bot(s)',
+	'Update current bot': 'Actualizar bot actual',
 	'Export {count} file(s)': 'Exportar {count} archivo(s)',
+	'Export current bot': 'Exportar bot actual',
 	'Download {count} package(s)': 'Descargar {count} paquete(s)',
 	'Paste {count} copied file(s)': 'Pegar {count} archivo(s) copiado(s)',
 	'{count} file(s) in clipboard. Open target folder to paste.':
@@ -548,16 +569,17 @@ const ES: Record<string, string> = {
 	'Replaced 1 match.': 'Reemplazada 1 coincidencia.',
 	'Replace {count} match(es)?': 'Reemplazar {count} coincidencia(s)?',
 	'Replaced {count} match(es).': 'Reemplazadas {count} coincidencia(s).',
-	'Taskbot JSON changed in Control Room. Reload before saving.':
-		'El JSON de taskbot cambio en Control Room. Recarga antes de guardar.',
+	'Taskbot JSON changed in Control Room. Reload before importing.':
+		'El JSON de taskbot cambio en Control Room. Recarga antes de importar.',
 	changed: 'cambiado',
 	unchanged: 'sin cambios',
-	'Save JSON for file {fileId}? Status: {status}.':
-		'Guardar JSON para archivo {fileId}? Estado: {status}.',
+	'Import JSON to Control Room for file {fileId}? Status: {status}.':
+		'Importar JSON a Control Room para archivo {fileId}? Estado: {status}.',
 	'Update taskbot content in Control Room?':
 		'Actualizar contenido del taskbot en Control Room?',
-	'Taskbot JSON saved.': 'JSON de taskbot guardado.',
-	'Taskbot JSON save failed.': 'Guardado de JSON de taskbot fallo.',
+	'Taskbot JSON imported to Control Room.':
+		'JSON de taskbot importado a Control Room.',
+	'Taskbot JSON import failed.': 'Importacion de JSON de taskbot fallo.',
 	'Package scan skipped: {message}':
 		'Escaneo de paquetes omitido: {message}',
 	'Metadata scan skipped: {message}':
@@ -578,7 +600,7 @@ const ES: Record<string, string> = {
 		'Avanzado: guarda contenido del bot sin procesar en Control Room.',
 	'Copy to clipboard': 'Copiar al portapapeles',
 	Format: 'Formatear',
-	'Save JSON': 'Guardar JSON',
+	'Import JSON to control room': 'Importar JSON a Control Room',
 	'Save edited JSON back to Control Room.':
 		'Guarda el JSON editado en Control Room.',
 	'Unsupported page. Open Automation Anywhere folder, taskbot, or packages page.':
