@@ -85,12 +85,14 @@ function createVariableMetadata(record: JsonRecord): VariableMetadata | null {
 		`${record.output === true ? '\u2191' : ''}${record.input === true ? '\u2193' : ''}`;
 	const segments = [`${prefix}${name}`];
 
+	const defaultValue = Object.prototype.hasOwnProperty.call(record, 'defaultValue')
+		? formatDefaultValue(record.defaultValue)
+		: null;
 	const description = readText(record.description);
-	if (description) segments.push(description);
-
-	if (Object.prototype.hasOwnProperty.call(record, 'defaultValue')) {
-		const defaultValue = formatDefaultValue(record.defaultValue);
-		if (defaultValue) segments.push(defaultValue);
+	if (defaultValue) {
+		segments.push(defaultValue);
+	} else if (description) {
+		segments.push(description);
 	}
 
 	const label = segments.join(' \u2022 ');

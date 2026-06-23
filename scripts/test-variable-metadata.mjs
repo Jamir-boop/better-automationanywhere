@@ -28,7 +28,7 @@ assert.equal(
 		},
 		'istrnew'
 	),
-	`${'\u2191'}${'\u2193'}iStrNew ${'\u2022'} New string value ${'\u2022'} hello`
+	`${'\u2191'}${'\u2193'}iStrNew ${'\u2022'} hello`
 );
 
 assert.equal(
@@ -48,6 +48,17 @@ assert.equal(
 assert.equal(labelFor({ variables: [{ name: 'Count', defaultValue: 0 }] }, 'count'), `Count ${'\u2022'} 0`);
 assert.equal(labelFor({ variables: [{ name: 'Empty', defaultValue: '' }] }, 'empty'), 'Empty');
 assert.equal(labelFor({ variables: [{ name: 'Nil', defaultValue: null }] }, 'nil'), 'Nil');
+assert.equal(
+	labelFor(
+		{
+			variables: [
+				{ name: 'Fallback', description: 'Use description', defaultValue: null },
+			],
+		},
+		'fallback'
+	),
+	`Fallback ${'\u2022'} Use description`
+);
 
 assert.equal(
 	labelFor(
