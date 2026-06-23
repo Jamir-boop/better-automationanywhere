@@ -2129,13 +2129,23 @@ async function pasteClipboardSlot(slot: number): Promise<void> {
 
 document.querySelectorAll<HTMLButtonElement>('[data-copy-slot]').forEach((button) => {
 	button.addEventListener('click', async () => {
-		await copyClipboardSlot(Number(button.dataset.copySlot));
+		button.disabled = true;
+		try {
+			await copyClipboardSlot(Number(button.dataset.copySlot));
+		} finally {
+			button.disabled = false;
+		}
 	});
 });
 
 document.querySelectorAll<HTMLButtonElement>('[data-paste-slot]').forEach((button) => {
 	button.addEventListener('click', async () => {
-		await pasteClipboardSlot(Number(button.dataset.pasteSlot));
+		button.disabled = true;
+		try {
+			await pasteClipboardSlot(Number(button.dataset.pasteSlot));
+		} finally {
+			button.disabled = false;
+		}
 	});
 });
 

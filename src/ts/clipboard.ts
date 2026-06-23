@@ -11,6 +11,9 @@ const UID_PLACEHOLDER = '__BETTER_AA_UID__';
 const GLOBAL_CLIPBOARD_KEY = 'globalClipboard';
 const GLOBAL_CLIPBOARD_UID_KEY = 'globalClipboardUid';
 const GLOBAL_CLIPBOARD_WATCH_INTERVAL_MS = 500;
+const CLIPBOARD_BUTTON_WAIT_MS = 1500;
+const CLIPBOARD_COPY_WAIT_MS = 3000;
+const CLIPBOARD_POLL_MS = 50;
 const TASK_EDITOR_SELECTORS = [
 	'.aa-icon-action-clipboard-copy--shared',
 	'.aa-icon-action-clipboard-paste--shared',
@@ -23,6 +26,7 @@ let globalClipboardWatcherStarted = false;
 let globalClipboardWatcherOnEditorPage = false;
 let lastSeenGlobalClipboard: string | null = null;
 let ignoredGlobalClipboardWrite: string | null = null;
+let pasteInFlight = false;
 
 function generateUid(): string {
 	if (crypto.randomUUID) return crypto.randomUUID();
@@ -37,8 +41,57 @@ function getGlobalClipboardValue(): string | null {
 	return localStorage.getItem(GLOBAL_CLIPBOARD_KEY);
 }
 
+function isClickableButton(el: Element | null): el is HTMLElement {
+	if (!(el instanceof HTMLElement)) return false;
+	if (el.closest('[aria-hidden="true"]')) return false;
+	if (el.closest<HTMLButtonElement>('button:disabled')) return false;
+	if (el instanceof HTMLButtonElement && el.disabled) return false;
+	return el.offsetParent !== null;
+}
+
+async function waitForSharedClipboardButton(
+	selector: string,
+	context: string,
+	message: string
+): Promise<HTMLElement | null> {
+	const start = Date.now();
+	while (Date.now() - start < CLIPBOARD_BUTTON_WAIT_MS) {
+		const el = document.querySelector(selector);
+		if (isClickableButton(el)) return el;
+		await utils.sleep(CLIPBOARD_POLL_MS);
+	}
+	void debugWarn('clipboard', message, { selector, context }, { feedback: true });
+	return null;
+}
+
 function markGlobalClipboardWrite(value: string): void {
 	ignoredGlobalClipboardWrite = value;
+}
+
+async function readFreshSharedCopy(context: string): Promise<string | null> {
+	const copyButton = await waitForSharedClipboardButton(
+		'.aa-icon-action-clipboard-copy--shared',
+		context,
+		'Shared copy button not found.'
+	);
+	if (!copyButton) {
+		ui.showNotification(t('Copy failed'), t('Shared copy button not found.'));
+		return null;
+	}
+
+	const previousClipboardJSON = getGlobalClipboardValue();
+	localStorage.removeItem(GLOBAL_CLIPBOARD_KEY);
+	copyButton.click();
+
+	const globalClipboardJSON = await utils.waitForClipboardJson(
+		CLIPBOARD_COPY_WAIT_MS,
+		CLIPBOARD_POLL_MS
+	);
+	if (!globalClipboardJSON && previousClipboardJSON !== null) {
+		markGlobalClipboardWrite(previousClipboardJSON);
+		localStorage.setItem(GLOBAL_CLIPBOARD_KEY, previousClipboardJSON);
+	}
+	return globalClipboardJSON;
 }
 
 function isTaskEditorPage(): boolean {
@@ -136,28 +189,7 @@ export function startGlobalClipboardWatcher(): void {
 }
 
 export async function copyToSlot(slot: number): Promise<string | null> {
-	const copyButton = utils.safeQuery(
-		'.aa-icon-action-clipboard-copy--shared',
-		'copyToSlot',
-		{
-			feedback: true,
-			message: 'Shared copy button not found.',
-			source: 'clipboard',
-		}
-	) as HTMLElement | null;
-	if (!copyButton) {
-		ui.showNotification(t('Copy failed'), t('Shared copy button not found.'));
-		return null;
-	}
-
-	const previousClipboardJSON = getGlobalClipboardValue();
-	copyButton.click();
-
-	const globalClipboardJSON = await utils.waitForClipboardJson(
-		1500,
-		50,
-		previousClipboardJSON
-	);
+	const globalClipboardJSON = await readFreshSharedCopy('copyToSlot');
 	if (!globalClipboardJSON) {
 		void debugWarn('clipboard', 'Clipboard JSON was not available for slot copy.', {
 			slot,
@@ -187,6 +219,57 @@ export async function copyToSlot(slot: number): Promise<string | null> {
 	}
 }
 
+async function withPasteLock<T>(fn: () => Promise<T>): Promise<T> {
+	if (pasteInFlight) throw new Error(t('Paste already in progress.'));
+	pasteInFlight = true;
+	try {
+		return await fn();
+	} finally {
+		pasteInFlight = false;
+	}
+}
+
+async function requestSharedPaste(
+	clipboardData: string,
+	context: string,
+	slot?: number,
+	notify = true
+): Promise<void> {
+	const uid = generateUid();
+	const cleanedData = cleanAutomationAnywhereJson(replaceStoredUid(clipboardData, uid));
+	markGlobalClipboardWrite(cleanedData);
+	localStorage.setItem(GLOBAL_CLIPBOARD_KEY, cleanedData);
+	localStorage.setItem(GLOBAL_CLIPBOARD_UID_KEY, `"${uid}"`);
+
+	if (
+		localStorage.getItem(GLOBAL_CLIPBOARD_KEY) !== cleanedData ||
+		localStorage.getItem(GLOBAL_CLIPBOARD_UID_KEY) !== `"${uid}"`
+	) {
+		throw new Error('Automation Anywhere clipboard write failed.');
+	}
+
+	const pasteButton = await waitForSharedClipboardButton(
+		'.aa-icon-action-clipboard-paste--shared',
+		context,
+		'Shared paste button not found.'
+	);
+	if (!pasteButton) {
+		ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
+		throw new Error('Shared paste button not found.');
+	}
+
+	pasteButton.click();
+	void debugInfo('clipboard', 'Clipboard paste requested.', { slot }, { feedback: true });
+	if (notify) {
+		ui.showNotification(
+			t('Paste sent'),
+			slot === undefined
+				? t('Sent content from universal clipboard to Automation Anywhere.')
+				: t('Sent content from slot {slot} to Automation Anywhere.', { slot })
+		);
+	}
+}
+
 export async function pasteFromSlot(slot: number): Promise<string | null> {
 	const clipboardData = await universalClipboardSlot(slot).getValue();
 	if (!clipboardData) {
@@ -195,39 +278,26 @@ export async function pasteFromSlot(slot: number): Promise<string | null> {
 		return null;
 	}
 
-	const uid = generateUid();
-	const cleanedData = cleanAutomationAnywhereJson(replaceStoredUid(clipboardData, uid));
-	markGlobalClipboardWrite(cleanedData);
-	localStorage.setItem(GLOBAL_CLIPBOARD_KEY, cleanedData);
-	localStorage.setItem(GLOBAL_CLIPBOARD_UID_KEY, `"${uid}"`);
-
-	const pasteButton = utils.safeQuery(
-		'.aa-icon-action-clipboard-paste--shared',
-		'pasteFromSlot',
-		{
-			feedback: true,
-			message: 'Shared paste button not found.',
-			source: 'clipboard',
-		}
-	) as HTMLElement | null;
-	if (!pasteButton) {
-		ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
-		throw new Error('Shared paste button not found.');
-	}
-
-	setTimeout(() => {
-		pasteButton.click();
-		void debugInfo('clipboard', 'Clipboard slot pasted.', { slot }, { feedback: true });
-		ui.showNotification(t('Pasted'), t('Inserted content from slot {slot}.', { slot }));
-	}, 500);
+	await withPasteLock(() => requestSharedPaste(clipboardData, 'pasteFromSlot', slot));
 	return clipboardData;
 }
 
 export async function universalCopy(): Promise<string | null> {
-	return saveGlobalClipboardToDefaultSlot('universalCopy');
+	const globalClipboardJSON = await readFreshSharedCopy('universalCopy');
+	if (!globalClipboardJSON) {
+		void debugWarn('clipboard', 'Fresh clipboard JSON was not available.', undefined, {
+			feedback: true,
+		});
+		ui.showNotification(
+			t('Copy failed'),
+			t('Automation Anywhere did not produce fresh clipboard JSON.')
+		);
+		return null;
+	}
+	return saveGlobalClipboardValueToDefaultSlot(globalClipboardJSON, 'universalCopy');
 }
 
-export async function universalPaste(): Promise<string | null> {
+export async function universalPaste(notify = true): Promise<string | null> {
 	const clipboardData = await universalClipboard.getValue();
 	if (!clipboardData) {
 		void debugWarn('clipboard', 'Universal clipboard is empty.', undefined, {
@@ -237,32 +307,9 @@ export async function universalPaste(): Promise<string | null> {
 		return null;
 	}
 
-	const uid = generateUid();
-	const cleanedData = cleanAutomationAnywhereJson(replaceStoredUid(clipboardData, uid));
-	markGlobalClipboardWrite(cleanedData);
-	localStorage.setItem(GLOBAL_CLIPBOARD_KEY, cleanedData);
-	localStorage.setItem(GLOBAL_CLIPBOARD_UID_KEY, `"${uid}"`);
-
-	setTimeout(() => {
-		const pasteButton = utils.safeQuery(
-			'.aa-icon-action-clipboard-paste--shared',
-			'universalPaste',
-			{
-				feedback: true,
-				message: 'Shared paste button not found.',
-				source: 'clipboard',
-			}
-		) as HTMLElement | null;
-		if (!pasteButton) {
-			ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
-			return;
-		}
-		pasteButton.click();
-		void debugInfo('clipboard', 'Universal clipboard pasted.', undefined, {
-			feedback: true,
-		});
-		ui.showNotification(t('Pasted'), t('Inserted content from universal clipboard.'));
-	}, 1000);
+	await withPasteLock(() =>
+		requestSharedPaste(clipboardData, 'universalPaste', undefined, notify)
+	);
 	return clipboardData;
 }
 
@@ -286,7 +333,7 @@ export async function importActionJson(json: string): Promise<void> {
 		feedback: true,
 	});
 	await utils.sleep(200);
-	await universalPaste();
+	await universalPaste(false);
 	ui.showNotification(t('Import queued'), t('JSON accepted. Pasting action now.'));
 }
 

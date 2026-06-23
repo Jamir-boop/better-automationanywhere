@@ -339,6 +339,8 @@ const ES: Record<string, string> = {
 	'Could not read current clipboard JSON.':
 		'No se pudo leer el JSON del portapapeles actual.',
 	'Shared copy button not found.': 'Boton de copia compartida no encontrado.',
+	'Automation Anywhere did not produce fresh clipboard JSON.':
+		'Automation Anywhere no produjo JSON nuevo en el portapapeles.',
 	'Clipboard JSON was not available in time for slot {slot}.':
 		'El JSON del portapapeles no estuvo disponible a tiempo para el espacio {slot}.',
 	'Saved current selection to slot {slot}.':
@@ -349,6 +351,12 @@ const ES: Record<string, string> = {
 	'Slot {slot} is empty.': 'El espacio {slot} esta vacio.',
 	'Paste failed': 'Pegado fallido',
 	'Shared paste button not found.': 'Boton de pegado compartido no encontrado.',
+	'Paste already in progress.': 'Pegado ya en progreso.',
+	'Paste sent': 'Pegado enviado',
+	'Sent content from slot {slot} to Automation Anywhere.':
+		'Contenido del espacio {slot} enviado a Automation Anywhere.',
+	'Sent content from universal clipboard to Automation Anywhere.':
+		'Contenido del portapapeles universal enviado a Automation Anywhere.',
 	Pasted: 'Pegado',
 	'Inserted content from slot {slot}.': 'Contenido insertado desde el espacio {slot}.',
 	'Inserted content from universal clipboard.':

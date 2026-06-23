@@ -690,7 +690,7 @@ async function handleRuntimeMessage(
 		if (message.type === 'PASTE_FROM_SLOT') {
 			const json = await pasteFromSlot(message.slot);
 			return json
-				? { ok: true, message: t('Pasted slot {slot}.', { slot: message.slot }), json }
+				? { ok: true, message: t('Paste queued.'), json }
 				: { ok: false, error: t('Slot {slot} is empty.', { slot: message.slot }) };
 		}
 		if (message.type === 'UNIVERSAL_COPY') {
