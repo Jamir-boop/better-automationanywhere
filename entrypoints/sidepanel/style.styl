@@ -24,6 +24,18 @@
 	-webkit-font-smoothing: antialiased
 	-moz-osx-font-smoothing: grayscale
 
+html
+	scrollbar-gutter: stable
+
+@supports not (scrollbar-gutter: stable)
+	html
+		overflow-y: scroll
+
+*,
+*::before,
+*::after
+	box-sizing: border-box
+
 body
 	margin: 0
 	min-width: 300px
@@ -46,12 +58,14 @@ select,
 input,
 textarea
 	font: inherit
+	min-width: 0
 
 #app
 	display: flex
 	flex-direction: column
 	gap: 12px
 	min-height: 100vh
+	min-width: 0
 	padding: 14px
 
 .panel-header
@@ -60,10 +74,14 @@ textarea
 	justify-content: space-between
 	gap: 12px
 
+	> div
+		min-width: 0
+
 	h1
 		margin: 0
 		font-size: 1.08rem
 		line-height: 1.2
+		overflow-wrap: anywhere
 
 	p
 		margin: 3px 0 0
@@ -146,11 +164,13 @@ main
 	display: flex
 	flex-direction: column
 	gap: 12px
+	min-width: 0
 
 .tab-panel
 	display: flex
 	flex-direction: column
 	gap: 12px
+	min-width: 0
 
 	&[hidden]
 		display: none
@@ -159,6 +179,7 @@ main
 	display: flex
 	flex-direction: column
 	gap: 10px
+	min-width: 0
 	border: 1px solid var(--border)
 	border-radius: 8px
 	padding: 12px
@@ -175,9 +196,11 @@ main
 	align-items: center
 	justify-content: space-between
 	gap: 10px
+	min-width: 0
 
 	h2
 		flex: 1 1 auto
+		min-width: 0
 
 	#restoreUserstyleDefaults
 		flex: 0 0 auto
@@ -227,6 +250,7 @@ main
 	display: flex
 	flex-direction: column
 	gap: 8px
+	min-width: 0
 
 .inline-hint
 	margin: -2px 0 0
@@ -316,6 +340,10 @@ main
 		color: var(--text-muted)
 		font-size: .7rem
 
+	> span
+		min-width: 0
+		overflow-wrap: anywhere
+
 .text-row
 	align-items: stretch
 	flex-direction: column
@@ -347,6 +375,7 @@ main
 	grid-template-columns: minmax(0, 1fr) auto
 	gap: 8px
 	align-items: center
+	min-width: 0
 
 .background-preview
 	width: 100%
@@ -368,6 +397,7 @@ input[type='search'],
 input[type='file'],
 textarea
 	width: 100%
+	max-width: 100%
 	color: var(--text)
 	background: var(--surface-0)
 	border: 1px solid var(--border-strong)
@@ -478,6 +508,7 @@ textarea
 
 .json-field
 	position: relative
+	min-width: 0
 
 	.json-area
 		padding-right: 38px
@@ -510,18 +541,20 @@ textarea
 
 .button-grid
 	display: grid
-	grid-template-columns: 1fr 1fr
+	grid-template-columns: repeat(2, minmax(0, 1fr))
 	gap: 8px
 
 .button-grid-full
 	grid-column: 1 / -1
 
 button
+	min-width: 0
 	color: var(--text)
 	background: var(--surface-0)
 	border: 1px solid var(--border-strong)
 	border-radius: 6px
 	padding: 7px 8px
+	text-align: center
 	cursor: pointer
 
 	&:focus
@@ -566,7 +599,7 @@ button
 
 .slot-row
 	display: grid
-	grid-template-columns: minmax(60px, .8fr) minmax(104px, 1fr) 58px 58px
+	grid-template-columns: minmax(44px, .75fr) minmax(0, 1fr) auto auto
 	align-items: center
 	gap: 6px
 	padding: 6px
@@ -586,6 +619,7 @@ button
 		border-color: #A33A3A
 
 	span
+		min-width: 0
 		color: var(--text)
 		font-size: .82rem
 
@@ -631,6 +665,7 @@ button
 	align-items: center
 	gap: 12px
 	flex-wrap: wrap
+	min-width: 0
 	padding-bottom: 6px
 	border-bottom: 1px solid var(--border)
 
@@ -881,6 +916,7 @@ button
 	display: flex
 	align-items: center
 	gap: 8px
+	min-width: 0
 
 .doctor-summary
 	color: var(--text-muted)
@@ -901,6 +937,10 @@ button
 	border-radius: 6px
 	background: var(--surface-0)
 	font-size: .74rem
+
+	span:first-child
+		min-width: 0
+		overflow-wrap: anywhere
 
 	&.is-current-match
 		border-color: var(--accent)
@@ -1162,7 +1202,7 @@ button
 
 .tools-action-bar
 	display: grid
-	grid-template-columns: 1fr 1fr
+	grid-template-columns: repeat(2, minmax(0, 1fr))
 	gap: 8px
 
 	button[hidden]
@@ -1228,8 +1268,10 @@ button
 	align-items: center
 	justify-content: space-between
 	gap: 8px
+	min-width: 0
 
 .package-list-label
+	min-width: 0
 	color: var(--accent)
 	font-size: .74rem
 	text-transform: uppercase

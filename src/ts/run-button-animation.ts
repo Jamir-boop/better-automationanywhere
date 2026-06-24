@@ -12,32 +12,8 @@ export const PIXEL_SIZE = 40;
 export const SEGMENTS = 5;
 const PULSE_DURATION_MS = 3200;
 
-const GRADIENT_STOPS: [number, number, number][] = [
-	[37, 99, 235],
-	[14, 165, 233],
-	[6, 182, 212],
-	[139, 92, 246],
-	[20, 184, 166],
-	[37, 99, 235],
-];
-
-function mix(a: number, b: number, t: number): number {
-	return Math.round(a + (b - a) * t);
-}
-
-export function getGradientColor(t: number, alpha: number): string {
-	const scaled = t * (GRADIENT_STOPS.length - 1);
-	const i = Math.floor(scaled);
-	const localT = scaled - i;
-
-	const from = GRADIENT_STOPS[i];
-	const to = GRADIENT_STOPS[Math.min(i + 1, GRADIENT_STOPS.length - 1)];
-
-	const r = mix(from[0], to[0], localT);
-	const g = mix(from[1], to[1], localT);
-	const b = mix(from[2], to[2], localT);
-
-	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+export function getGradientColor(_t: number, alpha: number): string {
+	return `rgba(255, 185, 0, ${alpha})`;
 }
 
 function getPulseData(button: HTMLButtonElement): {
