@@ -133,6 +133,9 @@ let activeRunButtonWavesEnabled = false;
 let variableMetadataObserver: MutationObserver | null = null;
 let variableMetadataScheduled = false;
 let variableMetadataCurrentFileId: string | null = null;
+let variableMetadataMissingSignature: string | null = null;
+let variableMetadataMissingRetryCount = 0;
+let variableMetadataRetryTimer: ReturnType<typeof setTimeout> | undefined;
 const variableMetadataCache = new Map<string, Promise<VariableMetadataLookup | null>>();
 
 function applyBundledAssetVariables(): void {
@@ -340,16 +343,61 @@ async function loadVariableMetadata(
 	return promise;
 }
 
+function clearVariableMetadataMissingRefresh(): void {
+	if (variableMetadataRetryTimer) clearTimeout(variableMetadataRetryTimer);
+	variableMetadataRetryTimer = undefined;
+	variableMetadataMissingSignature = null;
+	variableMetadataMissingRetryCount = 0;
+}
+
+function refreshMissingVariableMetadata(
+	fileId: string,
+	missingNames: string[]
+): void {
+	const signature = `${fileId}\u0000${missingNames.join('\u0000')}`;
+	if (signature !== variableMetadataMissingSignature) {
+		clearVariableMetadataMissingRefresh();
+		variableMetadataMissingSignature = signature;
+	}
+	if (
+		variableMetadataMissingRetryCount >= 2 ||
+		variableMetadataRetryTimer
+	) {
+		return;
+	}
+
+	const refresh = (): void => {
+		variableMetadataRetryTimer = undefined;
+		variableMetadataCache.delete(fileId);
+		scheduleVariableMetadataSync();
+	};
+	if (variableMetadataMissingRetryCount++ === 0) refresh();
+	else {
+		// ponytail: one delayed retry; poll only if Control Room lag proves longer.
+		variableMetadataRetryTimer = setTimeout(refresh, 1_000);
+	}
+}
+
 function applyVariableMetadataLabels(
 	section: HTMLElement,
-	lookup: VariableMetadataLookup
+	lookup: VariableMetadataLookup,
+	fileId: string
 ): void {
+	const missingNames: string[] = [];
+	const seenMissingNames = new Set<string>();
 	section.querySelectorAll<HTMLElement>(VARIABLE_ROW_SELECTOR).forEach((row) => {
+		const rowName = row.dataset.itemName;
 		const label = row.querySelector<HTMLElement>(VARIABLE_LABEL_SELECTOR);
 		if (!label) return;
 
-		const metadata = findVariableMetadata(lookup, row.dataset.itemName);
+		const metadata = findVariableMetadata(lookup, rowName);
 		if (!metadata) {
+			const name = (rowName ?? '').replace(/\s+/g, ' ').trim();
+			const key = name.toLocaleLowerCase();
+			if (name && !seenMissingNames.has(key)) {
+				seenMissingNames.add(key);
+				missingNames.push(name);
+			}
 			restoreVariableMetadataLabel(label);
 			return;
 		}
@@ -374,11 +422,15 @@ function applyVariableMetadataLabels(
 		label.classList.add('better-aa-variable-metadata-label');
 		row.classList.add('better-aa-variable-metadata-row');
 	});
+
+	if (missingNames.length) refreshMissingVariableMetadata(fileId, missingNames);
+	else clearVariableMetadataMissingRefresh();
 }
 
 async function syncVariableMetadataLabels(): Promise<void> {
 	const context = getVariableMetadataContext();
 	if (!context) {
+		clearVariableMetadataMissingRefresh();
 		if (variableMetadataCurrentFileId !== null) {
 			variableMetadataCurrentFileId = null;
 			restoreVariableMetadataLabels();
@@ -387,6 +439,7 @@ async function syncVariableMetadataLabels(): Promise<void> {
 	}
 
 	if (context.fileId !== variableMetadataCurrentFileId) {
+		clearVariableMetadataMissingRefresh();
 		restoreVariableMetadataLabels();
 		variableMetadataCurrentFileId = context.fileId;
 	}
@@ -401,7 +454,7 @@ async function syncVariableMetadataLabels(): Promise<void> {
 	) {
 		return;
 	}
-	applyVariableMetadataLabels(context.section, lookup);
+	applyVariableMetadataLabels(context.section, lookup, context.fileId);
 }
 
 function installVariableMetadataObserver(): void {
