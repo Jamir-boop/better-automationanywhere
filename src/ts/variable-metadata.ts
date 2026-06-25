@@ -59,6 +59,12 @@ function formatDefaultValue(value: unknown): string | null {
 			if (isEmptyArray(listValue)) return null;
 			return formatDefaultValue(listValue);
 		}
+		const isDictionary = type.includes('dictionary');
+		if (isDictionary) {
+			const dictValue = value.dictionary ?? value.value;
+			if (isEmptyArray(dictValue)) return null;
+			return formatJsonValue(dictValue);
+		}
 		if (Object.prototype.hasOwnProperty.call(value, 'string')) {
 			return formatDefaultValue(value.string);
 		}

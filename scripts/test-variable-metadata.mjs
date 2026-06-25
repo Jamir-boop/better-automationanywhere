@@ -178,4 +178,55 @@ assert.equal(
 	`foo ${'\u2022'} lower`
 );
 
+assert.equal(
+	labelFor(
+		{
+			variables: [
+				{
+					name: 'iDictConfig',
+					description: 'App config',
+					type: 'DICTIONARY',
+					input: true,
+					subtype: 'STRING',
+					defaultValue: { type: 'DICTIONARY', dictionary: [] },
+				},
+			],
+		},
+		'idictconfig'
+	),
+	`${'\u2193'}iDictConfig ${'\u2022'} App config`
+);
+
+assert.equal(
+	labelFor(
+		{
+			variables: [
+				{
+					name: 'iDictEmpty',
+					type: 'DICTIONARY',
+					defaultValue: { type: 'DICTIONARY', dictionary: [] },
+				},
+			],
+		},
+		'idictempty'
+	),
+	'iDictEmpty'
+);
+
+assert.equal(
+	labelFor(
+		{
+			variables: [
+				{
+					name: 'iDictFilled',
+					type: 'DICTIONARY',
+					defaultValue: { type: 'DICTIONARY', dictionary: [{ key: 'a', value: '1' }] },
+				},
+			],
+		},
+		'idictfilled'
+	),
+	`iDictFilled ${'\u2022'} [{"key":"a","value":"1"}]`
+);
+
 console.log('Variable metadata tests passed.');
