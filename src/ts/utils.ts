@@ -1,5 +1,8 @@
 import { debugWarn } from './debug';
-import { EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR } from './automation-anywhere';
+import {
+	EDITOR_PALETTE_TOGGLE_QUERY_SELECTOR,
+	TASKBOT_EDITOR_LAYOUT_SELECTOR,
+} from './automation-anywhere-selectors';
 
 interface SelectorDebugOptions {
 	feedback?: boolean;
@@ -129,7 +132,7 @@ export async function waitForClipboardJson(
 
 export function getPaletteState(): 'opened' | 'closed' {
 	const paletteElement = safeQuery(
-		'.editor-layout__palette',
+		TASKBOT_EDITOR_LAYOUT_SELECTOR,
 		'getPaletteState'
 	) as HTMLElement | null;
 	if (!paletteElement) return 'closed';

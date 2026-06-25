@@ -1,4 +1,9 @@
 import * as palette from './palette';
+import {
+	EDITOR_PALETTE_ACTIONS_SELECTOR,
+	EDITOR_PALETTE_HINT_TOGGLE_SELECTOR,
+	EDITOR_PALETTE_VARIABLES_SELECTOR,
+} from './automation-anywhere-selectors';
 import { debugInfo } from './debug';
 import { t } from './i18n';
 import * as ui from './ui';
@@ -42,11 +47,7 @@ function handleClick(event: MouseEvent, getShortcutLabel: () => string): void {
 	const target = event.target instanceof HTMLElement ? event.target : null;
 	if (!target) return;
 
-	if (
-		target.closest(
-			'div.editor-layout__resize:nth-child(2) > button:nth-child(2), button[aria-label="Expand"], button[aria-label="Collapse"]'
-		)
-	) {
+	if (target.closest(EDITOR_PALETTE_HINT_TOGGLE_SELECTOR)) {
 		showTip('editorPalette', t('Tip: toggle editor palette with Ctrl+D.'));
 		return;
 	}
@@ -54,7 +55,7 @@ function handleClick(event: MouseEvent, getShortcutLabel: () => string): void {
 	const customPaletteLabel = getCustomPaletteButtonLabel(target);
 	if (
 		customPaletteLabel === 'variables' ||
-		target.closest('button[data-path="EditorPalette.section.button"][aria-label="Variables"]')
+		target.closest(EDITOR_PALETTE_VARIABLES_SELECTOR)
 	) {
 		showTip('variables', t('Tip: open variables with Alt+V.'));
 		return;
@@ -62,9 +63,7 @@ function handleClick(event: MouseEvent, getShortcutLabel: () => string): void {
 
 	if (
 		customPaletteLabel === 'actions' ||
-		target.closest(
-			'div.editor-palette__accordion button[aria-label="Actions"], button[data-path="EditorPalette.section.button"][aria-label="Actions"]'
-		)
+		target.closest(EDITOR_PALETTE_ACTIONS_SELECTOR)
 	) {
 		showTip('actions', t('Tip: open actions with Alt+A.'));
 		return;

@@ -14,6 +14,7 @@ import {
 	type OpenSidebarShortcut,
 } from './settings';
 import { registerMouseClickSuggestions } from './suggestions';
+import { TASKBOT_NODE_LINK_SELECTOR } from './automation-anywhere-selectors';
 import { toggleToolbar } from './utils';
 import * as ui from './ui';
 
@@ -29,8 +30,6 @@ let activeOpenSidebarShortcut: OpenSidebarShortcut =
 let activeBlockTaskbotNodeLabelClicks = DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS;
 let lastTaskbotLinkClickBlockedToastAt = 0;
 
-const TASKBOT_NODE_LABEL_LINK_SELECTOR =
-	'.taskbot-canvas-list-node__title a.taskbotnodelabel-details-link[href]';
 const TASKBOT_LINK_CLICK_BLOCKED_TOAST_COOLDOWN_MS = 2000;
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -102,7 +101,7 @@ function showTaskbotLinkClickBlockedToast(): void {
 function handleTaskbotNodeLinkClick(e: MouseEvent): void {
 	if (!activeBlockTaskbotNodeLabelClicks) return;
 	const target = e.target as HTMLElement | null;
-	const nodeLink = target?.closest?.(TASKBOT_NODE_LABEL_LINK_SELECTOR);
+	const nodeLink = target?.closest?.(TASKBOT_NODE_LINK_SELECTOR);
 	if (!nodeLink || e.button === 1) return;
 	e.preventDefault();
 	e.stopImmediatePropagation();

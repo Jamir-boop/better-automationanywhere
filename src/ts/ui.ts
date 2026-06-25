@@ -1,13 +1,17 @@
 import * as commands from './commands';
 import { debugWarn } from './debug';
 import { t } from './i18n';
+import {
+	ACTIVE_EDITOR_PALETTE_LABEL_SELECTOR,
+	EDITOR_PALETTE_SCROLLER_SELECTOR,
+	MAIN_NAVIGATION_SELECTOR,
+	PATHFINDER_COLLAPSE_BUTTON_SELECTOR,
+	PATHFINDER_COLLAPSED_SELECTOR,
+	PATHFINDER_EXPANDER_SELECTOR,
+	TASKBOT_EDITOR_LAYOUT_SELECTOR,
+} from './automation-anywhere-selectors';
 
 const NOTIFICATION_MIN_DURATION_MS = 8000;
-const PATHFINDER_EXPANDER_SELECTOR =
-	'button[data-path="Pathfinder.expander"], button.pathfinder-tray-expander';
-const PATHFINDER_COLLAPSE_BUTTON_SELECTOR =
-	'button[data-path="Pathfinder.expander"][aria-expanded="true"], button.pathfinder-tray-expander[aria-expanded="true"], button[aria-label="Collapse"]';
-const EDITOR_PALETTE_SCROLLER_SELECTOR = '.editor-palette-section__scroller';
 const DISABLED_PATHFINDER_EXPANDER_ATTR = 'data-better-aa-disabled-expander';
 const ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR =
 	'data-better-aa-original-title';
@@ -210,7 +214,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	containerDiv.appendChild(actionButton);
 	containerDiv.appendChild(triggerButton);
 
-	const palette = document.querySelector('.editor-layout__palette');
+	const palette = document.querySelector(TASKBOT_EDITOR_LAYOUT_SELECTOR);
 	if (palette) {
 		palette.appendChild(containerDiv);
 	}
@@ -255,8 +259,8 @@ export function insertCustomEditorPaletteButtons(): void {
 }
 
 export function removeInlineWidth(): void {
-	const nav = document.querySelector<HTMLElement>('.main-layout__navigation');
-	const pathfinderCollapsed = document.querySelector('.pathfinder--is_collapsed');
+	const nav = document.querySelector<HTMLElement>(MAIN_NAVIGATION_SELECTOR);
+	const pathfinderCollapsed = document.querySelector(PATHFINDER_COLLAPSED_SELECTOR);
 	if (pathfinderCollapsed) {
 		nav?.style.removeProperty('width');
 		return;
@@ -283,7 +287,7 @@ export function removeInlineWidth(): void {
 
 export function updateActiveButton(): void {
 	const activeSection = document.querySelector<HTMLElement>(
-		'.editor-palette-section__header--is_active .clipped-text__string--for_presentation'
+		ACTIVE_EDITOR_PALETTE_LABEL_SELECTOR
 	)?.innerText;
 	const buttons = document.querySelectorAll('.customActionVariableButton');
 	buttons.forEach((button) => {

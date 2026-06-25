@@ -5,15 +5,18 @@ import {
 	normalizeBotExecutionModalPosition,
 	type BotExecutionModalPosition,
 } from './settings';
+import {
+	ALERT_CONTROLS_SELECTOR,
+	BOT_MODAL_RUNNING_INDICATOR_SELECTOR,
+	BOT_MODAL_SELECTOR,
+	DIALOG_SELECTOR,
+	MESSAGE_CONTROLS_SELECTOR,
+	MESSAGE_HEADER_SELECTOR,
+	MESSAGE_TITLE_CONTAINER_SELECTOR,
+	MESSAGE_TITLE_SELECTOR,
+	MODAL_BACKDROP_SELECTOR,
+} from './automation-anywhere-selectors';
 
-const BOT_MODAL_SELECTOR = '[data-modal-id="taskbot-action-run-now"]';
-const DIALOG_SELECTOR = '[role="dialog"]';
-const ALERT_CONTROLS_SELECTOR = '.alert__controls';
-const MESSAGE_CONTROLS_SELECTOR = '.message__controls';
-const MESSAGE_TITLE_SELECTOR = '.message__title';
-const MESSAGE_TITLE_CONTAINER_SELECTOR = '.message__title-container';
-const RUNNING_INDICATOR_SELECTOR = '.devicechannelmodal, .rio-spinner--variant_WORKING';
-const BACKDROP_SELECTOR = '.modal-backdrop';
 const CONTROL_ATTR = 'data-better-aa-bot-modal-control';
 const CONTROL_HOST_ATTR = 'data-better-aa-bot-modal-control-host';
 const WIRED_ATTR = 'data-better-aa-bot-modal-wired';
@@ -48,13 +51,13 @@ function findBackdropNear(element: HTMLElement): HTMLElement | null {
 	const previousSibling = element.previousElementSibling;
 	if (
 		previousSibling instanceof HTMLElement &&
-		previousSibling.matches(BACKDROP_SELECTOR)
+		previousSibling.matches(MODAL_BACKDROP_SELECTOR)
 	) {
 		return previousSibling;
 	}
 
 	const nextSibling = element.nextElementSibling;
-	if (nextSibling instanceof HTMLElement && nextSibling.matches(BACKDROP_SELECTOR)) {
+	if (nextSibling instanceof HTMLElement && nextSibling.matches(MODAL_BACKDROP_SELECTOR)) {
 		return nextSibling;
 	}
 
@@ -66,13 +69,13 @@ function findBackdropNear(element: HTMLElement): HTMLElement | null {
 
 	for (let index = elementIndex - 1; index >= 0; index -= 1) {
 		const child = children[index];
-		if (child instanceof HTMLElement && child.matches(BACKDROP_SELECTOR)) {
+		if (child instanceof HTMLElement && child.matches(MODAL_BACKDROP_SELECTOR)) {
 			return child;
 		}
 	}
 
 	for (const child of children.slice(elementIndex + 1)) {
-		if (child instanceof HTMLElement && child.matches(BACKDROP_SELECTOR)) {
+		if (child instanceof HTMLElement && child.matches(MODAL_BACKDROP_SELECTOR)) {
 			return child;
 		}
 	}
@@ -88,7 +91,7 @@ function getDialog(modal: HTMLElement): HTMLElement | null {
 
 function getControlHost(modal: HTMLElement): HTMLElement | null {
 	return (
-		modal.querySelector<HTMLElement>('.message__header') ??
+		modal.querySelector<HTMLElement>(MESSAGE_HEADER_SELECTOR) ??
 		modal.querySelector<HTMLElement>(MESSAGE_TITLE_CONTAINER_SELECTOR) ??
 		modal.querySelector<HTMLElement>(ALERT_CONTROLS_SELECTOR) ??
 		modal.querySelector<HTMLElement>(MESSAGE_CONTROLS_SELECTOR)
@@ -106,7 +109,7 @@ function isBotExecutionModal(modal: HTMLElement): boolean {
 		modal.matches(BOT_MODAL_SELECTOR) &&
 		Boolean(getControlHost(modal)) &&
 		(hasBotExecutionTitle(modal) ||
-			Boolean(modal.querySelector(RUNNING_INDICATOR_SELECTOR)))
+			Boolean(modal.querySelector(BOT_MODAL_RUNNING_INDICATOR_SELECTOR)))
 	);
 }
 

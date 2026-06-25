@@ -1,4 +1,5 @@
-const ACTIVE_FOLDER_SELECTOR = '.folder-list-item--is_active';
+import { ACTIVE_FOLDER_SELECTOR } from './automation-anywhere-selectors';
+
 const SCROLL_DEBOUNCE_MS = 100;
 
 let autoScrollEnabled = false;

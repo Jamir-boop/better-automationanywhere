@@ -2,6 +2,11 @@ import * as ui from './ui';
 import { debugError, debugInfo, debugWarn } from './debug';
 import { t } from './i18n';
 import {
+	SHARED_COPY_BUTTON_SELECTOR,
+	SHARED_PASTE_BUTTON_SELECTOR,
+	TASK_EDITOR_CAPABILITY_SELECTOR,
+} from './automation-anywhere-selectors';
+import {
 	universalClipboard,
 	universalClipboardSlot,
 } from './universal-clipboard-storage';
@@ -17,14 +22,6 @@ const CLIPBOARD_POLL_MS = 50;
 const CLIPBOARD_PASTE_READY_WAIT_MS = 1500;
 const CLIPBOARD_PASTE_BEFORE_CLICK_MS = 2500;
 const CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS = 1500;
-const TASK_EDITOR_SELECTORS = [
-	'.aa-icon-action-clipboard-copy--shared',
-	'.aa-icon-action-clipboard-paste--shared',
-	'.taskbot-editor__toolbar__action',
-	'.taskbot-canvas-list-node',
-	'.editor-layout__canvas',
-];
-
 let globalClipboardWatcherStarted = false;
 let globalClipboardWatcherOnEditorPage = false;
 let lastSeenGlobalClipboard: string | null = null;
@@ -91,7 +88,7 @@ async function waitForPasteClipboardValue(
 
 async function readFreshSharedCopy(context: string): Promise<string | null> {
 	const copyButton = await waitForSharedClipboardButton(
-		'.aa-icon-action-clipboard-copy--shared',
+		SHARED_COPY_BUTTON_SELECTOR,
 		context,
 		'Shared copy button not found.'
 	);
@@ -118,7 +115,7 @@ async function readFreshSharedCopy(context: string): Promise<string | null> {
 function isTaskEditorPage(): boolean {
 	const hash = location.hash.toLowerCase();
 	if (hash.includes('taskbot') || hash.includes('editor')) return true;
-	return TASK_EDITOR_SELECTORS.some((selector) => !!document.querySelector(selector));
+	return Boolean(document.querySelector(TASK_EDITOR_CAPABILITY_SELECTOR));
 }
 
 function serializeClipboardJsonWithPlaceholder(globalClipboardJSON: string): string {
@@ -274,7 +271,7 @@ async function requestSharedPaste(
 	await utils.sleep(CLIPBOARD_PASTE_BEFORE_CLICK_MS);
 
 	const pasteButton = await waitForSharedClipboardButton(
-		'.aa-icon-action-clipboard-paste--shared',
+		SHARED_PASTE_BUTTON_SELECTOR,
 		context,
 		'Shared paste button not found.'
 	);

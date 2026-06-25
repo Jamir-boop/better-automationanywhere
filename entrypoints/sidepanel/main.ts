@@ -1053,7 +1053,7 @@ function renderDoctorChecklist(): void {
 
 		const meta = document.createElement('span');
 		meta.className = 'doctor-check-meta';
-		const parts = [check.severity, check.source];
+		const parts = [check.severity, check.selectorStatus, check.source];
 		if (check.triggerHint && check.severity === 'transient') {
 			parts.push(check.triggerHint);
 		}
@@ -1071,13 +1071,16 @@ function renderDoctorChecklist(): void {
 		body.className = 'doctor-check-details';
 		const result = currentDoctorResults.find((r) => r.id === check.id);
 		const detailLines = [
+			`${t('Feature')}: ${check.feature}`,
 			`${t('Selector')}: ${check.selector}`,
 			`${t('Source')}: ${check.source}`,
 			`${t('Severity')}: ${check.severity}`,
+			`${t('Selector status')}: ${check.selectorStatus}`,
 			`${t('Status')}: ${result?.status ?? t('Not checked')}`,
 			`${t('Count')}: ${result?.count ?? 0}`,
 		];
 		if (check.triggerHint) detailLines.push(`${t('Trigger')}: ${check.triggerHint}`);
+		if (check.notes) detailLines.push(`${t('Notes')}: ${check.notes}`);
 		if (result?.reason) detailLines.push(`${t('Reason')}: ${result.reason}`);
 		body.textContent = detailLines.join('\n');
 

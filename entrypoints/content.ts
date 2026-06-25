@@ -15,6 +15,19 @@ import {
 	isTextFileUrl,
 } from '../src/ts/automation-anywhere';
 import {
+	ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR,
+	EDITOR_PALETTE_ACTIVE_ACCORDION_SELECTOR,
+	EDITOR_PALETTE_SECTION_SELECTOR,
+	EDITOR_PALETTE_VARIABLES_SELECTOR,
+	FOLDER_REFRESH_SELECTOR,
+	SHARED_COPY_BUTTON_SELECTOR,
+	SHARED_PASTE_BUTTON_SELECTOR,
+	TASK_EDITOR_CAPABILITY_SELECTOR,
+	VARIABLE_LABEL_SELECTOR,
+	VARIABLE_LABEL_TEXT_SELECTOR,
+	VARIABLE_ROW_SELECTOR,
+} from '../src/ts/automation-anywhere-selectors';
+import {
 	clampBackgroundColorValue,
 	getBackgroundColorRgbChannels,
 } from '../src/ts/background-colors';
@@ -106,15 +119,6 @@ import {
 const DEFAULT_LOADING_IMAGE_CSS = `url("${browser.runtime.getURL(
 	'media/loading.gif' as any
 )}")`;
-const SHARED_CLIPBOARD_SELECTORS = [
-	'.aa-icon-action-clipboard-copy--shared',
-	'.aa-icon-action-clipboard-paste--shared',
-];
-const TASK_EDITOR_CAPABILITY_SELECTORS = [
-	'.taskbot-editor__toolbar__action',
-	'.taskbot-canvas-list-node',
-	'.editor-layout__canvas',
-];
 const OPEN_SIDEBAR_BUTTON_ID = 'better-aa-open-sidebar-button';
 const FOLDERS_ROUTE_CLASS = 'better-aa-route-folders';
 const TASKBOT_ROUTE_CLASS = 'better-aa-route-taskbot';
@@ -122,12 +126,6 @@ const TEXT_FILE_ROUTE_CLASS = 'better-aa-route-text-file';
 const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
 const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
 const KEEP_ALIVE_INTERVAL_MS = 60_000;
-const VARIABLES_BUTTON_SELECTOR =
-	'button[data-path="EditorPalette.section.button"][aria-label="Variables"]';
-const VARIABLE_ROW_SELECTOR = '.editor-palette-item[data-item-name]';
-const VARIABLE_LABEL_SELECTOR =
-	'.editor-palette-item__child-label[data-path="ClippedText"]';
-const LABEL_TEXT_SELECTOR = '.clipped-text__string--for_presentation';
 const VARIABLE_METADATA_ORIGINAL_TEXT_ATTR = 'data-better-aa-original-text';
 
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
@@ -280,7 +278,7 @@ async function applyStyleClasses(): Promise<void> {
 }
 
 function getLabelTextElement(label: HTMLElement): HTMLElement {
-	return label.querySelector<HTMLElement>(LABEL_TEXT_SELECTOR) ?? label;
+	return label.querySelector<HTMLElement>(VARIABLE_LABEL_TEXT_SELECTOR) ?? label;
 }
 
 function restoreVariableMetadataLabel(label: HTMLElement): void {
@@ -304,15 +302,11 @@ function restoreVariableMetadataLabels(root: ParentNode = document): void {
 }
 
 function getActiveVariablesSection(): HTMLElement | null {
-	const button = document.querySelector<HTMLButtonElement>(VARIABLES_BUTTON_SELECTOR);
-	const section = button?.closest<HTMLElement>('[data-path="EditorPalette.section"]');
+	const button = document.querySelector<HTMLButtonElement>(EDITOR_PALETTE_VARIABLES_SELECTOR);
+	const section = button?.closest<HTMLElement>(EDITOR_PALETTE_SECTION_SELECTOR);
 	if (!button || !section) return null;
-	if (!button.closest('.editor-palette__accordion--is_active')) return null;
-	if (
-		!section.querySelector(
-			'.editor-palette-section__header--is_active'
-		)
-	) {
+	if (!button.closest(EDITOR_PALETTE_ACTIVE_ACCORDION_SELECTOR)) return null;
+	if (!section.querySelector(ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR)) {
 		return null;
 	}
 	return section;
@@ -692,7 +686,7 @@ function getAutomationAnywhereAuthToken(): string | null {
 }
 
 function refreshAutomationAnywhereFolderList(): boolean {
-	const refreshButton = document.getElementsByName('table-refresh')[0];
+	const refreshButton = document.querySelector(FOLDER_REFRESH_SELECTOR);
 	if (!(refreshButton instanceof HTMLElement)) return false;
 	refreshButton.click();
 	return true;
@@ -700,12 +694,9 @@ function refreshAutomationAnywhereFolderList(): boolean {
 
 function getToolCapabilities(): ContentActionResponse {
 	const universalClipboard =
-		SHARED_CLIPBOARD_SELECTORS.some((selector) =>
-			Boolean(document.querySelector(selector))
-		) ||
-		TASK_EDITOR_CAPABILITY_SELECTORS.some((selector) =>
-			Boolean(document.querySelector(selector))
-		);
+		Boolean(document.querySelector(SHARED_COPY_BUTTON_SELECTOR)) ||
+		Boolean(document.querySelector(SHARED_PASTE_BUTTON_SELECTOR)) ||
+		Boolean(document.querySelector(TASK_EDITOR_CAPABILITY_SELECTOR));
 	return {
 		ok: true,
 		capabilities: {

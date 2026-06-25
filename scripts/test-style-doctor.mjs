@@ -4,65 +4,85 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { root } from './lib/ts-module-loader.mjs';
 
-// --- File-based structural checks (no module import needed) ---
 const styleDoctorSource = await readFile(
 	join(root, 'src', 'ts', 'style-doctor.ts'),
 	'utf8'
 );
+const selectorRegistrySource = await readFile(
+	join(root, 'src', 'ts', 'automation-anywhere-selectors.ts'),
+	'utf8'
+);
 
-// Verify CHECKS array exists and has entries
+assert.ok(
+	selectorRegistrySource.includes('export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS'),
+	'selector registry check export exists'
+);
+assert.ok(
+	styleDoctorSource.includes('AUTOMATION_ANYWHERE_SELECTOR_CHECKS.map'),
+	'Style Doctor derives CHECKS from selector registry'
+);
 assert.ok(
 	styleDoctorSource.includes('export const CHECKS: StyleDoctorCheck[]'),
 	'CHECKS array export exists'
 );
-const checksMatch = styleDoctorSource.match(/id:\s*'([^']+)'/g);
-assert.ok(checksMatch && checksMatch.length > 10, `CHECKS has ${checksMatch?.length ?? 0} entries (expected >10)`);
-
-// Verify DOCTOR_CHECK_GROUPS exists with all 4 groups
 assert.ok(
-	styleDoctorSource.includes('export const DOCTOR_CHECK_GROUPS'),
-	'DOCTOR_CHECK_GROUPS export exists'
+	styleDoctorSource.includes('selectorStatus'),
+	'Style Doctor preserves selector lifecycle status'
 );
+
+const checkBlocks = selectorRegistrySource
+	.split(/\n\t\{/)
+	.filter((block) => /id:\s*'[^']+'/.test(block));
+assert.ok(checkBlocks.length > 10, `registry has ${checkBlocks.length} checks (expected >10)`);
+
+const ids = checkBlocks.map((block) => block.match(/id:\s*'([^']+)'/)?.[1]).filter(Boolean);
+assert.equal(new Set(ids).size, ids.length, 'registry check ids are unique');
+
+for (const block of checkBlocks) {
+	const id = block.match(/id:\s*'([^']+)'/)?.[1] ?? 'unknown';
+	for (const field of ['view', 'group', 'label', 'feature', 'selector', 'source', 'severity', 'status']) {
+		assert.match(block, new RegExp(`${field}:\\s*`), `${id} has ${field}`);
+	}
+}
+
 for (const group of ['general', 'taskbot-editor', 'taskbot-transient', 'folder-navigation']) {
 	assert.ok(
 		styleDoctorSource.includes(`key: '${group}'`),
 		`group '${group}' exists in DOCTOR_CHECK_GROUPS`
 	);
+	assert.ok(
+		selectorRegistrySource.includes(`group: '${group}'`),
+		`group '${group}' used in selector registry`
+	);
 }
 
-// Verify every CHECK has a group field
-const groupPattern = /group:\s*'([^']+)'/g;
-const foundGroups = new Set();
-let gMatch;
-while ((gMatch = groupPattern.exec(styleDoctorSource)) !== null) {
-	foundGroups.add(gMatch[1]);
-}
-for (const group of ['general', 'taskbot-editor', 'taskbot-transient', 'folder-navigation']) {
-	assert.ok(foundGroups.has(group), `group '${group}' used in CHECKS`);
+for (const badSelector of ['#app', '#tools', '[data-panel=', '[data-tab=']) {
+	assert.ok(
+		!selectorRegistrySource.includes(badSelector),
+		`registry excludes sidepanel selector ${badSelector}`
+	);
 }
 
-// Verify compareResults and getChecksForGroup exports exist
+const taskbotTransientIds = [
+	'bot-modal',
+	'bot-modal-controls',
+	'bot-modal-dialog',
+	'bot-modal-running-indicator',
+	'error-modal',
+	'done-modal',
+];
+for (const id of taskbotTransientIds) {
+	const block = checkBlocks.find((item) => item.includes(`id: '${id}'`));
+	assert.ok(block, `transient check ${id} exists`);
+	assert.ok(block.includes("group: 'taskbot-transient'"), `${id} is taskbot-transient`);
+	assert.ok(block.includes("severity: 'transient'"), `${id} is transient severity`);
+}
+
 assert.ok(styleDoctorSource.includes('export function compareResults'), 'compareResults export exists');
 assert.ok(styleDoctorSource.includes('export function getChecksForGroup'), 'getChecksForGroup export exists');
 assert.ok(styleDoctorSource.includes('export function runSingleCheck'), 'runSingleCheck export exists');
 assert.ok(styleDoctorSource.includes('export function detectStyleDoctorView'), 'detectStyleDoctorView export exists');
 
-// Verify taskbot-specific transient checks (bot-modal, error-modal, done-modal) live under taskbot-transient
-const taskbotTransientIds = ['bot-modal', 'bot-modal-controls', 'bot-modal-dialog', 'bot-modal-running-indicator', 'error-modal', 'done-modal'];
-const checkBlocks = styleDoctorSource.split(/\t\{$/);
-for (const block of checkBlocks) {
-	const idMatch = block.match(/id:\s*'([^']+)'/);
-	if (!idMatch || !taskbotTransientIds.includes(idMatch[1])) continue;
-	const groupInBlock = block.match(/group:\s*'([^']+)'/);
-	assert.ok(groupInBlock, `transient check ${idMatch[1]} has group`);
-	assert.equal(
-		groupInBlock[1],
-		'taskbot-transient',
-		`transient check ${idMatch[1]} has group taskbot-transient`
-	);
-}
-
-// --- Inline logic tests (same algorithm as style-doctor.ts) ---
 function compareResults(previous, current) {
 	const previousMap = new Map(previous?.map((r) => [r.id, r.status]) ?? []);
 	return current.map((result) => {
@@ -83,13 +103,11 @@ const current = [
 	{ id: 'd', status: 'warn', count: 0 },
 ];
 
-// null previous -> all new
 const allNew = compareResults(null, current);
 for (const item of allNew) {
 	assert.equal(item.delta, 'new', `null previous: ${item.id} is new`);
 }
 
-// with previous
 const previous = [
 	{ id: 'a', status: 'pass', count: 1 },
 	{ id: 'b', status: 'fail', count: 0 },
@@ -101,7 +119,6 @@ assert.equal(comparison.find((c) => c.id === 'b').delta, 'fixed');
 assert.equal(comparison.find((c) => c.id === 'c').delta, 'regressed');
 assert.equal(comparison.find((c) => c.id === 'd').delta, 'new');
 
-// getChecksForGroup logic
 const TEST_CHECKS = [
 	{ id: 'x', group: 'general' },
 	{ id: 'y', group: 'taskbot-editor' },

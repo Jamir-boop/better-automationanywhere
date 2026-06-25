@@ -2,9 +2,12 @@ import {
 	formatRgbaColorMix,
 	type RgbColor,
 } from './background-colors';
+import {
+	RUN_BUTTON_HOST_SELECTOR,
+	RUN_BUTTON_PLAY_ICON_SELECTOR,
+	RUN_BUTTON_SELECTOR,
+} from './automation-anywhere-selectors';
 
-const RUN_BUTTON_SELECTOR =
-	'button[aria-label="Run"][name="run"], button[name="run"]';
 const STYLE_TAG_ID = 'better-aa-run-button-animation-style';
 const PULSE_LAYER_ID = 'better-aa-run-button-pulse-layer';
 const RUN_BUTTON_HOST_CLASS = 'better-aa-run-button-host';
@@ -161,15 +164,33 @@ function clearPulseTimeouts(pulseTimeouts: number[]): void {
 	pulseTimeouts.length = 0;
 }
 
+function withSelectorSuffix(selector: string, suffix = ''): string {
+	return selector
+		.split(',')
+		.map((part) => `${part.trim()}${suffix}`)
+		.join(',\n\t\t');
+}
+
 function injectStyles(): void {
 	if (document.getElementById(STYLE_TAG_ID)) return;
+
+	const runButton = withSelectorSuffix(RUN_BUTTON_SELECTOR);
+	const runButtonBefore = withSelectorSuffix(RUN_BUTTON_SELECTOR, '::before');
+	const runButtonAfter = withSelectorSuffix(RUN_BUTTON_SELECTOR, '::after');
+	const runButtonHover = withSelectorSuffix(RUN_BUTTON_SELECTOR, ':hover');
+	const runButtonFocus = withSelectorSuffix(RUN_BUTTON_SELECTOR, ':focus-visible');
+	const runButtonHoverBefore = withSelectorSuffix(RUN_BUTTON_SELECTOR, ':hover::before');
+	const runButtonHoverAfter = withSelectorSuffix(RUN_BUTTON_SELECTOR, ':hover::after');
+	const runButtonHoverIcon = withSelectorSuffix(
+		RUN_BUTTON_SELECTOR,
+		`:hover ${RUN_BUTTON_PLAY_ICON_SELECTOR}`
+	);
 
 	const style = document.createElement('style');
 	style.id = STYLE_TAG_ID;
 	style.textContent = `
 		/* ── Idle glow + base emphasis ── */
-		button[aria-label="Run"][name="run"],
-		button[name="run"] {
+		${runButton} {
 			position: relative !important;
 			z-index: 2147483642 !important;
 			overflow: hidden !important;
@@ -202,8 +223,7 @@ function injectStyles(): void {
 		}
 
 		/* ── Sweep fill pseudo-element ── */
-		button[aria-label="Run"][name="run"]::before,
-		button[name="run"]::before {
+		${runButtonBefore} {
 			content: "" !important;
 			position: absolute !important;
 			inset: -1px !important;
@@ -225,8 +245,7 @@ function injectStyles(): void {
 		}
 
 		/* ── Fill overlay pseudo-element ── */
-		button[aria-label="Run"][name="run"]::after,
-		button[name="run"]::after {
+		${runButtonAfter} {
 			content: "" !important;
 			position: absolute !important;
 			inset: 0 !important;
@@ -242,10 +261,8 @@ function injectStyles(): void {
 		}
 
 		/* ── Lift + glow on hover/focus ── */
-		button[aria-label="Run"][name="run"]:hover,
-		button[name="run"]:hover,
-		button[aria-label="Run"][name="run"]:focus-visible,
-		button[name="run"]:focus-visible {
+		${runButtonHover},
+		${runButtonFocus} {
 			transform: translateY(-1px) !important;
 			background:
 				linear-gradient(
@@ -263,20 +280,17 @@ function injectStyles(): void {
 		}
 
 		/* ── Sweep animation on hover/focus ── */
-		button[aria-label="Run"][name="run"]:hover::before,
-		button[name="run"]:hover::before {
+		${runButtonHoverBefore} {
 			animation: better-aa-sweep 850ms cubic-bezier(.2,.8,.2,1) both !important;
 		}
 
 		/* ── Fill animation on hover/focus ── */
-		button[aria-label="Run"][name="run"]:hover::after,
-		button[name="run"]:hover::after {
+		${runButtonHoverAfter} {
 			animation: better-aa-fill 850ms cubic-bezier(.2,.8,.2,1) both !important;
 		}
 
 		/* ── Icon pop ── */
-		button[aria-label="Run"][name="run"]:hover .rio-icon--icon_play-triangle,
-		button[name="run"]:hover .rio-icon--icon_play-triangle {
+		${runButtonHoverIcon} {
 			animation: better-aa-icon-pop 850ms cubic-bezier(.2,.8,.2,1) both !important;
 		}
 
@@ -356,7 +370,7 @@ let currentStyleEnabled = false;
 let currentWavesEnabled = false;
 
 function getRunButtonHost(button: HTMLButtonElement): HTMLElement | null {
-	return button.closest<HTMLElement>('.icon-button, [data-path="IconButton"]');
+	return button.closest<HTMLElement>(RUN_BUTTON_HOST_SELECTOR);
 }
 
 function setActiveRunButton(button: HTMLButtonElement | null): void {
@@ -398,12 +412,7 @@ function handleWaveEvent(event: Event): void {
 		: target.closest(RUN_BUTTON_SELECTOR);
 
 	if (!(matchedButton instanceof HTMLButtonElement)) return;
-	if (
-		!matchedButton.matches(
-			'button[aria-label="Run"][name="run"], button[name="run"]'
-		)
-	)
-		return;
+	if (!matchedButton.matches(RUN_BUTTON_SELECTOR)) return;
 
 	if (activeButton !== matchedButton) {
 		stopPulse();

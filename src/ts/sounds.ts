@@ -1,4 +1,11 @@
 import { isTaskEditorUrl } from './automation-anywhere';
+import {
+	DONE_BADGE_ICON_SELECTOR,
+	DONE_MODAL_SELECTOR,
+	ERROR_BADGE_ICON_SELECTOR,
+	ERROR_MODAL_SELECTOR,
+	RUN_BUTTON_NAME_SELECTOR,
+} from './automation-anywhere-selectors';
 import { debugInfo, debugWarn } from './debug';
 
 let enabled = false;
@@ -92,11 +99,11 @@ function playDoneSound(): void {
 }
 
 function checkForErrorBadge(): void {
-	const errorModal = document.querySelector('.modal--theme_error');
+	const errorModal = document.querySelector(ERROR_MODAL_SELECTOR);
 	if (!errorModal) return;
 
 	document
-		.querySelectorAll('span.rio-icon.rio-icon--icon_exclamation-mark--internal-use')
+		.querySelectorAll(ERROR_BADGE_ICON_SELECTOR)
 		.forEach((span) => {
 			if (handledBadges.has(span)) return;
 			handledBadges.add(span);
@@ -105,10 +112,10 @@ function checkForErrorBadge(): void {
 }
 
 function checkForDoneBadge(): void {
-	const doneModal = document.querySelector('.taskbot-success');
+	const doneModal = document.querySelector(DONE_MODAL_SELECTOR);
 	if (!doneModal) return;
 
-	document.querySelectorAll('span.rio-icon.rio-icon--icon_checkmark').forEach((span) => {
+	document.querySelectorAll(DONE_BADGE_ICON_SELECTOR).forEach((span) => {
 		if (handledBadges.has(span)) return;
 		handledBadges.add(span);
 		playDoneSound();
@@ -159,7 +166,7 @@ function wireRunButton(runButton: HTMLButtonElement): void {
 }
 
 function captureRunButton(attempts = 5): void {
-	const runButton = document.querySelector<HTMLButtonElement>('button[name="run"]');
+	const runButton = document.querySelector<HTMLButtonElement>(RUN_BUTTON_NAME_SELECTOR);
 	if (runButton) {
 		wireRunButton(runButton);
 		return;

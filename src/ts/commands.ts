@@ -4,10 +4,26 @@ import { getCommandHelp, renderHelpHtml } from './help';
 import { t } from './i18n';
 import type { ContentActionResponse } from './messages';
 import type { SidepanelFocusTarget, SidepanelTab } from './sidepanel-state';
+import {
+	ADD_VARIABLE_CONFIRM_BUTTON_SELECTOR,
+	ADD_VARIABLE_CREATE_BUTTON_SELECTOR,
+	ADD_VARIABLE_SECTION_BUTTON_SELECTOR,
+	DELETE_UNUSED_VARIABLES_MENU_BUTTON_SELECTOR,
+	DELETE_UNUSED_VARIABLES_OPTION_SELECTOR,
+	EDITOR_PALETTE_ACTIONS_SELECTOR,
+	EDITOR_PALETTE_SEARCH_CANCEL_SELECTOR,
+	EDITOR_PALETTE_TRIGGERS_SELECTOR,
+	EDITOR_PALETTE_VARIABLES_SELECTOR,
+	SIDEBAR_NAVIGATION_ITEM_LABEL_SELECTOR,
+	SIDEBAR_NAVIGATION_LINKS_SELECTOR,
+	SIDEBAR_NAVIGATION_PRIMARY_ITEM_SELECTOR,
+	SIDEBAR_NAVIGATION_PRIMARY_LABEL_SELECTOR,
+	SIDEBAR_NAVIGATION_SECONDARY_SELECTOR,
+	TASKBOT_LINE_NUMBER_SELECTOR,
+} from './automation-anywhere-selectors';
 import * as ui from './ui';
 import * as utils from './utils';
 
-const SIDEBAR_NAVIGATION_SELECTOR = 'nav[data-path="Pathfinder.primaryItems"]';
 const SIDEBAR_NAVIGATION_ALIAS_SYNONYMS: Record<string, string[]> = {
 	home: ['dashboard', 'overview'],
 	private: ['p', 'private bots'],
@@ -33,12 +49,12 @@ export async function showActions(): Promise<void> {
 		utils.toggleToolbar();
 	}
 	await utils.clickIfExists(
-		'div.editor-palette__accordion button[aria-label="Actions"]',
+		EDITOR_PALETTE_ACTIONS_SELECTOR,
 		'showActions'
 	);
 	await utils.sleep(100);
 	await utils.clickIfExists(
-		'.editor-palette-search__cancel button[type="button"][tabindex="-1"]',
+		EDITOR_PALETTE_SEARCH_CANCEL_SELECTOR,
 		'showActions'
 	);
 }
@@ -48,8 +64,7 @@ export async function showVariables(): Promise<void> {
 		utils.toggleToolbar();
 		await utils.sleep(1000);
 	}
-	const selector =
-		'button[data-path="EditorPalette.section.button"][aria-label="Variables"]';
+	const selector = EDITOR_PALETTE_VARIABLES_SELECTOR;
 	for (let i = 0; i < 10; i++) {
 		const el = document.querySelector<HTMLElement>(selector);
 		if (el) {
@@ -69,7 +84,7 @@ export function showTriggers(): void {
 		utils.toggleToolbar();
 	}
 	void utils.clickIfExists(
-		'button.editor-palette-section__header-button[data-path="EditorPalette.section.button"][aria-label="Triggers"]',
+		EDITOR_PALETTE_TRIGGERS_SELECTOR,
 		'showTriggers'
 	);
 }
@@ -79,33 +94,30 @@ export async function addVariable(): Promise<void> {
 		utils.toggleToolbar();
 		await utils.sleep(300);
 	}
-	await utils.clickIfExists('div.editor-palette__accordion header button', 'addVariable');
+	await utils.clickIfExists(ADD_VARIABLE_SECTION_BUTTON_SELECTOR, 'addVariable');
 	await utils.sleep(200);
-	await utils.clickIfExists('button[name="create"]', 'addVariable');
+	await utils.clickIfExists(ADD_VARIABLE_CREATE_BUTTON_SELECTOR, 'addVariable');
 	await utils.sleep(200);
-	await utils.clickIfExists(
-		'div.action-bar--theme_default button:nth-child(2)',
-		'addVariable'
-	);
+	await utils.clickIfExists(ADD_VARIABLE_CONFIRM_BUTTON_SELECTOR, 'addVariable');
 }
 
 export async function deleteUnusedVariables(): Promise<void> {
 	await showVariables();
 	await utils.sleep(1000);
 	await utils.clickIfExists(
-		'button.action-bar__item--is_menu:nth-child(5)',
+		DELETE_UNUSED_VARIABLES_MENU_BUTTON_SELECTOR,
 		'deleteUnusedVariables'
 	);
 	await utils.sleep(1000);
 	await utils.clickIfExists(
-		'.dropdown-options.g-scroller button.rio-focus--inset_4px:nth-child(2)',
+		DELETE_UNUSED_VARIABLES_OPTION_SELECTOR,
 		'deleteUnusedVariables'
 	);
 }
 
 export function scrollToLineNumber(lineNumber: number): void {
 	const lineElements = document.querySelectorAll(
-		'.taskbot-canvas-list-node > .taskbot-canvas-list-node__number'
+		TASKBOT_LINE_NUMBER_SELECTOR
 	);
 	if (lineNumber < 1 || lineNumber > lineElements.length) {
 		void debugWarn('commands', 'Line number is out of range.', {
@@ -290,22 +302,22 @@ function getCommandAliasSet(commands: Record<string, Command>): Set<string> {
 }
 
 function getSidebarNavigationGroupLabel(link: Element): string {
-	const secondaryList = link.closest('.pathfinder-items--variant_secondary');
+	const secondaryList = link.closest(SIDEBAR_NAVIGATION_SECONDARY_SELECTOR);
 	if (!secondaryList) return '';
 
 	const primaryItem = secondaryList.parentElement?.closest(
-		'.pathfinder-items__item--variant_primary'
+		SIDEBAR_NAVIGATION_PRIMARY_ITEM_SELECTOR
 	);
 	return (
 		primaryItem
-			?.querySelector('[data-path="Pathfinder.button"] .pathfinder-items__item-label')
+			?.querySelector(SIDEBAR_NAVIGATION_PRIMARY_LABEL_SELECTOR)
 			?.textContent || ''
 	);
 }
 
 function getSidebarNavigationLabel(link: Element): string {
 	return (
-		link.querySelector('.pathfinder-items__item-label')?.textContent ||
+		link.querySelector(SIDEBAR_NAVIGATION_ITEM_LABEL_SELECTOR)?.textContent ||
 		link.getAttribute('aria-label') ||
 		link.getAttribute('title') ||
 		link.getAttribute('name') ||
@@ -356,9 +368,7 @@ function createNavigationCommand(
 
 function getSidebarNavigationCommandDefinitions(): Array<Command & { key: string }> {
 	const commands: Array<Command & { key: string }> = [];
-	const navigationLinks = document.querySelectorAll(
-		`${SIDEBAR_NAVIGATION_SELECTOR} a[href^="#/"]`
-	);
+	const navigationLinks = document.querySelectorAll(SIDEBAR_NAVIGATION_LINKS_SELECTOR);
 
 	navigationLinks.forEach((link, index) => {
 		const path = toInternalNavigationPath(link.getAttribute('href'));
