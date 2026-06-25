@@ -96,4 +96,40 @@ assert.equal(
 	'taskbot-json'
 );
 
+assert.deepEqual(
+	tools.getAvailableAutomationAnywhereTools(
+		{
+			url: '',
+			baseUrl: '',
+			hostname: '',
+			pageType: 'public-folder',
+		},
+		{ universalClipboard: false }
+	),
+	['copy-files', 'update-packages', 'export-bots']
+);
+
+assert.deepEqual(
+	tools.getAvailableAutomationAnywhereTools(
+		{
+			url: '',
+			baseUrl: '',
+			hostname: '',
+			pageType: 'private-folder',
+		},
+		{ universalClipboard: false }
+	),
+	['copy-files', 'update-packages', 'export-bots']
+);
+
+assert.equal(
+	tools.getDefaultTaskbotTool({
+		url: '',
+		baseUrl: '',
+		hostname: '',
+		pageType: 'public-folder',
+	}, { universalClipboard: false }),
+	null
+);
+
 console.log('Taskbot tools tests passed.');

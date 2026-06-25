@@ -20,7 +20,7 @@ export function getAvailableAutomationAnywhereTools(
 		return tools;
 	}
 	if (context.pageType === 'public-folder') {
-		tools.push('export-bots');
+		tools.push('copy-files', 'update-packages', 'export-bots');
 		return tools;
 	}
 	if (context.pageType === 'private-taskbot') {
