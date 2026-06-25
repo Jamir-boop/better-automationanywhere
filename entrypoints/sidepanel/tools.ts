@@ -1562,6 +1562,10 @@ async function updateSelectedPackages(): Promise<void> {
 	const bots = getSelectedFiles();
 	if (!bots.length) return;
 
+	const taskbotTabId = isTaskbotContext(activeRuntime.context)
+		? activeRuntime.tabId
+		: undefined;
+
 	setBusy(primaryActionButton, true, t('Updating...'));
 	startToolRun(
 		t('Update Packages'),
@@ -1624,6 +1628,15 @@ async function updateSelectedPackages(): Promise<void> {
 				total: bots.length,
 			}));
 		}
+
+		if (updated > 0 && taskbotTabId !== undefined) {
+			try {
+				await browser.tabs.reload(taskbotTabId);
+			} catch {
+				// swallow — successful package writes must not appear as failures
+			}
+		}
+
 		const summary = t(
 			'Update packages done. Updated {updated}, skipped {skipped}, failed {failed}.',
 			{ updated, skipped, failed }
