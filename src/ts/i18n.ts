@@ -352,6 +352,8 @@ const ES: Record<string, string> = {
 	'Paste failed': 'Pegado fallido',
 	'Shared paste button not found.': 'Boton de pegado compartido no encontrado.',
 	'Paste already in progress.': 'Pegado ya en progreso.',
+	'Preparing {label} paste... {seconds}s':
+		'Preparando pegado de {label}... {seconds}s',
 	'Paste sent': 'Pegado enviado',
 	'Sent content from slot {slot} to Automation Anywhere.':
 		'Contenido del espacio {slot} enviado a Automation Anywhere.',

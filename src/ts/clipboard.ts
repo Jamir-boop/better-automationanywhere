@@ -14,6 +14,9 @@ const GLOBAL_CLIPBOARD_WATCH_INTERVAL_MS = 500;
 const CLIPBOARD_BUTTON_WAIT_MS = 1500;
 const CLIPBOARD_COPY_WAIT_MS = 3000;
 const CLIPBOARD_POLL_MS = 50;
+const CLIPBOARD_PASTE_READY_WAIT_MS = 1500;
+const CLIPBOARD_PASTE_BEFORE_CLICK_MS = 2500;
+const CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS = 1500;
 const TASK_EDITOR_SELECTORS = [
 	'.aa-icon-action-clipboard-copy--shared',
 	'.aa-icon-action-clipboard-paste--shared',
@@ -66,6 +69,24 @@ async function waitForSharedClipboardButton(
 
 function markGlobalClipboardWrite(value: string): void {
 	ignoredGlobalClipboardWrite = value;
+}
+
+async function waitForPasteClipboardValue(
+	cleanedData: string,
+	uid: string
+): Promise<boolean> {
+	const targetUid = `"${uid}"`;
+	let consecutive = 0;
+	const start = Date.now();
+	while (Date.now() - start < CLIPBOARD_PASTE_READY_WAIT_MS) {
+		const match =
+			localStorage.getItem(GLOBAL_CLIPBOARD_KEY) === cleanedData &&
+			localStorage.getItem(GLOBAL_CLIPBOARD_UID_KEY) === targetUid;
+		consecutive = match ? consecutive + 1 : 0;
+		if (consecutive >= 2) return true;
+		await utils.sleep(CLIPBOARD_POLL_MS);
+	}
+	return false;
 }
 
 async function readFreshSharedCopy(context: string): Promise<string | null> {
@@ -238,15 +259,19 @@ async function requestSharedPaste(
 	const uid = generateUid();
 	const cleanedData = cleanAutomationAnywhereJson(replaceStoredUid(clipboardData, uid));
 	markGlobalClipboardWrite(cleanedData);
+
+	localStorage.removeItem(GLOBAL_CLIPBOARD_KEY);
+	localStorage.removeItem(GLOBAL_CLIPBOARD_UID_KEY);
+	await utils.sleep(0);
+
 	localStorage.setItem(GLOBAL_CLIPBOARD_KEY, cleanedData);
 	localStorage.setItem(GLOBAL_CLIPBOARD_UID_KEY, `"${uid}"`);
 
-	if (
-		localStorage.getItem(GLOBAL_CLIPBOARD_KEY) !== cleanedData ||
-		localStorage.getItem(GLOBAL_CLIPBOARD_UID_KEY) !== `"${uid}"`
-	) {
+	const stable = await waitForPasteClipboardValue(cleanedData, uid);
+	if (!stable) {
 		throw new Error('Automation Anywhere clipboard write failed.');
 	}
+	await utils.sleep(CLIPBOARD_PASTE_BEFORE_CLICK_MS);
 
 	const pasteButton = await waitForSharedClipboardButton(
 		'.aa-icon-action-clipboard-paste--shared',
@@ -258,6 +283,8 @@ async function requestSharedPaste(
 		throw new Error('Shared paste button not found.');
 	}
 
+	window.focus();
+	pasteButton.focus({ preventScroll: true });
 	pasteButton.click();
 	void debugInfo('clipboard', 'Clipboard paste requested.', { slot }, { feedback: true });
 	if (notify) {
@@ -268,6 +295,8 @@ async function requestSharedPaste(
 				: t('Sent content from slot {slot} to Automation Anywhere.', { slot })
 		);
 	}
+
+	await utils.sleep(CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS);
 }
 
 export async function pasteFromSlot(slot: number): Promise<string | null> {

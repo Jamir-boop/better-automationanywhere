@@ -2111,11 +2111,37 @@ async function copyClipboardSlot(slot: number): Promise<void> {
 	);
 }
 
+function setClipboardPasteButtonsDisabled(disabled: boolean): void {
+	document.querySelectorAll<HTMLButtonElement>('[data-paste-slot]').forEach((button) => {
+		button.disabled = disabled;
+	});
+}
+
 async function pasteClipboardSlot(slot: number): Promise<void> {
-	const response =
-		slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
-			? await sendActiveTabMessage({ type: 'UNIVERSAL_PASTE' })
-			: await sendActiveTabMessage({ type: 'PASTE_FROM_SLOT', slot });
+	const label = getClipboardSlotLabel(slot);
+	let seconds = 0;
+	let response: ContentActionResponse = { ok: false, error: t('Action failed.') };
+	setClipboardPasteButtonsDisabled(true);
+	showStatusMessage(
+		t('Preparing {label} paste... {seconds}s', { label, seconds }),
+		'info'
+	);
+	const timer = window.setInterval(() => {
+		seconds += 1;
+		showStatusMessage(
+			t('Preparing {label} paste... {seconds}s', { label, seconds }),
+			'info'
+		);
+	}, 1000);
+	try {
+		response =
+			slot === DEFAULT_UNIVERSAL_CLIPBOARD_SLOT
+				? await sendActiveTabMessage({ type: 'UNIVERSAL_PASTE' })
+				: await sendActiveTabMessage({ type: 'PASTE_FROM_SLOT', slot });
+	} finally {
+		window.clearInterval(timer);
+		setClipboardPasteButtonsDisabled(false);
+	}
 	if (response.ok && response.json) {
 		setActionJsonValue(prettyJson(response.json));
 	}
