@@ -4,6 +4,7 @@ import type {
 	ContentActionResponse,
 } from './messages';
 import { parseAutomationAnywhereTaskEditorRoute } from './automation-anywhere';
+import { debugWarn } from './debug';
 
 export const AUTOMATION_ANYWHERE_TASKBOT_TYPE = 'application/vnd.aa.taskbot';
 const AUTOMATION_ANYWHERE_DIRECTORY_TYPES = new Set([
@@ -202,20 +203,38 @@ export async function getAutomationAnywhereAuthToken(tabId: number): Promise<str
 		response = (await browser.tabs.sendMessage(tabId, {
 			type: 'GET_AA_AUTH_TOKEN',
 		})) as ContentActionResponse | undefined;
-	} catch {
+	} catch (error) {
 		const fallbackToken = await getAutomationAnywhereAuthTokenViaScripting(tabId);
-		if (fallbackToken) return fallbackToken;
+		if (fallbackToken) {
+			void debugWarn('api', 'Auth token read fell back to scripting.', {
+				tabId,
+				error,
+			}, { feedback: true, keepDetails: true });
+			return fallbackToken;
+		}
 		throw new Error('Refresh Automation Anywhere tab.');
 	}
 
 	if (!response?.ok) {
 		const fallbackToken = await getAutomationAnywhereAuthTokenViaScripting(tabId);
-		if (fallbackToken) return fallbackToken;
+		if (fallbackToken) {
+			void debugWarn('api', 'Auth token read fell back to scripting.', {
+				tabId,
+				responseError: response?.error,
+			}, { feedback: true, keepDetails: true });
+			return fallbackToken;
+		}
 		throw new Error(response?.error || 'Refresh Automation Anywhere tab.');
 	}
 	if (!response.authToken) {
 		const fallbackToken = await getAutomationAnywhereAuthTokenViaScripting(tabId);
-		if (fallbackToken) return fallbackToken;
+		if (fallbackToken) {
+			void debugWarn('api', 'Auth token read fell back to scripting.', {
+				tabId,
+				reason: 'empty-content-response',
+			}, { feedback: true, keepDetails: true });
+			return fallbackToken;
+		}
 		throw new Error('Log in to Control Room or refresh page.');
 	}
 	return response.authToken;
@@ -558,7 +577,12 @@ export class AutomationAnywhereApi {
 					body: { fileIds },
 				}
 			);
-		} catch {
+		} catch (error) {
+			void debugWarn('api', 'Dependency batch endpoint failed; using per-file fallback.', {
+				fileCount: fileIds.length,
+				fileIds,
+				error,
+			}, { feedback: true, keepDetails: true });
 			const responses = await Promise.all(
 				fileIds.map((fileId) => this.getFileDependencies(fileId))
 			);

@@ -794,14 +794,23 @@ async function refreshFeedbackHistory(): Promise<void> {
 }
 
 function formatFeedbackForAi(events: DebugEvent[]): string {
+	const header = [
+		t('# Better AA Developer Experience Debug Log'),
+		'',
+		`Generated: ${new Date().toISOString()}`,
+		`Extension version: ${browser.runtime.getManifest().version}`,
+		`Browser target: ${
+			import.meta.env.FIREFOX ? 'firefox' : import.meta.env.CHROME ? 'chrome' : 'unknown'
+		}`,
+		t('Stored entries: {count}', { count: events.length }),
+	].join('\n');
+
 	if (!events.length) {
-		return `${t('# Better AA Developer Experience Debug Log')}\n\n${t('Stored entries: {count}', { count: 0 })}\n\n${t('No debug log.')}`;
+		return `${header}\n\n${t('No debug log.')}`;
 	}
 
 	return [
-		t('# Better AA Developer Experience Debug Log'),
-		'',
-		t('Stored entries: {count}', { count: events.length }),
+		header,
 		'',
 		...events.flatMap((event, index) => {
 			const lines = [

@@ -63,7 +63,8 @@ interface InitializeToolsOptions {
 		severity: FeedbackSeverity,
 		source: string,
 		message: string,
-		details?: Record<string, unknown>
+		details?: Record<string, unknown>,
+		options?: { keepDetails?: boolean; debugOnly?: boolean }
 	): void | Promise<void>;
 }
 
@@ -115,6 +116,7 @@ interface ExportTaskbotScan {
 }
 
 interface ToolRunState {
+	runId: string;
 	title: string;
 	total: number;
 	completed: number;
@@ -589,13 +591,28 @@ function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void 
 	activeToolRun?.lines.push({ message, severity });
 }
 
+function createToolRunId(): string {
+	if (crypto.randomUUID) return crypto.randomUUID();
+	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function appendToolLog(
 	message: string,
 	severity: FeedbackSeverity = 'info',
 	details?: Record<string, unknown>
 ): void {
 	addRunLine(message, severity);
-	void options.addFeedback(severity, 'tools', message, details);
+	void options.addFeedback(
+		severity,
+		'tools',
+		message,
+		{
+			...(activeToolRun ? { runId: activeToolRun.runId } : {}),
+			...(currentTool ? { tool: currentTool } : {}),
+			...details,
+		},
+		{ keepDetails: true, debugOnly: severity === 'info' }
+	);
 }
 
 function getProgressPercent(completed: number, total: number): number {
@@ -619,6 +636,7 @@ function setToolProgress(completed: number, total: number, message: string): voi
 
 function startToolRun(title: string, total: number, message: string): void {
 	activeToolRun = {
+		runId: createToolRunId(),
 		title,
 		total,
 		completed: 0,
@@ -676,6 +694,21 @@ function finishToolRun(
 	addRunLine(summary, severity);
 	setToolProgress(run.total, run.total, summary);
 	activeToolRun = null;
+	void options.addFeedback(
+		severity,
+		'tools',
+		t('{title} run finished.', { title: run.title }),
+		{
+			runId: run.runId,
+			tool: currentTool,
+			title: run.title,
+			total: run.total,
+			completed: run.completed,
+			durationMs: Date.now() - run.startedAt,
+			summary,
+		},
+		{ keepDetails: true, debugOnly: severity === 'info' }
+	);
 	showToolFinishModal(run, summary, severity);
 }
 
@@ -751,6 +784,18 @@ async function refreshToolsContext(): Promise<void> {
 			setSelectedToolPanel(null);
 			renderActionButtons();
 			setToolsHelpMatrixVisible(true);
+			void options.addFeedback(
+				'info',
+				'tools',
+				t('Tools context unsupported.'),
+				active
+					? {
+							pageType: active.context.pageType,
+							host: active.context.hostname,
+						}
+					: { reason: 'no-active-tab' },
+				{ keepDetails: true, debugOnly: true }
+			);
 			return;
 		}
 
@@ -763,6 +808,21 @@ async function refreshToolsContext(): Promise<void> {
 		};
 		contextText.textContent = getContextLabel(active.context);
 		const tools = getAvailableTools(active.context, capabilities);
+		void options.addFeedback(
+			'info',
+			'tools',
+			t('Tools context loaded.'),
+			{
+				tabId: active.tabId,
+				pageType: active.context.pageType,
+				host: active.context.hostname,
+				fileId: active.context.fileId,
+				folderId: active.context.folderId,
+				capabilities,
+				tools,
+			},
+			{ keepDetails: true, debugOnly: true }
+		);
 		updateAvailabilityDot(tools.length > 0);
 		setToolsHelpMatrixVisible(tools.length === 0);
 
@@ -803,6 +863,13 @@ async function refreshToolsContext(): Promise<void> {
 		contextText.textContent =
 			error instanceof Error ? error.message : t('Tools context failed.');
 		setToolStatus(contextText.textContent, 'error');
+		void options.addFeedback(
+			'error',
+			'tools',
+			t('Tools context failed.'),
+			{ error },
+			{ keepDetails: true }
+		);
 	}
 }
 
@@ -814,7 +881,14 @@ async function getToolCapabilities(tabId: number): Promise<ToolCapabilities> {
 		return response?.ok && response.capabilities
 			? response.capabilities
 			: EMPTY_TOOL_CAPABILITIES;
-	} catch {
+	} catch (error) {
+		void options.addFeedback(
+			'warn',
+			'tools',
+			t('Tool capabilities unavailable.'),
+			{ tabId, error },
+			{ keepDetails: true }
+		);
 		return EMPTY_TOOL_CAPABILITIES;
 	}
 }
@@ -1436,7 +1510,7 @@ function copySelectedFiles(): void {
 	void options.addFeedback('info', 'tools', summary, {
 		count: copiedFiles.length,
 		sourceFolderId: folderId,
-	});
+	}, { keepDetails: true, debugOnly: true });
 	updateActionBar();
 }
 
@@ -1914,6 +1988,17 @@ async function loadTaskbotJson(): Promise<void> {
 		taskbotJsonBaseline = normalizeTaskbotJsonContent(content);
 		taskbotJsonWorkbench.setValue(JSON.stringify(content, null, 2));
 		setToolStatus(t('Taskbot JSON loaded.'));
+		void options.addFeedback(
+			'info',
+			'tools',
+			t('Taskbot JSON loaded.'),
+			{
+				tool: 'taskbot-json',
+				fileId,
+				bytes: taskbotJsonWorkbench.getValue().length,
+			},
+			{ keepDetails: true, debugOnly: true }
+		);
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool || taskbotJsonFileId !== fileId) {
 			return;
@@ -1976,6 +2061,18 @@ async function saveTaskbotJson(): Promise<void> {
 		const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
 		if (tab?.id) await browser.tabs.reload(tab.id);
 		setToolStatus(t('Taskbot JSON imported to Control Room.'));
+		void options.addFeedback(
+			'info',
+			'tools',
+			t('Taskbot JSON imported to Control Room.'),
+			{
+				tool: 'taskbot-json',
+				fileId,
+				status: changeStatus,
+				bytes: normalizeTaskbotJsonContent(parsed).length,
+			},
+			{ keepDetails: true, debugOnly: true }
+		);
 	} catch (error) {
 		setToolStatus(error instanceof Error ? error.message : t('Taskbot JSON import failed.'), 'error');
 	}

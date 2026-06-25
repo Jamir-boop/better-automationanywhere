@@ -134,6 +134,7 @@ let variableMetadataObserver: MutationObserver | null = null;
 let variableMetadataScheduled = false;
 let variableMetadataCurrentFileId: string | null = null;
 let variableMetadataMissingSignature: string | null = null;
+let variableMetadataExhaustedSignature: string | null = null;
 let variableMetadataMissingRetryCount = 0;
 let variableMetadataRetryTimer: ReturnType<typeof setTimeout> | undefined;
 const variableMetadataCache = new Map<string, Promise<VariableMetadataLookup | null>>();
@@ -173,13 +174,40 @@ function syncBotExecutionModal(): void {
 	);
 }
 
+function getPageContextLogDetails(): Record<string, unknown> {
+	const context = parseAutomationAnywherePageContext(location.href);
+	return {
+		pageType: context.pageType,
+		host: context.hostname,
+		fileId: context.fileId,
+		folderId: context.folderId,
+	};
+}
+
 function watchRouteChanges(): void {
 	let lastRouteUrl = location.href;
+	let lastRouteContext = parseAutomationAnywherePageContext(location.href);
 	const update = () => {
 		requestAnimationFrame(() => {
 			applyRouteClasses();
 			if (location.href === lastRouteUrl) return;
 			lastRouteUrl = location.href;
+			const routeContext = parseAutomationAnywherePageContext(lastRouteUrl);
+			if (routeContext.pageType !== lastRouteContext.pageType) {
+				void debugInfo(
+					'content',
+					'Automation Anywhere route page type changed.',
+					{
+						previousPageType: lastRouteContext.pageType,
+						pageType: routeContext.pageType,
+						host: routeContext.hostname,
+						fileId: routeContext.fileId,
+						folderId: routeContext.folderId,
+					},
+					{ feedback: true, keepDetails: true, debugOnly: true }
+				);
+			}
+			lastRouteContext = routeContext;
 			void browser.runtime.sendMessage({
 				type: 'AA_ROUTE_CHANGED',
 				url: lastRouteUrl,
@@ -325,16 +353,35 @@ async function loadVariableMetadata(
 
 	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
 	if (!authToken) {
-		void debugWarn('variable-metadata', 'Automation Anywhere auth token not found.');
+		void debugWarn(
+			'variable-metadata',
+			'Automation Anywhere auth token not found.',
+			{ fileId },
+			{ feedback: true, keepDetails: true }
+		);
 		return null;
 	}
 
 	const promise = new AutomationAnywhereApi(baseUrl, authToken)
 		.getBotContent(fileId)
-		.then((content) => extractVariableMetadataLookup(content))
+		.then((content) => {
+			const lookup = extractVariableMetadataLookup(content);
+			void debugInfo(
+				'variable-metadata',
+				'Variable metadata loaded.',
+				{ fileId, variableCount: lookup.size },
+				{ feedback: true, keepDetails: true, debugOnly: true }
+			);
+			return lookup;
+		})
 		.catch((error) => {
 			variableMetadataCache.delete(fileId);
-			void debugWarn('variable-metadata', 'Variable metadata load failed.', { error });
+			void debugWarn(
+				'variable-metadata',
+				'Variable metadata load failed.',
+				{ fileId, error },
+				{ feedback: true, keepDetails: true }
+			);
 			return null;
 		})
 		.finally(scheduleVariableMetadataSync);
@@ -347,6 +394,7 @@ function clearVariableMetadataMissingRefresh(): void {
 	if (variableMetadataRetryTimer) clearTimeout(variableMetadataRetryTimer);
 	variableMetadataRetryTimer = undefined;
 	variableMetadataMissingSignature = null;
+	variableMetadataExhaustedSignature = null;
 	variableMetadataMissingRetryCount = 0;
 }
 
@@ -363,6 +411,18 @@ function refreshMissingVariableMetadata(
 		variableMetadataMissingRetryCount >= 2 ||
 		variableMetadataRetryTimer
 	) {
+		if (
+			variableMetadataMissingRetryCount >= 2 &&
+			variableMetadataExhaustedSignature !== signature
+		) {
+			variableMetadataExhaustedSignature = signature;
+			void debugWarn(
+				'variable-metadata',
+				'Variable metadata retry exhausted.',
+				{ fileId, missingNames, retryCount: variableMetadataMissingRetryCount },
+				{ feedback: true, keepDetails: true }
+			);
+		}
 		return;
 	}
 
@@ -371,7 +431,14 @@ function refreshMissingVariableMetadata(
 		variableMetadataCache.delete(fileId);
 		scheduleVariableMetadataSync();
 	};
-	if (variableMetadataMissingRetryCount++ === 0) refresh();
+	const retryCount = variableMetadataMissingRetryCount++;
+	void debugInfo(
+		'variable-metadata',
+		'Variable metadata retry queued.',
+		{ fileId, missingNames, retryCount },
+		{ feedback: true, keepDetails: true, debugOnly: true }
+	);
+	if (retryCount === 0) refresh();
 	else {
 		// ponytail: one delayed retry; poll only if Control Room lag proves longer.
 		variableMetadataRetryTimer = setTimeout(refresh, 1_000);
@@ -385,6 +452,7 @@ function applyVariableMetadataLabels(
 ): void {
 	const missingNames: string[] = [];
 	const seenMissingNames = new Set<string>();
+	let appliedCount = 0;
 	section.querySelectorAll<HTMLElement>(VARIABLE_ROW_SELECTOR).forEach((row) => {
 		const rowName = row.dataset.itemName;
 		const label = row.querySelector<HTMLElement>(VARIABLE_LABEL_SELECTOR);
@@ -401,6 +469,7 @@ function applyVariableMetadataLabels(
 			restoreVariableMetadataLabel(label);
 			return;
 		}
+		appliedCount += 1;
 
 		if (!label.hasAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR)) {
 			label.setAttribute(
@@ -423,6 +492,12 @@ function applyVariableMetadataLabels(
 		row.classList.add('better-aa-variable-metadata-row');
 	});
 
+	void debugInfo(
+		'variable-metadata',
+		'Variable metadata labels synced.',
+		{ fileId, appliedCount, missingCount: missingNames.length, missingNames },
+		{ feedback: true, keepDetails: true, debugOnly: true }
+	);
 	if (missingNames.length) refreshMissingVariableMetadata(fileId, missingNames);
 	else clearVariableMetadataMissingRefresh();
 }
@@ -774,6 +849,16 @@ async function handleRuntimeMessage(
 			return { ok: true, message: t('Import queued.') };
 		}
 	} catch (error) {
+		void debugError(
+			'content',
+			'Content action failed.',
+			{
+				messageType: message.type,
+				...getPageContextLogDetails(),
+				error,
+			},
+			{ feedback: true, keepDetails: true }
+		);
 		return {
 			ok: false,
 			error: error instanceof Error ? error.message : t('Action failed.'),

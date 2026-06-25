@@ -57,6 +57,7 @@ import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
 
 const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
 const CONTROL_ROOM_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
+const SLOW_API_REQUEST_MS = 2000;
 
 const controlRoomVersionCache = new Map<
 	string,
@@ -567,6 +568,48 @@ function parseJsonLike(value: string): unknown {
 	}
 }
 
+function getApiRequestTarget(url: string, includeFullUrl = false): Record<string, string> {
+	try {
+		const parsed = new URL(url);
+		return {
+			host: parsed.hostname,
+			path: `${parsed.pathname}${parsed.search}`,
+			...(includeFullUrl ? { url } : {}),
+		};
+	} catch {
+		return includeFullUrl ? { url } : { path: url };
+	}
+}
+
+function getApiRequestBodyKind(body: string | undefined): string {
+	if (body === undefined) return 'none';
+	const trimmed = body.trim();
+	if (!trimmed) return 'empty';
+	if (trimmed.startsWith('{')) return 'json-object';
+	if (trimmed.startsWith('[')) return 'json-array';
+	return 'string';
+}
+
+function getApiRequestLogDetails(
+	message: AutomationAnywhereApiRequestMessage,
+	requestId: string,
+	durationMs: number,
+	extra: Record<string, unknown> = {},
+	includeFullUrl = false
+): Record<string, unknown> {
+	const method = message.config.method ?? 'GET';
+	return {
+		requestId,
+		method,
+		responseType: message.config.responseType ?? 'json',
+		bodyKind: getApiRequestBodyKind(message.config.body),
+		bodyBytes: message.config.body?.length ?? 0,
+		durationMs,
+		...getApiRequestTarget(message.config.url, includeFullUrl),
+		...extra,
+	};
+}
+
 function extractApiErrorMessage(data: unknown): string | null {
 	if (!data || typeof data !== 'object') return null;
 	const record = data as Record<string, unknown>;
@@ -597,55 +640,92 @@ async function readApiError(response: Response): Promise<string> {
 async function handleApiRequest(
 	message: AutomationAnywhereApiRequestMessage
 ): Promise<AutomationAnywhereApiResponse> {
+	const requestId = createNonce();
+	const startedAt = Date.now();
+	const method = message.config.method ?? 'GET';
 	try {
 		const response = await fetch(message.config.url, {
-			method: message.config.method ?? 'GET',
+			method,
 			headers: message.config.headers,
 			body: message.config.body,
 		});
 
 		if (!response.ok) {
+			const error = await readApiError(response);
+			void debugWarn(
+				'api',
+				'Automation Anywhere API request failed.',
+				getApiRequestLogDetails(
+					message,
+					requestId,
+					Date.now() - startedAt,
+					{ status: response.status, error },
+					true
+				),
+				{ feedback: true, keepDetails: true }
+			);
 			return {
 				ok: false,
 				status: response.status,
-				error: await readApiError(response),
+				error,
 			};
 		}
 
+		let data: unknown;
 		if (message.config.responseType === 'blob') {
 			const blob = await response.blob();
-			return {
-				ok: true,
-				data: {
-					blob: await blobToDataUrl(blob),
-					type: blob.type,
-					size: blob.size,
-					fileName: parseContentDispositionFileName(
-						response.headers.get('content-disposition')
-					),
-				},
+			data = {
+				blob: await blobToDataUrl(blob),
+				type: blob.type,
+				size: blob.size,
+				fileName: parseContentDispositionFileName(
+					response.headers.get('content-disposition')
+				),
 			};
-		}
-
-		if (message.config.responseType === 'text') {
-			return { ok: true, data: await response.text() };
-		}
-
-		if (message.config.responseType === 'bot-content') {
+		} else if (message.config.responseType === 'text') {
+			data = await response.text();
+		} else if (message.config.responseType === 'bot-content') {
 			const headerContent =
 				response.headers.get('x-bot-content') ?? response.headers.get('X-Bot-Content');
-			if (headerContent) return { ok: true, data: parseJsonLike(headerContent) };
-			const text = await response.text();
-			return { ok: true, data: parseJsonLike(text) };
+			data = headerContent
+				? parseJsonLike(headerContent)
+				: parseJsonLike(await response.text());
+		} else {
+			const contentType = response.headers.get('content-type') ?? '';
+			if (contentType.includes('application/json')) data = await response.json();
+			else {
+				const text = await response.text();
+				data = text ? parseJsonLike(text) : undefined;
+			}
 		}
 
-		const contentType = response.headers.get('content-type') ?? '';
-		if (contentType.includes('application/json')) {
-			return { ok: true, data: await response.json() };
+		const durationMs = Date.now() - startedAt;
+		if (method !== 'GET' || durationMs >= SLOW_API_REQUEST_MS) {
+			void debugInfo(
+				'api',
+				method === 'GET'
+					? 'Automation Anywhere API request slow.'
+					: 'Automation Anywhere API write completed.',
+				getApiRequestLogDetails(message, requestId, durationMs, {
+					status: response.status,
+				}),
+				{ feedback: true, keepDetails: true, debugOnly: true }
+			);
 		}
-		const text = await response.text();
-		return { ok: true, data: text ? parseJsonLike(text) : undefined };
+		return { ok: true, data };
 	} catch (error) {
+		void debugError(
+			'api',
+			'Automation Anywhere API request crashed.',
+			getApiRequestLogDetails(
+				message,
+				requestId,
+				Date.now() - startedAt,
+				{ error },
+				true
+			),
+			{ feedback: true, keepDetails: true }
+		);
 		return {
 			ok: false,
 			error: error instanceof Error ? error.message : 'Automation Anywhere API request failed.',
