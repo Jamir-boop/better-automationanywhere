@@ -2,7 +2,7 @@
   "name": "better-automationanywhere-dx",
   "description": "Better AA Developer Experience for Automation Anywhere",
   "private": true,
-  "version": "1.14.0",
+  "version": "1.14.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -17,10 +17,11 @@
     "compile": "tsc --noEmit",
     "test:style-doctor": "node scripts/test-style-doctor.mjs",
     "test:control-room-version": "node scripts/test-control-room-version.mjs",
+    "test:background-colors": "node scripts/test-background-colors.mjs",
     "test:debug": "node scripts/test-debug.mjs",
     "test:variable-metadata": "node scripts/test-variable-metadata.mjs",
     "test:taskbot-tools": "node scripts/test-taskbot-tools.mjs",
-    "check:maintenance": "tsc --noEmit && node scripts/test-style-doctor.mjs && node scripts/test-control-room-version.mjs && node scripts/test-debug.mjs && node scripts/test-variable-metadata.mjs && node scripts/test-taskbot-tools.mjs && wxt build && wxt build -b firefox",
+    "check:maintenance": "tsc --noEmit && node scripts/test-style-doctor.mjs && node scripts/test-control-room-version.mjs && node scripts/test-background-colors.mjs && node scripts/test-debug.mjs && node scripts/test-variable-metadata.mjs && node scripts/test-taskbot-tools.mjs && wxt build && wxt build -b firefox",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

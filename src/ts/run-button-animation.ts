@@ -1,8 +1,16 @@
+import {
+	formatRgbaColorMix,
+	type RgbColor,
+} from './background-colors';
+
 const RUN_BUTTON_SELECTOR =
 	'button[aria-label="Run"][name="run"], button[name="run"]';
 const STYLE_TAG_ID = 'better-aa-run-button-animation-style';
 const PULSE_LAYER_ID = 'better-aa-run-button-pulse-layer';
 const RUN_BUTTON_HOST_CLASS = 'better-aa-run-button-host';
+const RUN_PRIMARY_RGB_VAR = '--better-aa-background-color-3-rgb';
+const RUN_SECONDARY_RGB_VAR = '--better-aa-background-color-1-rgb';
+const DEFAULT_RUN_COLOR: RgbColor = { red: 182, green: 182, blue: 182 };
 
 export const BURST_ALPHAS = [1, 0.72, 0.44, 0.2];
 export const BURST_GAP_MS = 120;
@@ -12,8 +20,31 @@ export const PIXEL_SIZE = 40;
 export const SEGMENTS = 5;
 const PULSE_DURATION_MS = 3200;
 
-export function getGradientColor(_t: number, alpha: number): string {
-	return `rgba(255, 185, 0, ${alpha})`;
+function parseRgbChannels(value: string): RgbColor | null {
+	const channels = value.split(',').map((part) => Number(part.trim()));
+	if (
+		channels.length !== 3 ||
+		channels.some((channel) => !Number.isFinite(channel))
+	) {
+		return null;
+	}
+	const [red, green, blue] = channels;
+	return { red, green, blue };
+}
+
+function getCssRgbColor(name: string): RgbColor {
+	if (typeof document === 'undefined') return DEFAULT_RUN_COLOR;
+	const value = getComputedStyle(document.documentElement).getPropertyValue(name);
+	return parseRgbChannels(value) ?? DEFAULT_RUN_COLOR;
+}
+
+export function getGradientColor(
+	t: number,
+	alpha: number,
+	primary: RgbColor = getCssRgbColor(RUN_PRIMARY_RGB_VAR),
+	secondary: RgbColor = getCssRgbColor(RUN_SECONDARY_RGB_VAR)
+): string {
+	return formatRgbaColorMix(primary, secondary, t, alpha);
 }
 
 function getPulseData(button: HTMLButtonElement): {
@@ -64,8 +95,9 @@ function drawPixelRingFrame(
 	for (let i = 0; i < SEGMENTS; i += 1) {
 		const start = (i / SEGMENTS) * Math.PI * 2;
 		const end = ((i + 1) / SEGMENTS) * Math.PI * 2;
+		const colorProgress = i / Math.max(1, SEGMENTS - 1);
 		ctx.beginPath();
-		ctx.strokeStyle = getGradientColor(i / SEGMENTS, alpha);
+		ctx.strokeStyle = getGradientColor(colorProgress, alpha);
 		ctx.arc(center, center, radius, start, end);
 		ctx.stroke();
 	}
@@ -148,12 +180,20 @@ function injectStyles(): void {
 				background 160ms ease,
 				color 160ms ease,
 				box-shadow 160ms ease !important;
-			background: #ffffff !important;
-			border-color: #3b82f6 !important;
+			--better-aa-run-color-primary-rgb: var(--better-aa-background-color-3-rgb, 182, 182, 182);
+			--better-aa-run-color-secondary-rgb: var(--better-aa-background-color-1-rgb, 182, 182, 182);
+			background:
+				linear-gradient(
+					135deg,
+					rgba(var(--better-aa-run-color-primary-rgb), 0.16),
+					rgba(var(--better-aa-run-color-secondary-rgb), 0.1)
+				),
+				#ffffff !important;
+			border-color: rgba(var(--better-aa-run-color-primary-rgb), 0.72) !important;
 			box-shadow:
-				0 0 0 1px rgba(59, 130, 246, 0.18),
-				0 0 22px rgba(37, 99, 235, 0.22),
-				0 0 42px rgba(14, 165, 233, 0.14) !important;
+				0 0 0 1px rgba(var(--better-aa-run-color-primary-rgb), 0.2),
+				0 0 22px rgba(var(--better-aa-run-color-primary-rgb), 0.24),
+				0 0 42px rgba(var(--better-aa-run-color-secondary-rgb), 0.16) !important;
 		}
 
 		.${RUN_BUTTON_HOST_CLASS} {
@@ -174,10 +214,10 @@ function injectStyles(): void {
 					110deg,
 					transparent 0%,
 					transparent 22%,
-					rgba(59, 130, 246, 0.22) 34%,
-					rgba(14, 165, 233, 0.65) 45%,
-					rgba(139, 92, 246, 0.45) 56%,
-					rgba(20, 184, 166, 0.35) 66%,
+					rgba(var(--better-aa-run-color-primary-rgb), 0.22) 34%,
+					rgba(var(--better-aa-run-color-primary-rgb), 0.65) 45%,
+					rgba(var(--better-aa-run-color-secondary-rgb), 0.45) 56%,
+					rgba(var(--better-aa-run-color-secondary-rgb), 0.35) 66%,
 					transparent 78%,
 					transparent 100%
 				) !important;
@@ -193,7 +233,12 @@ function injectStyles(): void {
 			z-index: 0 !important;
 			pointer-events: none !important;
 			opacity: 0;
-			background: rgba(255, 255, 255, 0.18) !important;
+			background:
+				linear-gradient(
+					135deg,
+					rgba(var(--better-aa-run-color-primary-rgb), 0.18),
+					rgba(var(--better-aa-run-color-secondary-rgb), 0.18)
+				) !important;
 		}
 
 		/* ── Lift + glow on hover/focus ── */
@@ -202,13 +247,19 @@ function injectStyles(): void {
 		button[aria-label="Run"][name="run"]:focus-visible,
 		button[name="run"]:focus-visible {
 			transform: translateY(-1px) !important;
-			background: #ffffff !important;
-			border-color: #3b82f6 !important;
+			background:
+				linear-gradient(
+					135deg,
+					rgba(var(--better-aa-run-color-primary-rgb), 0.22),
+					rgba(var(--better-aa-run-color-secondary-rgb), 0.14)
+				),
+				#ffffff !important;
+			border-color: rgba(var(--better-aa-run-color-primary-rgb), 0.85) !important;
 			box-shadow:
-				0 0 0 1px rgba(59, 130, 246, 0.28),
-				0 12px 32px rgba(37, 99, 235, 0.22),
-				0 0 46px rgba(14, 165, 233, 0.22),
-				0 0 54px rgba(139, 92, 246, 0.14) !important;
+				0 0 0 1px rgba(var(--better-aa-run-color-primary-rgb), 0.3),
+				0 12px 32px rgba(var(--better-aa-run-color-primary-rgb), 0.24),
+				0 0 46px rgba(var(--better-aa-run-color-secondary-rgb), 0.24),
+				0 0 54px rgba(var(--better-aa-run-color-secondary-rgb), 0.16) !important;
 		}
 
 		/* ── Sweep animation on hover/focus ── */

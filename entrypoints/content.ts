@@ -14,7 +14,10 @@ import {
 	isTaskEditorUrl,
 	isTextFileUrl,
 } from '../src/ts/automation-anywhere';
-import { clampBackgroundColorValue } from '../src/ts/background-colors';
+import {
+	clampBackgroundColorValue,
+	getBackgroundColorRgbChannels,
+} from '../src/ts/background-colors';
 import {
 	setBotExecutionModalEnabled,
 	setBotExecutionModalPosition,
@@ -551,12 +554,19 @@ function setStyleValue(key: string, value: string): void {
 		document.documentElement.style.removeProperty(field.cssVar);
 		return;
 	}
-	document.documentElement.style.setProperty(
-		field.cssVar,
+	const nextValue =
 		field.type === 'color'
 			? clampBackgroundColorValue(normalizedValue || field.defaultValue)
-			: normalizedValue || field.defaultValue
-	);
+			: normalizedValue || field.defaultValue;
+	document.documentElement.style.setProperty(field.cssVar, nextValue);
+	if (field.type === 'color') {
+		const rgbChannels = getBackgroundColorRgbChannels(nextValue);
+		if (rgbChannels) {
+			document.documentElement.style.setProperty(`${field.cssVar}-rgb`, rgbChannels);
+		} else {
+			document.documentElement.style.removeProperty(`${field.cssVar}-rgb`);
+		}
+	}
 }
 
 async function applyStyleValues(): Promise<void> {

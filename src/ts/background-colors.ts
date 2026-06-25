@@ -82,6 +82,33 @@ export function formatRgba(rgb: RgbColor, alpha: number): string {
 	return `rgba(${rgb.red}, ${rgb.green}, ${rgb.blue}, ${formatAlpha(alpha)})`;
 }
 
+export function formatRgbChannels(rgb: RgbColor): string {
+	return `${rgb.red}, ${rgb.green}, ${rgb.blue}`;
+}
+
+export function getBackgroundColorRgbChannels(value: string): string | null {
+	const parsed = parseCssColorValue(clampBackgroundColorValue(value));
+	return parsed ? formatRgbChannels(parsed.rgb) : null;
+}
+
+export function mixRgbColors(start: RgbColor, end: RgbColor, amount: number): RgbColor {
+	const t = clamp(amount, 0, 1);
+	return {
+		red: Math.round(start.red + (end.red - start.red) * t),
+		green: Math.round(start.green + (end.green - start.green) * t),
+		blue: Math.round(start.blue + (end.blue - start.blue) * t),
+	};
+}
+
+export function formatRgbaColorMix(
+	start: RgbColor,
+	end: RgbColor,
+	amount: number,
+	alpha: number
+): string {
+	return formatRgba(mixRgbColors(start, end, amount), alpha);
+}
+
 export function clampBackgroundColorValue(value: string): string {
 	const parsed = parseCssColorValue(value);
 	if (!parsed) return value;
