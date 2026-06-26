@@ -416,7 +416,6 @@ const ES: Record<string, string> = {
 		'Copia la lista de paquetes al portapapeles.',
 	'Package list copied.': 'Lista de paquetes copiada.',
 	'Package usage': 'Uso de paquetes',
-	'Load more usage': 'Cargar mas uso',
 	Idle: 'Inactivo',
 	'Tool finished': 'Herramienta terminada',
 	Close: 'Cerrar',
@@ -467,8 +466,12 @@ const ES: Record<string, string> = {
 		'Muestra bots que usan una version de paquete seleccionada.',
 	'Loading...': 'Cargando...',
 	'Loading more...': 'Cargando mas...',
+	'Loading packages...': 'Cargando paquetes...',
 	'{count} item(s) loaded.': '{count} elemento(s) cargado(s).',
 	'{count} package(s) loaded.': '{count} paquete(s) cargado(s).',
+	'Showing cached packages. Refreshing...':
+		'Mostrando paquetes en cache. Actualizando...',
+	'Package list refreshed.': 'Lista de paquetes actualizada.',
 	'{count} package version(s) loaded.':
 		'{count} version(es) de paquete cargada(s).',
 	'Folder list failed.': 'Lista de carpeta fallo.',
@@ -483,6 +486,8 @@ const ES: Record<string, string> = {
 	'Version {version} | missing pkgDownloadUrl':
 		'Version {version} | falta pkgDownloadUrl',
 	'Search packages': 'Buscar paquetes',
+	'Type at least {count} characters to search packages.':
+		'Escribe al menos {count} caracteres para buscar paquetes.',
 	'{selected} selected / {loaded} loaded':
 		'{selected} seleccionados / {loaded} cargados',
 	'No matches.': 'Sin coincidencias.',
@@ -579,17 +584,10 @@ const ES: Record<string, string> = {
 	'{count} usage row(s)': '{count} fila(s) de uso',
 	'No usage found for selected package version.':
 		'No se encontro uso para la version de paquete seleccionada.',
-	'Click View usage to show package versions with usage.':
-		'Haz clic en Ver uso para mostrar versiones de paquete con uso.',
 	'Updated {date}': 'Actualizado {date}',
 	'By {user}': 'Por {user}',
 	'default package version': 'version de paquete predeterminada',
 	'non-default package version': 'version de paquete no predeterminada',
-	'Open unavailable': 'Abrir no disponible',
-	Open: 'Abrir',
-	'Open bot in current tab.': 'Abre el bot en la pestana actual.',
-	'Only taskbot usage rows can be opened.':
-		'Solo se pueden abrir filas de uso de taskbot.',
 	'Copy path': 'Copiar ruta',
 	'Loading usage...': 'Cargando uso...',
 	'{count} usage row(s) loaded.': '{count} fila(s) de uso cargadas.',
@@ -600,11 +598,6 @@ const ES: Record<string, string> = {
 		'Filtro de estado de paquete fallo. Actualiza paquetes e intenta de nuevo.',
 	'No path found.': 'No se encontro ruta.',
 	'Path copied.': 'Ruta copiada.',
-	'Opening...': 'Abriendo...',
-	'Bot path could not be resolved. Path copied.':
-		'No se pudo resolver la ruta del bot. Ruta copiada.',
-	'Opening bot.': 'Abriendo bot.',
-	'Open bot failed.': 'Abrir bot fallo.',
 	'File {fileId}': 'Archivo {fileId}',
 	'Taskbot JSON loaded.': 'JSON de taskbot cargado.',
 	'Taskbot JSON load failed.': 'Carga de JSON de taskbot fallo.',

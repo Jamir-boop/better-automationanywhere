@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.16.0           | A360 v.40+                       | Chrome / Edge   | Supported |
+| 1.16.9           | A360 v.40+                       | Chrome / Edge   | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · Report issue
 
@@ -64,7 +64,7 @@ The sidepanel Tools tab adapts to the active Control Room page.
 - Packages page: download selected package JAR files and view bots using a selected package version.
 - Package detail page: download versions for the opened package and view usage across all used versions.
 
-Package Usage groups results by package version and each version group is collapsible. Versions with no usage are not shown. The tool requires Control Room package-management API permission.
+Package lists load in small pages with progress feedback. Package Usage loads all results, groups them by package version, and makes each version group collapsible. Versions with no usage are not shown. The tool requires Control Room package-management API permission.
 
 ------
 

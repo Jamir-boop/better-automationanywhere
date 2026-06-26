@@ -20,6 +20,15 @@ export function getAutomationAnywherePackageUsageStatusFilter(
 		: 'ENABLED';
 }
 
+export function hasMoreAutomationAnywherePackageUsage(
+	loadedCount: number,
+	pageLength: number,
+	total: number,
+	requestedLength: number
+): boolean {
+	return pageLength > 0 && (total > 0 ? loadedCount < total : pageLength >= requestedLength);
+}
+
 export function getAvailableAutomationAnywhereTools(
 	context: AutomationAnywherePageContext,
 	capabilities: ToolCapabilities = { universalClipboard: false }

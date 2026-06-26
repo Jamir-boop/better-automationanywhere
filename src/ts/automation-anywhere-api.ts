@@ -353,56 +353,6 @@ export function getAutomationAnywhereFileType(
 	return file.type || file.contentType || file.mimeType;
 }
 
-export function isAutomationAnywhereTaskbotType(type: unknown): boolean {
-	return String(type ?? '').toLowerCase() === AUTOMATION_ANYWHERE_TASKBOT_TYPE;
-}
-
-export function normalizeAutomationAnywherePath(path: string): string {
-	return path
-		.replace(/\\/g, '/')
-		.replace(/\/+/g, '/')
-		.replace(/^\/|\/$/g, '')
-		.trim()
-		.toLowerCase();
-}
-
-function stripAutomationAnywherePathRoot(path: string): string {
-	return normalizeAutomationAnywherePath(path).replace(/^automation anywhere\//, '');
-}
-
-export function automationAnywherePathsMatch(left: string, right: string): boolean {
-	const normalizedLeft = normalizeAutomationAnywherePath(left);
-	const normalizedRight = normalizeAutomationAnywherePath(right);
-	return (
-		normalizedLeft === normalizedRight ||
-		stripAutomationAnywherePathRoot(left) === stripAutomationAnywherePathRoot(right)
-	);
-}
-
-export function getAutomationAnywhereFileWorkspace(
-	file: AutomationAnywhereFile
-): 'private' | 'public' {
-	const workspaceType = String(file.workspaceType ?? '').toLowerCase();
-	if (workspaceType === 'public') return 'public';
-	if (workspaceType === 'private') return 'private';
-	return String(file.workspaceId ?? '') === '0' ? 'public' : 'private';
-}
-
-export function buildAutomationAnywhereTaskbotUrl(
-	baseUrl: string,
-	file: AutomationAnywhereFile
-): string {
-	const workspace = getAutomationAnywhereFileWorkspace(file);
-	const mode = workspace === 'public' ? 'view' : 'edit';
-	const parentId = file.parentId === undefined ? '' : String(file.parentId);
-	const folderSegment = parentId
-		? `/folders/${encodeURIComponent(parentId)}`
-		: '';
-	return `${baseUrl}/#/bots/repository/${workspace}${folderSegment}/files/taskbot/${encodeURIComponent(
-		getAutomationAnywhereFileId(file)
-	)}/${mode}`;
-}
-
 export function extractAutomationAnywherePackages(
 	content: unknown
 ): Array<{ name: string; version: string }> {
@@ -614,13 +564,21 @@ export class AutomationAnywhereApi {
 	async listPackages(params: {
 		offset?: number;
 		length?: number;
+		query?: string;
+		exactName?: string;
 	}): Promise<AutomationAnywherePackageListResponse> {
+		const filter = params.exactName
+			? { operator: 'eq', field: 'name', value: params.exactName }
+			: params.query
+				? { operator: 'substring', field: 'name', value: params.query }
+				: undefined;
 		const response = await this.request<AutomationAnywherePackageListResponse>(
 			'/v3/packages/package/list',
 			{
 				method: 'POST',
 				body: {
 					includeDownloadUrls: true,
+					filter,
 					page: {
 						offset: params.offset ?? 0,
 						length: params.length ?? 200,
@@ -687,43 +645,6 @@ export class AutomationAnywhereApi {
 			...response,
 			list: response.list ?? response.items ?? [],
 		};
-	}
-
-	async findAutomationByUsageRow(
-		row: AutomationAnywherePackageUsage
-	): Promise<AutomationAnywhereFile | null> {
-		const name = String(row.automationName ?? '').trim();
-		const path = String(row.automationPath ?? '').trim();
-		if (!name || !path) return null;
-
-		const matches: AutomationAnywhereFile[] = [];
-		for (let offset = 0; ; offset += 1000) {
-			const response = await this.request<AutomationAnywhereFolderListResponse>(
-				'/v2/repository/file/list',
-				{
-					method: 'POST',
-					body: {
-						filter: {
-							operator: 'substring',
-							field: 'name',
-							value: name,
-						},
-						page: { offset, length: 1000 },
-					},
-				}
-			);
-			const list = response.list ?? response.items ?? [];
-			matches.push(
-				...list.filter((item) => {
-					const itemName = getAutomationAnywhereFileName(item);
-					const itemPath = String(item.path ?? '').trim();
-					return itemName === name && itemPath && automationAnywherePathsMatch(itemPath, path);
-				})
-			);
-			if (list.length < 1000) break;
-		}
-
-		return matches.length === 1 ? matches[0] : null;
 	}
 
 	copyFile(fileId: string, name: string, parentId: string): Promise<unknown> {

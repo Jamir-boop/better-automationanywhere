@@ -161,6 +161,11 @@ assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter('Disabled'), 'D
 assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter(undefined), 'ENABLED');
 assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter('enabled'), 'ENABLED');
 
+assert.equal(tools.hasMoreAutomationAnywherePackageUsage(20, 20, 45, 200), true);
+assert.equal(tools.hasMoreAutomationAnywherePackageUsage(45, 5, 45, 200), false);
+assert.equal(tools.hasMoreAutomationAnywherePackageUsage(200, 200, 0, 200), true);
+assert.equal(tools.hasMoreAutomationAnywherePackageUsage(201, 1, 0, 200), false);
+
 assert.equal(
 	tools.getDefaultTaskbotTool({
 		url: '',

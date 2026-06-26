@@ -1178,6 +1178,10 @@ button
 		display: block
 		cursor: default
 
+	&.is-skeleton
+		pointer-events: none
+		cursor: default
+
 .tool-file-text
 	display: flex
 	min-width: 0
@@ -1194,6 +1198,43 @@ button
 		font-size: .66rem
 		line-height: 1.3
 		overflow-wrap: anywhere
+
+.skeleton-checkbox,
+.skeleton-bar
+	display: block
+	overflow: hidden
+	border-radius: 999px
+	background: linear-gradient(90deg, var(--surface-0), var(--surface-2), var(--surface-0))
+	background-size: 180% 100%
+	animation: skeleton-loading 1.2s ease-in-out infinite
+
+.skeleton-checkbox
+	width: 18px
+	height: 18px
+	margin-top: 2px
+
+.skeleton-title
+	width: 64%
+	height: .78rem
+
+.skeleton-meta
+	width: 42%
+	height: .62rem
+
+.skeleton-path
+	width: 88%
+	height: .62rem
+
+.skeleton-button
+	width: 58px
+	height: 28px
+	border-radius: 6px
+
+@keyframes skeleton-loading
+	0%
+		background-position: 120% 0
+	100%
+		background-position: -120% 0
 
 .tools-empty
 	margin: 0
@@ -1251,18 +1292,7 @@ button
 		input
 			cursor: not-allowed
 
-.tools-export-package-info
-	display: flex
-	flex-direction: column
-	gap: 6px
-	padding: 8px
-	border: 1px solid var(--border)
-	border-radius: 6px
-	background: var(--surface-0)
-
-	&[hidden]
-		display: none
-
+.tools-export-package-info,
 .package-usage-section
 	display: flex
 	flex-direction: column
@@ -1292,6 +1322,9 @@ button
 	border-radius: 6px
 	background: var(--surface-1)
 
+	&.is-skeleton
+		pointer-events: none
+
 .package-usage-text
 	display: flex
 	min-width: 0
@@ -1308,11 +1341,6 @@ button
 		font-size: .65rem
 		line-height: 1.3
 		overflow-wrap: anywhere
-
-.package-usage-actions
-	display: flex
-	flex-direction: column
-	gap: 5px
 
 .package-usage-version-group
 	padding: 7px

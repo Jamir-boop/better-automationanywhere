@@ -427,8 +427,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`
   - Setting/id: tool `download-packages`
   - Selectors: none; API/package list based
-  - Validate: open Packages page, select packages, download; open package detail page and download package versions.
-  - Expected: selected package downloads start; package detail page scopes to opened package; missing download URL is reported.
+  - Validate: open Packages page, search packages, load more, select packages, download; open package detail page and download package versions.
+  - Expected: first load is capped, search fetches matching package rows, progress updates during fallback scans, package detail page scopes to opened package, missing download URL is reported.
   - Status: active
   - Delete condition: packages API unavailable.
 
@@ -436,8 +436,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`, `src/ts/automation-anywhere-tools.ts`
   - Setting/id: tool `package-usage`
   - Selectors: none; API/package usage based
-  - Validate: open Packages page, select one package version, view usage; open package detail page and view usage without selecting a version.
-  - Expected: usage rows show bot name/path/status and open target bot; package detail usage groups rows by collapsible version; missing versions mean no usage found; `ENABLED`/`DISABLED` status filters do not trigger `No enum constant`.
+  - Validate: open Packages page, search/select one package version, view usage; open package detail page and view usage without selecting a version.
+  - Expected: all usage rows load automatically and show bot name/path/status and copy path, package detail usage groups rows by collapsible version, missing versions mean no usage found, `ENABLED`/`DISABLED` status filters do not trigger `No enum constant`.
   - Status: active
   - Delete condition: package usage API unavailable.
 

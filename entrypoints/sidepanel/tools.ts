@@ -3,7 +3,6 @@ import {
 	AUTOMATION_ANYWHERE_TASKBOT_TYPE,
 	applyPackageVersionsToContent,
 	automationAnywhereBlobResponseToBlob,
-	buildAutomationAnywhereTaskbotUrl,
 	dedupeAutomationAnywhereFiles,
 	extractAutomationAnywherePackages,
 	getActiveAutomationAnywhereContext,
@@ -12,7 +11,6 @@ import {
 	getAutomationAnywhereFileName,
 	getAutomationAnywhereFileType,
 	isAutomationAnywhereFolder,
-	isAutomationAnywhereTaskbotType,
 	isAutomationAnywhereTaskbot,
 	refreshAutomationAnywhereFolderList,
 	type ActiveAutomationAnywhereContext,
@@ -34,6 +32,7 @@ import {
 	getAvailableAutomationAnywhereTools,
 	getAutomationAnywherePackageUsageStatusFilter,
 	getDefaultTaskbotTool,
+	hasMoreAutomationAnywherePackageUsage,
 	type AutomationAnywhereToolId,
 } from '@/src/ts/automation-anywhere-tools';
 import type {
@@ -45,7 +44,6 @@ type FeedbackSeverity = 'info' | 'warn' | 'error';
 type ToolId = AutomationAnywhereToolId;
 type ToolListItem = AutomationAnywhereFile | AutomationAnywherePackage;
 type ExportFormat = 'zip' | 'separate';
-type PackageUsageOpenState = 'failed';
 
 interface ZipWriter {
 	folder(name: string): ZipWriter | null;
@@ -132,7 +130,9 @@ interface ToolRunState {
 }
 
 const PAGE_LENGTH = 200;
-const PACKAGE_USAGE_PAGE_LENGTH = 100;
+const PACKAGE_PAGE_LENGTH = 20;
+const PACKAGE_SEARCH_MIN_LENGTH = 2;
+const PACKAGE_SEARCH_DEBOUNCE_MS = 300;
 const EXPORT_BATCH_SIZE = 20;
 const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
 const CURRENT_TASKBOT_FALLBACK_NAME = 'Current bot';
@@ -172,6 +172,7 @@ let taskbotJsonFileId: string | null = null;
 let taskbotJsonBaseline: string | null = null;
 let activeToolRun: ToolRunState | null = null;
 let refreshToolsContextTimer: ReturnType<typeof setTimeout> | null = null;
+let packageSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 let contextText: HTMLElement;
 let toolsClipboardStatus: HTMLElement;
@@ -205,7 +206,6 @@ let toolsCopyPackageList: HTMLButtonElement;
 let packageUsageSection: HTMLElement;
 let packageUsageSummary: HTMLElement;
 let packageUsageList: HTMLElement;
-let packageUsageLoadMore: HTMLButtonElement;
 let toolsFinishModal: HTMLElement;
 let toolsFinishTitle: HTMLElement;
 let toolsFinishSummary: HTMLElement;
@@ -220,11 +220,14 @@ let exportPackageListText = '';
 let exportFormat: ExportFormat = 'zip';
 let exportBotsLegacyMode = false;
 let packageUsageItems: AutomationAnywherePackageUsage[] = [];
-let packageUsageOffset = 0;
-let packageUsageTotal = 0;
-let packageUsageLastRawPageLength = 0;
 let packageUsagePackageKey = '';
-let packageUsageOpenStates = new Map<string, PackageUsageOpenState>();
+let packageQuery = '';
+let packageScanOffset = 0;
+let packageFallbackScan = false;
+let packageListLoading = false;
+let packageUsageLoading = false;
+const packageListCache = new Map<string, AutomationAnywherePackage[]>();
+const packageListRefreshes = new Set<string>();
 
 export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): string {
 	return `
@@ -259,6 +262,15 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 							<dd>${t('Download Packages, Package Usage')}</dd>
 						</div>
 					</dl>
+				</div>
+				<div id="toolsProgress" class="tools-progress" hidden aria-live="polite">
+					<div class="tools-progress-meta">
+						<span id="toolsProgressLabel">${t('Idle')}</span>
+						<span id="toolsProgressPercent">0%</span>
+					</div>
+					<div id="toolsProgressBar" class="tools-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+						<span id="toolsProgressFill" class="tools-progress-fill"></span>
+					</div>
 				</div>
 			</section>
 
@@ -306,7 +318,6 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						<span id="packageUsageSummary" class="tools-count"></span>
 					</div>
 					<div id="packageUsageList" class="package-usage-list"></div>
-					<button id="packageUsageLoadMore" type="button" hidden>${t('Load more usage')}</button>
 				</div>
 				<div id="toolsExportPackageInfo" class="tools-export-package-info" hidden>
 					<div class="tools-export-package-header">
@@ -314,15 +325,6 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						<button id="toolsCopyPackageList" type="button" title="${t('Copy package list to clipboard.')}">${t('Copy')}</button>
 					</div>
 					<div id="toolsPackageListContent" class="package-list-content"></div>
-				</div>
-				<div id="toolsProgress" class="tools-progress" hidden aria-live="polite">
-					<div class="tools-progress-meta">
-						<span id="toolsProgressLabel">${t('Idle')}</span>
-						<span id="toolsProgressPercent">0%</span>
-					</div>
-					<div id="toolsProgressBar" class="tools-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-						<span id="toolsProgressFill" class="tools-progress-fill"></span>
-					</div>
 				</div>
 				<div id="toolsFinishModal" class="tools-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="toolsFinishTitle" hidden>
 					<div class="tools-modal">
@@ -396,7 +398,6 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	packageUsageSection = getRequiredElement('#packageUsageSection');
 	packageUsageSummary = getRequiredElement('#packageUsageSummary');
 	packageUsageList = getRequiredElement('#packageUsageList');
-	packageUsageLoadMore = getRequiredElement<HTMLButtonElement>('#packageUsageLoadMore');
 	toolsFinishModal = getRequiredElement('#toolsFinishModal');
 	toolsFinishTitle = getRequiredElement('#toolsFinishTitle');
 	toolsFinishSummary = getRequiredElement('#toolsFinishSummary');
@@ -422,7 +423,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	refreshButton.addEventListener('click', () => {
 		void refreshToolsContext();
 	});
-	searchInput.addEventListener('input', renderFileList);
+	searchInput.addEventListener('input', handleToolsSearchInput);
 	selectAllInput.addEventListener('change', toggleVisibleSelection);
 	primaryActionButton.addEventListener('click', () => {
 		void runPrimaryToolAction();
@@ -437,10 +438,6 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	toolsExportFormatSeparate.addEventListener('change', updateExportFormatFromInput);
 	toolsCopyPackageList.addEventListener('click', () => {
 		void copyExportPackageList();
-	});
-	packageUsageLoadMore.addEventListener('click', () => {
-		if (getPackageDetailsName()) void loadPackageDetailsUsage(false);
-		else void loadSelectedPackageUsage(false);
 	});
 	toolsFinishClose.addEventListener('click', hideToolFinishModal);
 	toolsFinishModal.addEventListener('click', (event) => {
@@ -481,6 +478,12 @@ function setToolStatus(
 	options.setStatus(message, severity, 'tools');
 }
 
+function clearPackageSearchTimer(): void {
+	if (!packageSearchTimer) return;
+	clearTimeout(packageSearchTimer);
+	packageSearchTimer = null;
+}
+
 function scheduleToolsContextRefresh(): void {
 	if (refreshToolsContextTimer) clearTimeout(refreshToolsContextTimer);
 	refreshToolsContextTimer = setTimeout(() => {
@@ -510,13 +513,59 @@ function clearExportPackageInfo(): void {
 }
 
 function clearPackageUsageResults(): void {
+	packageUsageLoading = false;
 	packageUsageItems = [];
-	packageUsageOffset = 0;
-	packageUsageTotal = 0;
-	packageUsageLastRawPageLength = 0;
 	packageUsagePackageKey = '';
-	packageUsageOpenStates = new Map();
 	renderPackageUsageResults();
+}
+
+function resetToolProgress(): void {
+	toolsProgress.hidden = true;
+	toolsProgressLabel.textContent = t('Idle');
+	toolsProgressPercent.textContent = '0%';
+	toolsProgressBar.setAttribute('aria-valuenow', '0');
+	toolsProgressBar.setAttribute('aria-valuetext', t('Idle'));
+	toolsProgressFill.style.width = '0';
+}
+
+function isPackageTool(tool: ToolId | null = currentTool): boolean {
+	return tool === 'download-packages' || tool === 'package-usage';
+}
+
+function getPackageSearchQuery(): string {
+	const query = searchInput.value.trim();
+	return query.length >= PACKAGE_SEARCH_MIN_LENGTH ? query : '';
+}
+
+function handleToolsSearchInput(): void {
+	if (!isPackageTool()) {
+		renderFileList();
+		return;
+	}
+	clearPackageSearchTimer();
+	const query = searchInput.value.trim();
+	packageQuery = query.length >= PACKAGE_SEARCH_MIN_LENGTH ? query : '';
+	if (query && query.length < PACKAGE_SEARCH_MIN_LENGTH) {
+		packageListLoading = false;
+		loadedItems = [];
+		selectedIds = new Set<string>();
+		loadedOffset = 0;
+		loadedTotal = 0;
+		lastRawPageLength = 0;
+		packageScanOffset = 0;
+		packageFallbackScan = false;
+		if (currentTool === 'package-usage') clearPackageUsageResults();
+		resetToolProgress();
+		renderFileList();
+		setToolStatus(t('Type at least {count} characters to search packages.', {
+			count: PACKAGE_SEARCH_MIN_LENGTH,
+		}));
+		return;
+	}
+	packageSearchTimer = setTimeout(() => {
+		packageSearchTimer = null;
+		void loadPackagePage(true, { keepSearch: true });
+	}, PACKAGE_SEARCH_DEBOUNCE_MS);
 }
 
 function readExportBotsLegacyMode(): boolean {
@@ -808,9 +857,11 @@ function setSelectedToolPanel(tool: ToolId | null): void {
 }
 
 async function refreshToolsContext(): Promise<void> {
+	clearPackageSearchTimer();
 	actionsContainer.textContent = '';
 	clearExportPackageInfo();
 	clearPackageUsageResults();
+	resetToolProgress();
 	setSelectedToolPanel(null);
 	taskbotJsonWorkbench.setValue('');
 	taskbotJsonFileId = null;
@@ -1092,9 +1143,12 @@ function renderActionButtons(): void {
 }
 
 async function selectTool(tool: ToolId): Promise<void> {
+	const wasPackageTool = isPackageTool();
+	clearPackageSearchTimer();
 	currentTool = tool;
 	clearExportPackageInfo();
 	clearPackageUsageResults();
+	resetToolProgress();
 	if (tool === 'export-bots') resetExportFormatToDefault();
 	renderActionButtons();
 	setSelectedToolPanel(tool);
@@ -1114,6 +1168,12 @@ async function selectTool(tool: ToolId): Promise<void> {
 		lastRawPageLength = 0;
 		searchInput.value = '';
 		renderFileList();
+		await loadPackageDetailsUsage();
+		return;
+	}
+
+	if (isPackageTool(tool)) {
+		await loadPackagePage(true, { keepSearch: wasPackageTool });
 		return;
 	}
 
@@ -1278,7 +1338,146 @@ async function loadCurrentTaskbotPage(reset: boolean): Promise<void> {
 	}
 }
 
-async function loadPackagePage(reset: boolean): Promise<void> {
+function getResponseTotal(response: {
+	page?: { totalFilter?: number; total?: number };
+	total?: number;
+}): number {
+	return response.page?.totalFilter ?? response.page?.total ?? response.total ?? 0;
+}
+
+function packageMatchesQuery(pkg: AutomationAnywherePackage, query: string): boolean {
+	const name = getAutomationAnywherePackageName(pkg).toLowerCase();
+	return name.includes(query.toLowerCase());
+}
+
+function packageMatchesFilter(
+	pkg: AutomationAnywherePackage,
+	query: string,
+	exactName: string | null
+): boolean {
+	return exactName
+		? getAutomationAnywherePackageName(pkg) === exactName
+		: !query || packageMatchesQuery(pkg, query);
+}
+
+function getPackageListCacheKey(
+	activeRuntime: ToolsRuntime,
+	query: string,
+	exactName: string | null
+): string {
+	return [activeRuntime.context.baseUrl, exactName ?? '', query].join('\u0000');
+}
+
+function cacheCurrentPackageList(cacheKey: string): void {
+	packageListCache.set(cacheKey, loadedItems.filter(isAutomationAnywherePackageItem));
+}
+
+function hydratePackageListCache(items: AutomationAnywherePackage[]): void {
+	loadedItems = [...items];
+	loadedOffset = items.length;
+	loadedTotal = items.length;
+	lastRawPageLength = items.length;
+	packageScanOffset = 0;
+	packageFallbackScan = false;
+	pruneSelection();
+	renderFileList();
+}
+
+async function refreshPackageListCache(
+	cacheKey: string,
+	activeRuntime: ToolsRuntime,
+	selectedTool: ToolId,
+	query: string,
+	exactName: string | null
+): Promise<void> {
+	if (packageListRefreshes.has(cacheKey)) return;
+	packageListRefreshes.add(cacheKey);
+	try {
+		const response = await activeRuntime.api.listPackages({
+			offset: 0,
+			length: PACKAGE_PAGE_LENGTH,
+			query: query || undefined,
+			exactName: exactName || undefined,
+		});
+		const responseList = response.list ?? [];
+		const filterIgnored = responseList.some(
+			(item) => !packageMatchesFilter(item, query, exactName)
+		);
+		if (filterIgnored || (exactName && !responseList.length)) return;
+
+		const rawList = responseList.filter((item) =>
+			packageMatchesFilter(item, query, exactName)
+		);
+		packageListCache.set(cacheKey, rawList);
+		if (
+			runtime !== activeRuntime ||
+			currentTool !== selectedTool ||
+			getPackageListCacheKey(activeRuntime, packageQuery, getPackageDetailsName()) !== cacheKey
+		) return;
+		hydratePackageListCache(rawList);
+		setToolStatus(t('Package list refreshed.'));
+	} catch (error) {
+		if (
+			runtime !== activeRuntime ||
+			currentTool !== selectedTool ||
+			getPackageListCacheKey(activeRuntime, packageQuery, getPackageDetailsName()) !== cacheKey
+		) return;
+		setToolStatus(
+			error instanceof Error ? error.message : t('Package list failed.'),
+			'warn'
+		);
+	} finally {
+		packageListRefreshes.delete(cacheKey);
+	}
+}
+
+async function scanPackagesFallback(
+	activeRuntime: ToolsRuntime,
+	selectedTool: ToolId,
+	query: string,
+	exactName: string | null
+): Promise<void> {
+	packageFallbackScan = true;
+	const targetCount = loadedItems.length + PACKAGE_PAGE_LENGTH;
+	const byId = new Map(loadedItems.map((item) => [getToolItemId(item), item]));
+
+	for (;;) {
+		const response = await activeRuntime.api.listPackages({
+			offset: packageScanOffset,
+			length: PAGE_LENGTH,
+		});
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+
+		const rawList = response.list ?? [];
+		lastRawPageLength = rawList.length;
+		loadedTotal = getResponseTotal(response);
+		packageScanOffset += PAGE_LENGTH;
+		for (const item of rawList) {
+			if (packageMatchesFilter(item, query, exactName)) {
+				byId.set(getToolItemId(item), item);
+			}
+		}
+		loadedItems = [...byId.values()];
+		if (loadedItems.length >= targetCount || rawList.length < PAGE_LENGTH) break;
+	}
+
+	loadedOffset = loadedItems.length;
+	packageListLoading = false;
+	pruneSelection();
+	renderFileList();
+	setSelectedToolPanel(selectedTool);
+	cacheCurrentPackageList(getPackageListCacheKey(activeRuntime, query, exactName));
+	setToolStatus(
+		exactName
+			? t('{count} package version(s) loaded.', { count: loadedItems.length })
+			: t('{count} package(s) loaded.', { count: loadedItems.length })
+	);
+}
+
+async function loadPackagePage(
+	reset: boolean,
+	options: { keepSearch?: boolean } = {}
+): Promise<void> {
 	const activeRuntime = runtime;
 	const selectedTool = currentTool;
 	const packageDetailsName = getPackageDetailsName();
@@ -1289,76 +1488,105 @@ async function loadPackagePage(reset: boolean): Promise<void> {
 		return;
 	}
 
+	let cacheKey = getPackageListCacheKey(activeRuntime, packageQuery, packageDetailsName);
 	setBusy(loadMoreButton, true, reset ? t('Loading...') : t('Loading more...'));
 	if (reset) {
+		packageListLoading = true;
 		loadedItems = [];
 		selectedIds = new Set<string>();
 		loadedOffset = 0;
 		loadedTotal = 0;
 		lastRawPageLength = 0;
-		searchInput.value = '';
+		packageScanOffset = 0;
+		packageFallbackScan = false;
+		if (!options.keepSearch) searchInput.value = '';
+		packageQuery = packageDetailsName ? '' : getPackageSearchQuery();
+		cacheKey = getPackageListCacheKey(activeRuntime, packageQuery, packageDetailsName);
+		resetToolProgress();
+		if (selectedTool === 'package-usage') clearPackageUsageResults();
+		const cached = packageListCache.get(cacheKey);
+		if (cached) {
+			packageListLoading = false;
+			hydratePackageListCache(cached);
+			setSelectedToolPanel(selectedTool);
+			setBusy(loadMoreButton, false, t('Load more'));
+			setToolStatus(t('Showing cached packages. Refreshing...'));
+			void refreshPackageListCache(
+				cacheKey,
+				activeRuntime,
+				selectedTool,
+				packageQuery,
+				packageDetailsName
+			);
+			return;
+		}
+		renderFileList();
+		setToolStatus(t('Loading packages...'));
 	}
 
 	try {
-		if (packageDetailsName) {
-			let offset = 0;
-			let lastLength = 0;
-			const byId = new Map<string, ToolListItem>();
-			for (;;) {
-				const response = await activeRuntime.api.listPackages({
-					offset,
-					length: PAGE_LENGTH,
-				});
-				if (runtime !== activeRuntime || currentTool !== selectedTool) return;
-				const rawList = response.list ?? [];
-				lastLength = rawList.length;
-				for (const item of rawList) {
-					if (getAutomationAnywherePackageName(item) === packageDetailsName) {
-						byId.set(getToolItemId(item), item);
-					}
-				}
-				offset += PAGE_LENGTH;
-				if (rawList.length < PAGE_LENGTH) break;
-			}
-			loadedItems = [...byId.values()];
-			loadedOffset = offset;
-			loadedTotal = loadedItems.length;
-			lastRawPageLength = lastLength;
-			pruneSelection();
-			renderFileList();
-			setSelectedToolPanel(selectedTool);
-			setToolStatus(t('{count} package version(s) loaded.', { count: loadedItems.length }));
+		if (packageFallbackScan) {
+			await scanPackagesFallback(
+				activeRuntime,
+				selectedTool,
+				packageQuery,
+				packageDetailsName
+			);
 			return;
 		}
 
 		const response = await activeRuntime.api.listPackages({
 			offset: loadedOffset,
-			length: PAGE_LENGTH,
+			length: PACKAGE_PAGE_LENGTH,
+			query: packageQuery || undefined,
+			exactName: packageDetailsName || undefined,
 		});
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
-		const rawList = response.list ?? [];
-		lastRawPageLength = rawList.length;
+		const responseList = response.list ?? [];
+		const filterIgnored = responseList.some(
+			(item) => !packageMatchesFilter(item, packageQuery, packageDetailsName)
+		);
+		if (filterIgnored || (packageDetailsName && reset && !responseList.length)) {
+			await scanPackagesFallback(activeRuntime, selectedTool, packageQuery, packageDetailsName);
+			return;
+		}
+		const rawList = responseList.filter((item) =>
+			packageMatchesFilter(item, packageQuery, packageDetailsName)
+		);
+		lastRawPageLength = responseList.length;
 		const byId = new Map(loadedItems.map((item) => [getToolItemId(item), item]));
 		for (const item of rawList) byId.set(getToolItemId(item), item);
 		loadedItems = [...byId.values()];
-		loadedOffset += PAGE_LENGTH;
-		loadedTotal =
-			response.page?.totalFilter ??
-			response.page?.total ??
-			response.total ??
-			Math.max(loadedItems.length, loadedTotal);
+		loadedOffset += PACKAGE_PAGE_LENGTH;
+		loadedTotal = getResponseTotal(response) || Math.max(loadedItems.length, loadedTotal);
+		packageListLoading = false;
 		pruneSelection();
 		renderFileList();
 		setSelectedToolPanel(selectedTool);
-		setToolStatus(t('{count} package(s) loaded.', { count: loadedItems.length }));
+		cacheCurrentPackageList(cacheKey);
+		const message = packageDetailsName
+			? t('{count} package version(s) loaded.', { count: loadedItems.length })
+			: t('{count} package(s) loaded.', { count: loadedItems.length });
+		setToolStatus(message);
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		if (packageQuery || packageDetailsName) {
+			await scanPackagesFallback(
+				activeRuntime,
+				selectedTool,
+				packageQuery,
+				packageDetailsName
+			);
+			return;
+		}
 		setToolStatus(
 			error instanceof Error ? error.message : t('Package list failed.'),
 			'error'
 		);
 	} finally {
 		if (runtime === activeRuntime && currentTool === selectedTool) {
+			packageListLoading = false;
+			renderFileList();
 			setBusy(loadMoreButton, false, t('Load more'));
 		}
 	}
@@ -1476,7 +1704,7 @@ function renderFileList(): void {
 		currentTool === 'download-packages' || packageUsageMode
 			? t('Search packages')
 			: t('Search files');
-	searchInput.hidden = currentTaskbotMode || packageDetailsUsageMode;
+	searchInput.hidden = currentTaskbotMode || Boolean(packageDetailsName);
 	const selectAllLabel = selectAllInput.closest<HTMLElement>('.tools-select-all');
 	if (selectAllLabel) {
 		selectAllLabel.hidden = currentTaskbotMode || packageUsageMode || packageDetailsUsageMode;
@@ -1504,12 +1732,12 @@ function renderFileList(): void {
 			});
 	fileList.textContent = '';
 
-	if (!visible.length) {
+	if (packageListLoading && isPackageTool() && !loadedItems.length) {
+		appendSkeletonRows(fileList, 6, 'package-list');
+	} else if (!packageDetailsUsageMode && !visible.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-empty';
-		empty.textContent = packageDetailsUsageMode
-			? t('Click View usage to show package versions with usage.')
-			: currentTaskbotMode
+		empty.textContent = currentTaskbotMode
 			? t('Current bot not found.')
 			: loadedItems.length
 			? t('No matches.')
@@ -1555,6 +1783,17 @@ function renderFileList(): void {
 	updateActionBar();
 }
 
+function appendSkeletonRows(
+	container: HTMLElement,
+	count: number,
+	type: 'package-list' | 'package-usage'
+): void {
+	const row = type === 'package-list'
+		? '<div class="tool-file-row is-skeleton" aria-hidden="true"><span class="skeleton-checkbox"></span><span class="tool-file-text"><span class="skeleton-bar skeleton-title"></span><span class="skeleton-bar skeleton-meta"></span></span></div>'
+		: '<div class="package-usage-row is-skeleton" aria-hidden="true"><span class="package-usage-text"><span class="skeleton-bar skeleton-title"></span><span class="skeleton-bar skeleton-path"></span><span class="skeleton-bar skeleton-meta"></span></span><span class="skeleton-bar skeleton-button"></span></div>';
+	container.insertAdjacentHTML('beforeend', row.repeat(count));
+}
+
 function getItemMeta(item: AutomationAnywhereFile): string {
 	const type = getAutomationAnywhereFileType(item) ?? t('unknown');
 	const modified = item.lastModified ?? item.modifiedOn ?? item.updatedOn;
@@ -1578,7 +1817,9 @@ function updateActionBar(): void {
 	const count = selectedIds.size;
 	const currentTaskbotMode = isCurrentTaskbotMode();
 	const packageDetailsName = getPackageDetailsName();
+	const packageDetailsUsageMode = isPackageDetailsUsageMode();
 	const usagePackage = currentTool === 'package-usage' ? getSelectedPackageForUsage() : null;
+	primaryActionButton.hidden = packageDetailsUsageMode;
 	primaryActionButton.disabled =
 		currentTool === 'package-usage' ? !usagePackage && !packageDetailsName : count === 0;
 	if (currentTool === 'copy-files') primaryActionButton.textContent = t('Copy {count} file(s)', { count });
@@ -1612,12 +1853,18 @@ function updateActionBar(): void {
 		count: copiedFiles.length,
 	});
 
-	loadMoreButton.hidden = currentTaskbotMode || !hasMoreItems();
-	packageUsageLoadMore.hidden =
-		currentTool !== 'package-usage' || !hasMorePackageUsage();
+	loadMoreButton.hidden =
+		currentTaskbotMode ||
+		Boolean(packageDetailsName) ||
+		!hasMoreItems();
 }
 
 function hasMoreItems(): boolean {
+	if (isPackageTool() && loadedTotal > 0) return loadedItems.length < loadedTotal;
+	if (isPackageTool() && packageFallbackScan) return lastRawPageLength >= PAGE_LENGTH;
+	if (isPackageTool()) {
+		return lastRawPageLength >= PACKAGE_PAGE_LENGTH;
+	}
 	return lastRawPageLength >= PAGE_LENGTH || loadedItems.length < loadedTotal;
 }
 
@@ -1662,23 +1909,11 @@ async function runPrimaryToolAction(): Promise<void> {
 	}
 	if (currentTool === 'package-usage') {
 		if (getPackageDetailsName()) {
-			await loadPackageDetailsUsage(true);
+			await loadPackageDetailsUsage();
 			return;
 		}
-		await loadSelectedPackageUsage(true);
+		await loadSelectedPackageUsage();
 	}
-}
-
-function getPackageUsageRowKey(row: AutomationAnywherePackageUsage): string {
-	const explicitId = getOptionalString(row.id);
-	if (explicitId) return explicitId;
-	return [
-		row.packageVersion,
-		row.packageStatus,
-		row.automationName,
-		row.automationPath,
-		row.updatedOn,
-	].map((value) => String(value ?? '')).join('\u0000');
 }
 
 function getPackageUsageVersion(row: AutomationAnywherePackageUsage): string {
@@ -1692,13 +1927,6 @@ function getPackageUsageStatusLabel(row: AutomationAnywherePackageUsage): string
 	return '';
 }
 
-function hasMorePackageUsage(): boolean {
-	return (
-		packageUsageLastRawPageLength >= PACKAGE_USAGE_PAGE_LENGTH ||
-		packageUsageItems.length < packageUsageTotal
-	);
-}
-
 function isPackageStatusEnumError(message: string): boolean {
 	return message.includes('PackageStatus') && message.includes('No enum constant');
 }
@@ -1710,7 +1938,6 @@ function renderPackageUsageResults(): void {
 	if (!visible) {
 		packageUsageSummary.textContent = '';
 		packageUsageList.textContent = '';
-		packageUsageLoadMore.hidden = true;
 		return;
 	}
 
@@ -1719,7 +1946,9 @@ function renderPackageUsageResults(): void {
 	});
 	packageUsageList.textContent = '';
 
-	if (!packageUsageItems.length) {
+	if (packageUsageLoading && !packageUsageItems.length) {
+		appendSkeletonRows(packageUsageList, 5, 'package-usage');
+	} else if (!packageUsageItems.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-empty';
 		empty.textContent = t('No usage found for selected package version.');
@@ -1752,14 +1981,12 @@ function renderPackageUsageResults(): void {
 		}
 	}
 
-	packageUsageLoadMore.hidden = !hasMorePackageUsage();
 }
 
 function appendPackageUsageRow(
 	row: AutomationAnywherePackageUsage,
 	container: HTMLElement
 ): void {
-	const key = getPackageUsageRowKey(row);
 	const item = document.createElement('div');
 	item.className = 'package-usage-row';
 
@@ -1788,24 +2015,6 @@ function appendPackageUsageRow(
 
 	text.append(name, path, meta);
 
-	const actions = document.createElement('span');
-	actions.className = 'package-usage-actions';
-
-	const openButton = document.createElement('button');
-	openButton.type = 'button';
-	openButton.textContent =
-		packageUsageOpenStates.get(key) === 'failed' ? t('Open unavailable') : t('Open');
-	const canOpen =
-		isAutomationAnywhereTaskbotType(row.automationType) &&
-		packageUsageOpenStates.get(key) !== 'failed';
-	openButton.disabled = !canOpen;
-	openButton.title = canOpen
-		? t('Open bot in current tab.')
-		: t('Only taskbot usage rows can be opened.');
-	openButton.addEventListener('click', () => {
-		void openPackageUsageAutomation(row, openButton);
-	});
-
 	const copyButton = document.createElement('button');
 	copyButton.type = 'button';
 	copyButton.textContent = t('Copy path');
@@ -1813,131 +2022,75 @@ function appendPackageUsageRow(
 		void copyPackageUsagePath(row);
 	});
 
-	actions.append(openButton, copyButton);
-	item.append(text, actions);
+	item.append(text, copyButton);
 	container.appendChild(item);
 }
 
-async function loadSelectedPackageUsage(reset: boolean): Promise<void> {
-	const activeRuntime = runtime;
-	const selectedTool = currentTool;
+async function loadSelectedPackageUsage(): Promise<void> {
 	const pkg = getSelectedPackageForUsage();
-	if (!activeRuntime || selectedTool !== 'package-usage' || !pkg) return;
+	if (!pkg) return;
 
-	const name = getAutomationAnywherePackageName(pkg);
-	const version = getAutomationAnywherePackageVersion(pkg);
-	const status = getAutomationAnywherePackageStatus(pkg);
-	const packageKey = getToolItemId(pkg);
-
-	setBusy(
-		reset ? primaryActionButton : packageUsageLoadMore,
-		true,
-		reset ? t('Loading usage...') : t('Loading more...')
-	);
-	if (reset || packageUsagePackageKey !== packageKey) {
-		packageUsageItems = [];
-		packageUsageOffset = 0;
-		packageUsageTotal = 0;
-		packageUsageLastRawPageLength = 0;
-		packageUsagePackageKey = packageKey;
-		packageUsageOpenStates = new Map();
-		renderPackageUsageResults();
-	}
-
-	try {
-		const response = await activeRuntime.api.getPackageUsage({
-			name,
-			version,
-			status,
-			offset: packageUsageOffset,
-			length: PACKAGE_USAGE_PAGE_LENGTH,
-		});
-		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
-		const rawList = response.list ?? [];
-		packageUsageLastRawPageLength = rawList.length;
-		const byKey = new Map(packageUsageItems.map((item) => [getPackageUsageRowKey(item), item]));
-		for (const item of rawList) byKey.set(getPackageUsageRowKey(item), item);
-		packageUsageItems = [...byKey.values()];
-		packageUsageOffset += PACKAGE_USAGE_PAGE_LENGTH;
-		packageUsageTotal =
-			response.page?.totalFilter ??
-			response.page?.total ??
-			response.total ??
-			Math.max(packageUsageItems.length, packageUsageTotal);
-		renderPackageUsageResults();
-		setToolStatus(t('{count} usage row(s) loaded.', { count: packageUsageItems.length }));
-	} catch (error) {
-		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
-		const message = error instanceof Error ? error.message : t('Package usage failed.');
-		setToolStatus(
-			message.startsWith('403 ')
-				? t('Manage packages permission required.')
-				: isPackageStatusEnumError(message)
-					? t('Package status filter failed. Refresh packages and try again.')
-				: message,
-			'error'
-		);
-	} finally {
-		if (runtime === activeRuntime && currentTool === selectedTool) {
-			setBusy(primaryActionButton, false);
-			setBusy(packageUsageLoadMore, false, t('Load more usage'));
-			updateActionBar();
-		}
-	}
+	await loadPackageUsage(getToolItemId(pkg), {
+		name: getAutomationAnywherePackageName(pkg),
+		version: getAutomationAnywherePackageVersion(pkg),
+		status: getAutomationAnywherePackageStatus(pkg),
+	});
 }
 
-async function loadPackageDetailsUsage(reset: boolean): Promise<void> {
+async function loadPackageDetailsUsage(): Promise<void> {
+	const packageName = getPackageDetailsName();
+	if (!packageName) return;
+
+	await loadPackageUsage(packageName, { name: packageName });
+}
+
+async function loadPackageUsage(
+	packageKey: string,
+	request: {
+		name: string;
+		version?: string;
+		status?: AutomationAnywherePackageUsageStatus;
+	}
+): Promise<void> {
 	const activeRuntime = runtime;
 	const selectedTool = currentTool;
-	const packageName = getPackageDetailsName();
-	if (!activeRuntime || selectedTool !== 'package-usage' || !packageName) return;
+	if (!activeRuntime || selectedTool !== 'package-usage') return;
 
-	setBusy(
-		reset ? primaryActionButton : packageUsageLoadMore,
-		true,
-		reset ? t('Loading usage...') : t('Loading more...')
-	);
-	if (reset || packageUsagePackageKey !== packageName) {
-		packageUsageItems = [];
-		packageUsageOffset = 0;
-		packageUsageTotal = 0;
-		packageUsageLastRawPageLength = 0;
-		packageUsagePackageKey = packageName;
-		packageUsageOpenStates = new Map();
-		renderPackageUsageResults();
-	}
+	setBusy(primaryActionButton, true, t('Loading usage...'));
+	packageUsageLoading = true;
+	packageUsageItems = [];
+	packageUsagePackageKey = packageKey;
+	resetToolProgress();
+	renderPackageUsageResults();
 
 	try {
-		const response = await activeRuntime.api.getPackageUsage({
-			name: packageName,
-			offset: packageUsageOffset,
-			length: PACKAGE_USAGE_PAGE_LENGTH,
-		});
-		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
-		const rawList = response.list ?? [];
-		packageUsageLastRawPageLength = rawList.length;
-		const byKey = new Map(packageUsageItems.map((item) => [getPackageUsageRowKey(item), item]));
-		for (const item of rawList) byKey.set(getPackageUsageRowKey(item), item);
-		packageUsageItems = [...byKey.values()];
-		packageUsageOffset += PACKAGE_USAGE_PAGE_LENGTH;
-		packageUsageTotal =
-			response.page?.totalFilter ??
-			response.page?.total ??
-			response.total ??
-			Math.max(packageUsageItems.length, packageUsageTotal);
-		packageUsageItems.sort((left, right) => {
-			const versionCompare = getPackageUsageVersion(left).localeCompare(
-				getPackageUsageVersion(right),
-				undefined,
-				{ numeric: true, sensitivity: 'base' }
-			);
-			if (versionCompare) return versionCompare;
-			return String(right.updatedOn ?? '').localeCompare(String(left.updatedOn ?? ''));
-		});
+		let offset = 0;
+		for (;;) {
+			const response = await activeRuntime.api.getPackageUsage({
+				...request,
+				offset,
+				length: PAGE_LENGTH,
+			});
+			if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+			const rawList = response.list ?? [];
+			packageUsageItems.push(...rawList);
+			offset += rawList.length;
+			if (
+				!hasMoreAutomationAnywherePackageUsage(
+					offset,
+					rawList.length,
+					getResponseTotal(response),
+					PAGE_LENGTH
+				)
+			) break;
+		}
+		packageUsageLoading = false;
 		renderPackageUsageResults();
 		setToolStatus(t('{count} usage row(s) loaded.', { count: packageUsageItems.length }));
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		packageUsageLoading = false;
+		renderPackageUsageResults();
 		const message = error instanceof Error ? error.message : t('Package usage failed.');
 		setToolStatus(
 			message.startsWith('403 ')
@@ -1950,7 +2103,6 @@ async function loadPackageDetailsUsage(reset: boolean): Promise<void> {
 	} finally {
 		if (runtime === activeRuntime && currentTool === selectedTool) {
 			setBusy(primaryActionButton, false);
-			setBusy(packageUsageLoadMore, false, t('Load more usage'));
 			updateActionBar();
 		}
 	}
@@ -1967,37 +2119,6 @@ async function copyPackageUsagePath(row: AutomationAnywherePackageUsage): Promis
 		setToolStatus(t('Path copied.'));
 	} catch (error) {
 		setToolStatus(error instanceof Error ? error.message : t('Copy failed.'), 'error');
-	}
-}
-
-async function openPackageUsageAutomation(
-	row: AutomationAnywherePackageUsage,
-	button: HTMLButtonElement
-): Promise<void> {
-	const activeRuntime = runtime;
-	if (!activeRuntime || currentTool !== 'package-usage') return;
-
-	setBusy(button, true, t('Opening...'));
-	try {
-		const file = await activeRuntime.api.findAutomationByUsageRow(row);
-		if (runtime !== activeRuntime || currentTool !== 'package-usage') return;
-		if (!file) {
-			packageUsageOpenStates.set(getPackageUsageRowKey(row), 'failed');
-			await copyPackageUsagePath(row);
-			setToolStatus(t('Bot path could not be resolved. Path copied.'), 'warn');
-			renderPackageUsageResults();
-			return;
-		}
-		const url = buildAutomationAnywhereTaskbotUrl(activeRuntime.context.baseUrl, file);
-		await browser.tabs.update(activeRuntime.tabId, { url });
-		setToolStatus(t('Opening bot.'));
-	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : t('Open bot failed.'), 'error');
-	} finally {
-		if (runtime === activeRuntime && currentTool === 'package-usage') {
-			button.disabled = false;
-			button.textContent = t('Open');
-		}
 	}
 }
 
