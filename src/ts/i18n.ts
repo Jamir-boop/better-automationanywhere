@@ -378,6 +378,8 @@ const ES: Record<string, string> = {
 		'Detecta herramientas para la pagina actual de AA.',
 	'Open Automation Anywhere folder, taskbot, or packages page.':
 		'Abre una carpeta, taskbot o pagina de paquetes de Automation Anywhere.',
+	'Open an Automation Anywhere folder, taskbot, or Packages page.':
+		'Abre una carpeta, taskbot o pagina de Paquetes de Automation Anywhere.',
 	'Open an Automation Anywhere folder, taskbot, or Packages page, then refresh.':
 		'Abre una carpeta, taskbot o pagina de Paquetes de Automation Anywhere y actualiza.',
 	'Tools appear when the active tab is on a supported Automation Anywhere page.':
@@ -389,6 +391,8 @@ const ES: Record<string, string> = {
 		'Portapapeles universal, JSON de taskbot, Actualizar paquetes, Exportar bots',
 	'Copy Files, Update Packages, Export Bots':
 		'Copiar archivos, Actualizar paquetes, Exportar bots',
+	'Download Packages, Package Usage':
+		'Descargar paquetes, Uso de paquetes',
 	Files: 'Archivos',
 	'{count} selected': '{count} seleccionados',
 	'0 selected': '0 seleccionados',
@@ -411,6 +415,8 @@ const ES: Record<string, string> = {
 	'Copy package list to clipboard.':
 		'Copia la lista de paquetes al portapapeles.',
 	'Package list copied.': 'Lista de paquetes copiada.',
+	'Package usage': 'Uso de paquetes',
+	'Load more usage': 'Cargar mas uso',
 	Idle: 'Inactivo',
 	'Tool finished': 'Herramienta terminada',
 	Close: 'Cerrar',
@@ -419,6 +425,7 @@ const ES: Record<string, string> = {
 	'Update Packages': 'Actualizar paquetes',
 	'Export Bots': 'Exportar bots',
 	'Download Packages': 'Descargar paquetes',
+	'Package Usage': 'Uso de paquetes',
 	'Use saved AA clipboard slots.': 'Usa espacios guardados del portapapeles AA.',
 	'Copy file references inside this extension.':
 		'Copia referencias de archivos dentro de esta extension.',
@@ -427,6 +434,8 @@ const ES: Record<string, string> = {
 	'Export selected files as a ZIP or separate downloads.':
 		'Exporta archivos seleccionados como ZIP o descargas separadas.',
 	'Download packages from this page.': 'Descarga paquetes desde esta pagina.',
+	'Find bots using selected package version.':
+		'Busca bots que usan la version de paquete seleccionada.',
 	'Load and edit raw taskbot JSON.': 'Carga y edita JSON de taskbot sin procesar.',
 	'Store selected file references inside extension.':
 		'Guarda referencias de archivos seleccionados dentro de la extension.',
@@ -438,6 +447,10 @@ const ES: Record<string, string> = {
 		'Descarga cada archivo seleccionado individualmente.',
 	'Download selected package JAR files.':
 		'Descarga archivos JAR de paquetes seleccionados.',
+	'Show usage for all used versions of this package.':
+		'Muestra uso para todas las versiones usadas de este paquete.',
+	'Show bots using selected package version.':
+		'Muestra bots que usan la version de paquete seleccionada.',
 	'Stores file references inside extension. Open another folder on same host to paste.':
 		'Guarda referencias de archivos dentro de la extension. Abre otra carpeta del mismo host para pegar.',
 	'Updates selected taskbots using package defaults from this Control Room.':
@@ -448,14 +461,25 @@ const ES: Record<string, string> = {
 		'Descarga archivos seleccionados uno por uno.',
 	'Downloads selected packages from the Packages page.':
 		'Descarga paquetes seleccionados desde la pagina Paquetes.',
+	'Only versions with usage are shown. Missing versions have no usage found.':
+		'Solo se muestran versiones con uso. Las versiones ausentes no tienen uso encontrado.',
+	'Shows bots using one selected package version.':
+		'Muestra bots que usan una version de paquete seleccionada.',
 	'Loading...': 'Cargando...',
 	'Loading more...': 'Cargando mas...',
 	'{count} item(s) loaded.': '{count} elemento(s) cargado(s).',
 	'{count} package(s) loaded.': '{count} paquete(s) cargado(s).',
+	'{count} package version(s) loaded.':
+		'{count} version(es) de paquete cargada(s).',
 	'Folder list failed.': 'Lista de carpeta fallo.',
 	'Package list failed.': 'Lista de paquetes fallo.',
 	unknown: 'desconocido',
+	Enabled: 'Habilitado',
+	Disabled: 'Deshabilitado',
+	'Package {name}': 'Paquete {name}',
+	'Package {name} on {host}': 'Paquete {name} en {host}',
 	'Version {version}': 'Version {version}',
+	'Version {version} | {status}': 'Version {version} | {status}',
 	'Version {version} | missing pkgDownloadUrl':
 		'Version {version} | falta pkgDownloadUrl',
 	'Search packages': 'Buscar paquetes',
@@ -482,6 +506,7 @@ const ES: Record<string, string> = {
 	'Export {count} file(s)': 'Exportar {count} archivo(s)',
 	'Export current bot': 'Exportar bot actual',
 	'Download {count} package(s)': 'Descargar {count} paquete(s)',
+	'View usage': 'Ver uso',
 	'Paste {count} copied file(s)': 'Pegar {count} archivo(s) copiado(s)',
 	'{count} file(s) in clipboard. Open target folder to paste.':
 		'{count} archivo(s) en el portapapeles. Abre la carpeta destino para pegar.',
@@ -551,6 +576,35 @@ const ES: Record<string, string> = {
 	'Download packages done. Downloaded {downloaded}, skipped {skipped}, failed {failed}.':
 		'Descarga de paquetes terminada. Descargados {downloaded}, omitidos {skipped}, fallidos {failed}.',
 	'Download packages failed.': 'Descarga de paquetes fallo.',
+	'{count} usage row(s)': '{count} fila(s) de uso',
+	'No usage found for selected package version.':
+		'No se encontro uso para la version de paquete seleccionada.',
+	'Click View usage to show package versions with usage.':
+		'Haz clic en Ver uso para mostrar versiones de paquete con uso.',
+	'Updated {date}': 'Actualizado {date}',
+	'By {user}': 'Por {user}',
+	'default package version': 'version de paquete predeterminada',
+	'non-default package version': 'version de paquete no predeterminada',
+	'Open unavailable': 'Abrir no disponible',
+	Open: 'Abrir',
+	'Open bot in current tab.': 'Abre el bot en la pestana actual.',
+	'Only taskbot usage rows can be opened.':
+		'Solo se pueden abrir filas de uso de taskbot.',
+	'Copy path': 'Copiar ruta',
+	'Loading usage...': 'Cargando uso...',
+	'{count} usage row(s) loaded.': '{count} fila(s) de uso cargadas.',
+	'Package usage failed.': 'Uso de paquetes fallo.',
+	'Manage packages permission required.':
+		'Se requiere permiso para administrar paquetes.',
+	'Package status filter failed. Refresh packages and try again.':
+		'Filtro de estado de paquete fallo. Actualiza paquetes e intenta de nuevo.',
+	'No path found.': 'No se encontro ruta.',
+	'Path copied.': 'Ruta copiada.',
+	'Opening...': 'Abriendo...',
+	'Bot path could not be resolved. Path copied.':
+		'No se pudo resolver la ruta del bot. Ruta copiada.',
+	'Opening bot.': 'Abriendo bot.',
+	'Open bot failed.': 'Abrir bot fallo.',
 	'File {fileId}': 'Archivo {fileId}',
 	'Taskbot JSON loaded.': 'JSON de taskbot cargado.',
 	'Taskbot JSON load failed.': 'Carga de JSON de taskbot fallo.',
@@ -607,6 +661,10 @@ const ES: Record<string, string> = {
 		'Guarda el JSON editado en Control Room.',
 	'Unsupported page. Open Automation Anywhere folder, taskbot, or packages page.':
 		'Pagina no compatible. Abre una carpeta, taskbot o pagina de paquetes de Automation Anywhere.',
+	'No tools for {host}. Open an Automation Anywhere folder, taskbot, or Packages page.':
+		'No hay herramientas para {host}. Abre una carpeta, taskbot o pagina de Paquetes de Automation Anywhere.',
+	'Unsupported Automation Anywhere page. Open a folder, taskbot, or Packages page.':
+		'Pagina de Automation Anywhere no compatible. Abre una carpeta, taskbot o pagina de Paquetes.',
 	'Tools context failed.': 'Fallo el contexto de herramientas.',
 	'{count} file(s) in clipboard. Paste available.':
 		'{count} archivo(s) en el portapapeles. Pegado disponible.',

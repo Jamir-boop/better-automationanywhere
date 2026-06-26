@@ -36,6 +36,26 @@ assert.equal(
 );
 
 assert.deepEqual(
+	mod.parseAutomationAnywherePackageRoute(
+		'https://tenant.my.automationanywhere.digital/#/bots/packages/versions/betterComments/view'
+	),
+	{ packageName: 'betterComments' }
+);
+
+assert.deepEqual(
+	mod.parseAutomationAnywherePackageRoute(
+		'https://tenant.my.automationanywhere.digital/#/bots/packages/versions'
+	),
+	{}
+);
+
+assert.equal(
+	mod.isAutomationAnywhereUrl('https://tenant.my.automationanywhere.digital/#/bots/packages'),
+	true
+);
+assert.equal(mod.isAutomationAnywhereUrl('https://chatgpt.com/'), false);
+
+assert.deepEqual(
 	tools.getAvailableAutomationAnywhereTools(
 		{
 			url: '',
@@ -121,6 +141,25 @@ assert.deepEqual(
 	),
 	['copy-files', 'update-packages', 'export-bots']
 );
+
+assert.deepEqual(
+	tools.getAvailableAutomationAnywhereTools(
+		{
+			url: '',
+			baseUrl: '',
+			hostname: '',
+			pageType: 'packages',
+			packageName: 'betterComments',
+		},
+		{ universalClipboard: false }
+	),
+	['download-packages', 'package-usage']
+);
+
+assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter('disabled'), 'DISABLED');
+assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter('Disabled'), 'DISABLED');
+assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter(undefined), 'ENABLED');
+assert.equal(tools.getAutomationAnywherePackageUsageStatusFilter('enabled'), 'ENABLED');
 
 assert.equal(
 	tools.getDefaultTaskbotTool({

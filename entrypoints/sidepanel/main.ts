@@ -499,7 +499,7 @@ replaceChildrenFromHtml(app, `
 		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">${t('Tools')}</button>
 		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">${t('UI')}</button>
 		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">${t('Settings')}</button>
-		<button class="tab-button tab-button-health" type="button" role="tab" aria-selected="false" data-tab="doctor" aria-label="${t('Health')}" title="${t('Health')}" hidden>✅</button>
+		<button class="tab-button tab-button-health" type="button" role="tab" aria-selected="false" data-tab="doctor" aria-label="${t('Health')}" title="${t('Health')}" hidden>ℹ</button>
 	</nav>
 
 	<main>
@@ -557,11 +557,11 @@ replaceChildrenFromHtml(app, `
 
 		<section class="tab-panel doctor-panel" role="tabpanel" data-panel="doctor" hidden>
 			<div class="health-subtabs" role="tablist" aria-label="${t('Health sections')}">
-				<button class="health-subtab is-active" type="button" role="tab" aria-selected="true" data-health-section="health">${t('Health')}</button>
-				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="logs">${t('Debug Logs')}</button>
+				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="health">${t('Health')}</button>
+				<button class="health-subtab is-active" type="button" role="tab" aria-selected="true" data-health-section="logs">${t('Debug Logs')}</button>
 			</div>
 
-			<div class="health-subpanel" data-health-subpanel="health">
+			<div class="health-subpanel" data-health-subpanel="health" hidden aria-hidden="true">
 				<section class="panel-section">
 					<h2>${t('Health')}</h2>
 					<div class="doctor-view-pills" role="group" aria-label="${t('Health check view selector')}">
@@ -589,7 +589,7 @@ replaceChildrenFromHtml(app, `
 				</section>
 			</div>
 
-			<section class="panel-section feedback-section health-subpanel" id="debugLogSection" data-health-subpanel="logs" hidden aria-hidden="true">
+			<section class="panel-section feedback-section health-subpanel" id="debugLogSection" data-health-subpanel="logs" aria-hidden="false">
 				<div class="section-heading-row">
 					<h2>${t('Debug Logs')}</h2>
 					<span class="feedback-actions">
@@ -683,7 +683,7 @@ const backgroundPreview =
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
 type HealthSection = 'health' | 'logs';
-let activeHealthSection: HealthSection = 'health';
+let activeHealthSection: HealthSection = 'logs';
 let actionJsonWorkbench: JsonWorkbench;
 let currentExtensionShortcuts: ExtensionShortcuts = {
 	openSidebar: getOpenSidebarShortcutLabel(currentOpenSidebarShortcut),

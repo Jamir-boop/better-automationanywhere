@@ -373,8 +373,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: `getActiveAutomationAnywhereContext`
   - Selectors: route/url based and task editor capability selector
-  - Validate: unsupported page, private/public folder, private/public taskbot, packages page.
-  - Expected: correct tools appear for page and capabilities.
+  - Validate: non-AA active tab, unsupported AA route, private/public folder, private/public taskbot, packages page, package detail page.
+  - Expected: correct tools appear for page and capabilities; no-tools context names current host when active tab is not an AA tools page.
   - Status: active
   - Delete condition: tools panel removed.
 
@@ -427,10 +427,19 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`
   - Setting/id: tool `download-packages`
   - Selectors: none; API/package list based
-  - Validate: open Packages page, select packages, download.
-  - Expected: selected package downloads start; missing download URL is reported.
+  - Validate: open Packages page, select packages, download; open package detail page and download package versions.
+  - Expected: selected package downloads start; package detail page scopes to opened package; missing download URL is reported.
   - Status: active
   - Delete condition: packages API unavailable.
+
+- [ ] Package Usage
+  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`, `src/ts/automation-anywhere-tools.ts`
+  - Setting/id: tool `package-usage`
+  - Selectors: none; API/package usage based
+  - Validate: open Packages page, select one package version, view usage; open package detail page and view usage without selecting a version.
+  - Expected: usage rows show bot name/path/status and open target bot; package detail usage groups rows by collapsible version; missing versions mean no usage found; `ENABLED`/`DISABLED` status filters do not trigger `No enum constant`.
+  - Status: active
+  - Delete condition: package usage API unavailable.
 
 - [ ] Taskbot JSON load/edit/save
   - Source: `entrypoints/sidepanel/tools.ts`

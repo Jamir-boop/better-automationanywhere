@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.14.1           | A360 v.40+                       | Chrome / Edge   | Supported |
+| 1.15.4           | A360 v.40+                       | Chrome / Edge   | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · Report issue
 
@@ -52,6 +52,19 @@ Open fast command search with `Alt + P`.
 Use it to navigate Control Room, manage variables, copy actions, paste actions, export action JSON, import action JSON, and jump to specific bot lines.
 
 https://github.com/Jamir-boop/automationanywhere-improvements/assets/73477811/f7c6eec2-409f-495d-88e3-028e5b6d4593
+
+------
+
+### Control Room tools
+
+The sidepanel Tools tab adapts to the active Control Room page.
+
+- Folder pages: copy files, update package versions, and export bots.
+- Taskbot pages: inspect/edit Taskbot JSON, update package versions, and export bots.
+- Packages page: download selected package JAR files and view bots using a selected package version.
+- Package detail page: download versions for the opened package and view usage across all used versions.
+
+Package Usage groups results by package version and each version group is collapsible. Versions with no usage are not shown. The tool requires Control Room package-management API permission.
 
 ------
 

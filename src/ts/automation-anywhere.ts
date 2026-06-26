@@ -14,6 +14,9 @@ const AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_DETAILS_RE =
 const AUTOMATION_ANYWHERE_FOLDER_ROUTE_RE =
 	/\/bots\/repository\/(private|public)\/folders\/([^/?#]+)\/?(?:[?#].*)?$/i;
 
+const AUTOMATION_ANYWHERE_PACKAGE_DETAILS_ROUTE_RE =
+	/\/bots\/packages\/versions\/([^/?#]+)\/view(?:[/?#]|$)/i;
+
 export const AUTOMATION_ANYWHERE_TASK_EDITOR_URL_RE =
 	/.*automationanywhere\.digital.*\/(?:bots\/repository\/)?(private|public)\/(?:folders\/[^/?#]+\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
 
@@ -48,6 +51,10 @@ export interface AutomationAnywhereTaskEditorRoute {
 	fileId: string;
 }
 
+export interface AutomationAnywherePackageRoute {
+	packageName?: string;
+}
+
 function decodeAutomationAnywhereRoutePart(value: string | undefined): string | undefined {
 	return value ? decodeURIComponent(value) : undefined;
 }
@@ -66,6 +73,19 @@ export function parseAutomationAnywhereTaskEditorRoute(
 		folderId: decodeAutomationAnywhereRoutePart(match[2]),
 		fileId,
 	};
+}
+
+export function parseAutomationAnywherePackageRoute(
+	url: string
+): AutomationAnywherePackageRoute | null {
+	const route = getAutomationAnywhereRoute(url);
+	const packageDetails = route.match(AUTOMATION_ANYWHERE_PACKAGE_DETAILS_ROUTE_RE);
+	if (packageDetails) {
+		return {
+			packageName: decodeAutomationAnywhereRoutePart(packageDetails[1]),
+		};
+	}
+	return /\/bots\/packages\/versions(?:[/?#]|$)/i.test(route) ? {} : null;
 }
 
 export function isFolderRepositoryUrl(url: string): boolean {

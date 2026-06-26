@@ -1263,6 +1263,82 @@ button
 	&[hidden]
 		display: none
 
+.package-usage-section
+	display: flex
+	flex-direction: column
+	gap: 6px
+	padding: 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+
+	&[hidden]
+		display: none
+
+.package-usage-list
+	display: flex
+	max-height: 320px
+	flex-direction: column
+	gap: 6px
+	overflow: auto
+
+.package-usage-row
+	display: grid
+	grid-template-columns: minmax(0, 1fr) auto
+	gap: 8px
+	align-items: start
+	padding: 7px 8px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-1)
+
+.package-usage-text
+	display: flex
+	min-width: 0
+	flex-direction: column
+	gap: 2px
+
+	strong
+		font-size: .74rem
+		line-height: 1.3
+		overflow-wrap: anywhere
+
+	small
+		color: var(--text-muted)
+		font-size: .65rem
+		line-height: 1.3
+		overflow-wrap: anywhere
+
+.package-usage-actions
+	display: flex
+	flex-direction: column
+	gap: 5px
+
+.package-usage-version-group
+	padding: 7px
+	border: 1px solid var(--border)
+	border-radius: 6px
+	background: var(--surface-0)
+
+	summary
+		cursor: pointer
+		list-style-position: inside
+
+	.package-usage-row
+		margin-top: 6px
+
+	h3
+		display: inline
+		margin: 0
+		color: var(--accent)
+		font-size: .74rem
+
+	summary > small
+		float: right
+		margin-left: 8px
+		color: var(--text-muted)
+		font-size: .65rem
+
 .tools-export-package-header
 	display: flex
 	align-items: center

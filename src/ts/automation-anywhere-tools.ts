@@ -7,7 +7,18 @@ export type AutomationAnywhereToolId =
 	| 'update-packages'
 	| 'export-bots'
 	| 'download-packages'
+	| 'package-usage'
 	| 'taskbot-json';
+
+export type AutomationAnywherePackageUsageStatusFilter = 'ENABLED' | 'DISABLED';
+
+export function getAutomationAnywherePackageUsageStatusFilter(
+	status: unknown
+): AutomationAnywherePackageUsageStatusFilter {
+	return String(status ?? '').trim().toLowerCase() === 'disabled'
+		? 'DISABLED'
+		: 'ENABLED';
+}
 
 export function getAvailableAutomationAnywhereTools(
 	context: AutomationAnywherePageContext,
@@ -32,7 +43,7 @@ export function getAvailableAutomationAnywhereTools(
 		return tools;
 	}
 	if (context.pageType === 'packages') {
-		tools.push('download-packages');
+		tools.push('download-packages', 'package-usage');
 		return tools;
 	}
 	return tools;
