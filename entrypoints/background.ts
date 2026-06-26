@@ -58,6 +58,7 @@ import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
 const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
 const CONTROL_ROOM_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SLOW_API_REQUEST_MS = 2000;
+const OPEN_SIDEBAR_CONTEXT_MENU_ID = 'open-better-aa-sidebar';
 
 const controlRoomVersionCache = new Map<
 	string,
@@ -345,6 +346,70 @@ async function setPanelActionBehavior(): Promise<void> {
 	const action = (browser as any).action ?? (browser as any).browserAction;
 	action?.onClicked?.addListener(() => {
 		openFirefoxSidebarFromUserAction({ userAction: true });
+	});
+}
+
+function getContextMenusApi(): any {
+	return (
+		(browser as any).menus ??
+		(browser as any).contextMenus ??
+		(globalThis as any).chrome?.contextMenus
+	);
+}
+
+function createOpenSidebarContextMenu(): void {
+	const menus = getContextMenusApi();
+	if (!menus?.create) return;
+
+	try {
+		menus.create({
+			id: OPEN_SIDEBAR_CONTEXT_MENU_ID,
+			title:
+				browser.i18n.getMessage('openSidebarCommandDescription') ||
+				'Open extension sidebar',
+			contexts: ['all'],
+			documentUrlPatterns: [...AUTOMATION_ANYWHERE_MATCHES],
+		});
+	} catch (error) {
+		void debugWarn('background', 'Context menu creation failed.', { error });
+	}
+}
+
+function openSidebarFromContextMenu(tabId?: number): void {
+	const request: SidebarOpenRequest = { tab: 'tools', userAction: true };
+	if (import.meta.env.CHROME) {
+		if (tabId !== undefined) {
+			void Promise.resolve(openChromeSidePanelFromSenderTab(tabId, request)).then(
+				(response) => {
+					if (!response.ok) {
+						void debugWarn('background', 'Context menu sidebar open failed.', {
+							error: response.error,
+						});
+					}
+				}
+			);
+			return;
+		}
+		openChromeSidePanelFromUserAction(request);
+		return;
+	}
+
+	openFirefoxSidebarFromUserAction(request);
+}
+
+function registerOpenSidebarContextMenu(): void {
+	const menus = getContextMenusApi();
+	if (!menus?.onClicked?.addListener) return;
+
+	if (import.meta.env.FIREFOX) {
+		createOpenSidebarContextMenu();
+	} else {
+		browser.runtime.onInstalled.addListener(createOpenSidebarContextMenu);
+	}
+
+	menus.onClicked.addListener((info: any, tab?: { id?: number }) => {
+		if (info?.menuItemId !== OPEN_SIDEBAR_CONTEXT_MENU_ID) return;
+		openSidebarFromContextMenu(tab?.id);
 	});
 }
 
@@ -782,4 +847,5 @@ export default defineBackground(() => {
 	});
 
 	void setPanelActionBehavior();
+	registerOpenSidebarContextMenu();
 });

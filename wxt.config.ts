@@ -36,7 +36,9 @@ export default defineConfig({
 		permissions: [
 			'storage',
 			'tabs',
-			...(browser === 'chrome' ? ['sidePanel', 'scripting', 'activeTab'] : []),
+			...(browser === 'chrome'
+				? ['sidePanel', 'scripting', 'activeTab', 'contextMenus']
+				: ['menus']),
 		],
 		host_permissions: automationAnywhereMatches,
 		web_accessible_resources:
