@@ -16,7 +16,6 @@ import {
 } from '../src/ts/automation-anywhere';
 import {
 	ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR,
-	EDITOR_PALETTE_ACTIVE_ACCORDION_SELECTOR,
 	EDITOR_PALETTE_SECTION_SELECTOR,
 	EDITOR_PALETTE_VARIABLES_SELECTOR,
 	FOLDER_REFRESH_SELECTOR,
@@ -194,6 +193,9 @@ function watchRouteChanges(): void {
 			if (location.href === lastRouteUrl) return;
 			lastRouteUrl = location.href;
 			const routeContext = parseAutomationAnywherePageContext(lastRouteUrl);
+			if (routeContext.mode !== lastRouteContext.mode) {
+				void applyStyleClasses();
+			}
 			if (routeContext.pageType !== lastRouteContext.pageType) {
 				void debugInfo(
 					'content',
@@ -255,6 +257,10 @@ async function applyStyleClasses(): Promise<void> {
 	const effectiveEnabled =
 		enabled &&
 		(compatibility.supported || compatibility.state === 'unknown' || forceUnsupported);
+	const customPaletteButtonsEnabled =
+		effectiveEnabled &&
+		styleFeatures.customPaletteButtons &&
+		parseAutomationAnywherePageContext(location.href).mode !== 'view';
 	document.documentElement.dataset.betterAaControlRoomState = compatibility.state;
 	document.documentElement.dataset.betterAaSupportedControlRoom =
 		formatControlRoomTarget(compatibility.target);
@@ -262,15 +268,15 @@ async function applyStyleClasses(): Promise<void> {
 	for (const feature of STYLE_FEATURES) {
 		document.documentElement.classList.toggle(
 			feature.className,
-			styleFeatures[feature.key]
+			feature.key === 'customPaletteButtons'
+				? customPaletteButtonsEnabled
+				: styleFeatures[feature.key]
 		);
 	}
 	activeRunButtonStyleEnabled = effectiveEnabled && styleFeatures.runButton;
 	activeRunButtonWavesEnabled = runButtonWavesEnabled;
 	setRunButtonAnimationEnabled(activeRunButtonStyleEnabled, activeRunButtonWavesEnabled);
-	setCustomPaletteButtonsEnabled(
-		effectiveEnabled && styleFeatures.customPaletteButtons
-	);
+	setCustomPaletteButtonsEnabled(customPaletteButtonsEnabled);
 	setPathFinderSlimSidebarEnabled(effectiveEnabled && styleFeatures.pathFinder);
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
@@ -302,14 +308,10 @@ function restoreVariableMetadataLabels(root: ParentNode = document): void {
 }
 
 function getActiveVariablesSection(): HTMLElement | null {
-	const button = document.querySelector<HTMLButtonElement>(EDITOR_PALETTE_VARIABLES_SELECTOR);
-	const section = button?.closest<HTMLElement>(EDITOR_PALETTE_SECTION_SELECTOR);
-	if (!button || !section) return null;
-	if (!button.closest(EDITOR_PALETTE_ACTIVE_ACCORDION_SELECTOR)) return null;
-	if (!section.querySelector(ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR)) {
-		return null;
-	}
-	return section;
+	const button = document.querySelector<HTMLButtonElement>(
+		`${ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR} ${EDITOR_PALETTE_VARIABLES_SELECTOR}`
+	);
+	return button?.closest<HTMLElement>(EDITOR_PALETTE_SECTION_SELECTOR) ?? null;
 }
 
 function getVariableMetadataContext(): {

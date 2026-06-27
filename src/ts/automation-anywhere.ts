@@ -9,7 +9,7 @@ export const AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_RE =
 	/\/(?:bots\/repository\/)?(private|public)\/(?:folders\/[^/?#]+\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
 
 const AUTOMATION_ANYWHERE_TASK_EDITOR_ROUTE_DETAILS_RE =
-	/\/(?:bots\/repository\/)?(private|public)\/(?:folders\/([^/?#]+)\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
+	/\/(?:bots\/repository\/)?(private|public)\/(?:folders\/([^/?#]+)\/)?files\/(?:task|taskbot)\/([^/?#]+)(?:\/(edit|view))?(?:[/?#]|$)/i;
 
 const AUTOMATION_ANYWHERE_FOLDER_ROUTE_RE =
 	/\/bots\/repository\/(private|public)\/folders\/([^/?#]+)\/?(?:[?#].*)?$/i;
@@ -49,6 +49,7 @@ export interface AutomationAnywhereTaskEditorRoute {
 	workspace: 'private' | 'public';
 	folderId?: string;
 	fileId: string;
+	mode?: 'edit' | 'view';
 }
 
 export interface AutomationAnywherePackageRoute {
@@ -68,10 +69,12 @@ export function parseAutomationAnywhereTaskEditorRoute(
 	if (!match) return null;
 	const fileId = decodeAutomationAnywhereRoutePart(match[3]);
 	if (!fileId) return null;
+	const mode = match[4]?.toLowerCase();
 	return {
 		workspace: match[1].toLowerCase() === 'public' ? 'public' : 'private',
 		folderId: decodeAutomationAnywhereRoutePart(match[2]),
 		fileId,
+		mode: mode === 'edit' || mode === 'view' ? mode : undefined,
 	};
 }
 

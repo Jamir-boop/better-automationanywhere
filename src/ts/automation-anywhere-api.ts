@@ -30,6 +30,7 @@ export interface AutomationAnywherePageContext {
 	pageType: AutomationAnywherePageType;
 	folderId?: string;
 	fileId?: string;
+	mode?: 'edit' | 'view';
 	packageName?: string;
 }
 
@@ -167,6 +168,7 @@ export function parseAutomationAnywherePageContext(
 			pageType: taskbot.workspace === 'public' ? 'public-taskbot' : 'private-taskbot',
 			folderId: taskbot.folderId,
 			fileId: taskbot.fileId,
+			mode: taskbot.mode,
 		};
 	}
 

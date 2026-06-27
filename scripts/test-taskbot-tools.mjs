@@ -16,6 +16,7 @@ assert.deepEqual(privateRoute, {
 	workspace: 'private',
 	folderId: 'abc 123',
 	fileId: 'bot 456',
+	mode: 'edit',
 });
 
 const publicRoute = mod.parseAutomationAnywhereTaskEditorRoute(
@@ -26,7 +27,20 @@ assert.deepEqual(publicRoute, {
 	workspace: 'public',
 	folderId: undefined,
 	fileId: '789',
+	mode: 'view',
 });
+
+assert.deepEqual(
+	mod.parseAutomationAnywhereTaskEditorRoute(
+		'https://tenant.my.automationanywhere.digital/#/bots/repository/private/files/task/101221277/view'
+	),
+	{
+		workspace: 'private',
+		folderId: undefined,
+		fileId: '101221277',
+		mode: 'view',
+	}
+);
 
 assert.equal(
 	mod.parseAutomationAnywhereTaskEditorRoute(

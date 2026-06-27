@@ -65,8 +65,6 @@ export const TASKBOT_NODE_LINK_SELECTOR =
 export const EDITOR_PALETTE_SELECTOR = '.editor-palette';
 export const EDITOR_PALETTE_CANVAS_SELECTOR = '.editor-layout__canvas';
 export const EDITOR_PALETTE_SECTION_SELECTOR = '[data-path="EditorPalette.section"]';
-export const EDITOR_PALETTE_ACTIVE_ACCORDION_SELECTOR =
-	'.editor-palette__accordion--is_active';
 export const ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR =
 	'.editor-palette-section__header--is_active';
 export const EDITOR_PALETTE_SCROLLER_SELECTOR = '.editor-palette-section__scroller';
