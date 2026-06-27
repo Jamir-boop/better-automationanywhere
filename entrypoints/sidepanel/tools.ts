@@ -1890,10 +1890,38 @@ function appendSkeletonRows(
 	count: number,
 	type: 'package-list' | 'package-usage'
 ): void {
-	const row = type === 'package-list'
-		? '<div class="tool-file-row is-skeleton" aria-hidden="true"><span class="skeleton-checkbox"></span><span class="tool-file-text"><span class="skeleton-bar skeleton-title"></span><span class="skeleton-bar skeleton-meta"></span></span></div>'
-		: '<div class="package-usage-row is-skeleton" aria-hidden="true"><span class="package-usage-text"><span class="skeleton-bar skeleton-title"></span><span class="skeleton-bar skeleton-path"></span><span class="skeleton-bar skeleton-meta"></span></span><span class="skeleton-bar skeleton-button"></span></div>';
-	container.insertAdjacentHTML('beforeend', row.repeat(count));
+	const createSpan = (className: string): HTMLSpanElement => {
+		const span = document.createElement('span');
+		span.className = className;
+		return span;
+	};
+
+	for (let index = 0; index < count; index++) {
+		const row = document.createElement('div');
+		row.className = type === 'package-list'
+			? 'tool-file-row is-skeleton'
+			: 'package-usage-row is-skeleton';
+		row.setAttribute('aria-hidden', 'true');
+
+		if (type === 'package-list') {
+			const text = createSpan('tool-file-text');
+			text.append(
+				createSpan('skeleton-bar skeleton-title'),
+				createSpan('skeleton-bar skeleton-meta')
+			);
+			row.append(createSpan('skeleton-checkbox'), text);
+		} else {
+			const text = createSpan('package-usage-text');
+			text.append(
+				createSpan('skeleton-bar skeleton-title'),
+				createSpan('skeleton-bar skeleton-path'),
+				createSpan('skeleton-bar skeleton-meta')
+			);
+			row.append(text, createSpan('skeleton-bar skeleton-button'));
+		}
+
+		container.appendChild(row);
+	}
 }
 
 function getItemMeta(item: AutomationAnywhereFile): string {
