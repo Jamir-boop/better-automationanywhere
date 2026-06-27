@@ -7,13 +7,14 @@ on:
         description: Check auth without uploading packages
         type: boolean
         default: true
-      chrome_skip_submit_review:
+      chrome_upload_only:
         description: Upload Chrome package without submitting for review
         type: boolean
         default: false
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: publish-stores
@@ -23,12 +24,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-      CHROME_PUBLISH_TARGET: default
-      CHROME_SKIP_SUBMIT_REVIEW: ${{ inputs.chrome_skip_submit_review }}
+      CHROME_EXTENSION_ID: ${{ vars.CHROME_EXTENSION_ID }}
+      CHROME_PUBLISHER_ID: ${{ vars.CHROME_PUBLISHER_ID }}
+      CHROME_PROJECT_ID: ${{ vars.CHROME_PROJECT_ID }}
+      SERVICE_ACCOUNT_EMAIL: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+      CHROME_UPLOAD_ONLY: ${{ inputs.chrome_upload_only }}
       FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
       FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
       FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
@@ -48,10 +48,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:maintenance
 
+      - name: Authenticate to Google Cloud
+        id: google-auth
+        uses: google-github-actions/auth@v3
+        with:
+          create_credentials_file: false
+          project_id: ${{ vars.CHROME_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+
       - name: Submit dry run
         if: ${{ inputs.dry_run }}
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: pnpm submit:dry-run
 
       - name: Submit to stores
         if: ${{ !inputs.dry_run }}
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: pnpm submit:stores

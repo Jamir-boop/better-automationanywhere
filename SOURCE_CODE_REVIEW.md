@@ -21,11 +21,7 @@ pnpm zip:firefox
 
 ## Submit
 
-Local setup:
-
-```bash
-pnpm submit:init
-```
+Local setup: [Chrome Web Store publishing setup](<docs/chrome web store credentials setup.md>).
 
 Local dry run:
 
