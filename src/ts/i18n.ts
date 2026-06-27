@@ -440,6 +440,8 @@ const ES: Record<string, string> = {
 		'Guarda referencias de archivos seleccionados dentro de la extension.',
 	'Update selected bots using default package versions.':
 		'Actualiza bots seleccionados usando versiones predeterminadas de paquetes.',
+	'Update selected packages using Control Room default versions.':
+		'Actualiza paquetes seleccionados usando versiones predeterminadas del Control Room.',
 	'Create one ZIP with taskbot dependencies and uploaded files.':
 		'Crea un ZIP con dependencias de taskbot y archivos subidos.',
 	'Download each selected file individually.':
@@ -454,6 +456,8 @@ const ES: Record<string, string> = {
 		'Guarda referencias de archivos dentro de la extension. Abre otra carpeta del mismo host para pegar.',
 	'Updates selected taskbots using package defaults from this Control Room.':
 		'Actualiza taskbots seleccionados usando valores predeterminados de paquetes de este Control Room.',
+	'Select outdated packages to update to Control Room defaults.':
+		'Selecciona paquetes desactualizados para usar los valores predeterminados del Control Room.',
 	'ZIP includes selected files and taskbot dependencies.':
 		'El ZIP incluye archivos seleccionados y dependencias de taskbot.',
 	'Downloads selected files one at a time.':
@@ -467,8 +471,11 @@ const ES: Record<string, string> = {
 	'Loading...': 'Cargando...',
 	'Loading more...': 'Cargando mas...',
 	'Loading packages...': 'Cargando paquetes...',
+	'Loading outdated packages...': 'Cargando paquetes desactualizados...',
 	'{count} item(s) loaded.': '{count} elemento(s) cargado(s).',
 	'{count} package(s) loaded.': '{count} paquete(s) cargado(s).',
+	'{count} outdated package(s) loaded.':
+		'{count} paquete(s) desactualizado(s) cargado(s).',
 	'Showing cached packages. Refreshing...':
 		'Mostrando paquetes en cache. Actualizando...',
 	'Package list refreshed.': 'Lista de paquetes actualizada.',
@@ -481,7 +488,10 @@ const ES: Record<string, string> = {
 	Disabled: 'Deshabilitado',
 	'Package {name}': 'Paquete {name}',
 	'Package {name} on {host}': 'Paquete {name} en {host}',
+	'Outdated packages': 'Paquetes desactualizados',
+	'All package versions are current.': 'Todas las versiones de paquetes estan actualizadas.',
 	'Version {version}': 'Version {version}',
+	'Version {current} to {target}': 'Version {current} a {target}',
 	'Version {version} | {status}': 'Version {version} | {status}',
 	'Version {version} | missing pkgDownloadUrl':
 		'Version {version} | falta pkgDownloadUrl',
@@ -507,6 +517,7 @@ const ES: Record<string, string> = {
 	'ID: {fileId}': 'ID: {fileId}',
 	'Copy {count} file(s)': 'Copiar {count} archivo(s)',
 	'Update {count} bot(s)': 'Actualizar {count} bot(s)',
+	'Update {count} package(s)': 'Actualizar {count} paquete(s)',
 	'Update current bot': 'Actualizar bot actual',
 	'Export {count} file(s)': 'Exportar {count} archivo(s)',
 	'Export current bot': 'Exportar bot actual',
@@ -528,6 +539,7 @@ const ES: Record<string, string> = {
 	'Paste done. Copied {copied}, skipped {skipped}, failed {failed}.':
 		'Pegado terminado. Copiados {copied}, omitidos {skipped}, fallidos {failed}.',
 	'Updating...': 'Actualizando...',
+	'Updating {count} package(s)...': 'Actualizando {count} paquete(s)...',
 	'Loading default package versions...':
 		'Cargando versiones predeterminadas de paquetes...',
 	'No default package versions found.':
@@ -540,6 +552,10 @@ const ES: Record<string, string> = {
 		'Actualizado: {name} - {count} paquete(s)',
 	'Update packages done. Updated {updated}, skipped {skipped}, failed {failed}.':
 		'Actualizacion de paquetes terminada. Actualizados {updated}, omitidos {skipped}, fallidos {failed}.',
+	'Selected packages are already current.':
+		'Los paquetes seleccionados ya estan actualizados.',
+	'Updated {count} package(s) in current bot.':
+		'Se actualizaron {count} paquete(s) en el bot actual.',
 	'Update packages failed.': 'Actualizacion de paquetes fallo.',
 	'Exporting...': 'Exportando...',
 	'Exporting {count} file(s). Do not close sidepanel.':

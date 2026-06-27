@@ -12,6 +12,24 @@ export type AutomationAnywhereToolId =
 
 export type AutomationAnywherePackageUsageStatusFilter = 'ENABLED' | 'DISABLED';
 
+export interface AutomationAnywherePackageUpdate {
+	name: string;
+	currentVersion: string;
+	targetVersion: string;
+}
+
+export function getAutomationAnywherePackageUpdates(
+	packages: ReadonlyArray<{ name: string; version: string }>,
+	defaultVersions: ReadonlyMap<string, string>
+): AutomationAnywherePackageUpdate[] {
+	return packages.flatMap((pkg) => {
+		const targetVersion = defaultVersions.get(pkg.name);
+		return targetVersion && targetVersion !== pkg.version
+			? [{ name: pkg.name, currentVersion: pkg.version, targetVersion }]
+			: [];
+	});
+}
+
 export function getAutomationAnywherePackageUsageStatusFilter(
 	status: unknown
 ): AutomationAnywherePackageUsageStatusFilter {

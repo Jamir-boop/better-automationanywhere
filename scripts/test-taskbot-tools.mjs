@@ -8,6 +8,27 @@ const tools = await importTsModule(
 	join(root, 'src', 'ts', 'automation-anywhere-tools.ts')
 );
 
+assert.deepEqual(
+	tools.getAutomationAnywherePackageUpdates(
+		[
+			{ name: 'Browser', version: '1.0.0' },
+			{ name: 'Excel', version: '2.0.0' },
+			{ name: 'MissingDefault', version: '3.0.0' },
+		],
+		new Map([
+			['Browser', '1.1.0'],
+			['Excel', '2.0.0'],
+		])
+	),
+	[
+		{
+			name: 'Browser',
+			currentVersion: '1.0.0',
+			targetVersion: '1.1.0',
+		},
+	]
+);
+
 const privateRoute = mod.parseAutomationAnywhereTaskEditorRoute(
 	'https://tenant.my.automationanywhere.digital/bots/repository/private/folders/abc%20123/files/taskbot/bot%20456/edit'
 );

@@ -397,11 +397,11 @@ Selector source of truth:
   - Delete condition: copy-file API unavailable.
 
 - [ ] Update Packages
-  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`
+  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `update-packages`
   - Selectors: none; API/content based
-  - Validate: update selected bot/current bot with outdated package versions.
-  - Expected: package versions update to defaults and save succeeds.
+  - Validate: on private taskbot `/edit`, deselect one of multiple outdated packages and update; also test private `/view` and folder mode.
+  - Expected: `/edit` lists outdated packages with current/default versions and updates only selected packages; `/view` and folder mode retain update-all behavior.
   - Status: active
   - Delete condition: AA package schema changes beyond repair.
 

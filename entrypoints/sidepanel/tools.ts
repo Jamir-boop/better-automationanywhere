@@ -30,6 +30,7 @@ import {
 import { t } from '@/src/ts/i18n';
 import {
 	getAvailableAutomationAnywhereTools,
+	getAutomationAnywherePackageUpdates,
 	getAutomationAnywherePackageUsageStatusFilter,
 	getDefaultTaskbotTool,
 	hasMoreAutomationAnywherePackageUsage,
@@ -226,6 +227,7 @@ let packageScanOffset = 0;
 let packageFallbackScan = false;
 let packageListLoading = false;
 let packageUsageLoading = false;
+let currentTaskbotPackageEmptyText = '';
 const packageListCache = new Map<string, AutomationAnywherePackage[]>();
 const packageListRefreshes = new Set<string>();
 
@@ -858,6 +860,7 @@ function setSelectedToolPanel(tool: ToolId | null): void {
 
 async function refreshToolsContext(): Promise<void> {
 	clearPackageSearchTimer();
+	currentTaskbotPackageEmptyText = '';
 	actionsContainer.textContent = '';
 	clearExportPackageInfo();
 	clearPackageUsageResults();
@@ -1050,6 +1053,14 @@ function isCurrentTaskbotMode(): boolean {
 	return Boolean(runtime && isTaskbotContext(runtime.context) && isCurrentTaskbotTool(currentTool));
 }
 
+function isCurrentTaskbotPackageSelectionMode(): boolean {
+	return Boolean(
+		runtime?.context.pageType === 'private-taskbot' &&
+			runtime.context.mode === 'edit' &&
+			currentTool === 'update-packages'
+	);
+}
+
 function getPackageDetailsName(): string | null {
 	return runtime?.context.pageType === 'packages' && runtime.context.packageName
 		? runtime.context.packageName
@@ -1089,7 +1100,11 @@ function getToolActionHelp(tool: ToolId): string {
 
 function getPrimaryActionHelp(tool: ToolId | null): string {
 	if (tool === 'copy-files') return t('Store selected file references inside extension.');
-	if (tool === 'update-packages') return t('Update selected bots using default package versions.');
+	if (tool === 'update-packages') {
+		return isCurrentTaskbotPackageSelectionMode()
+			? t('Update selected packages using Control Room default versions.')
+			: t('Update selected bots using default package versions.');
+	}
 	if (tool === 'export-bots') {
 		return getActiveExportFormat() === 'zip'
 			? t('Create one ZIP with taskbot dependencies and uploaded files.')
@@ -1108,7 +1123,9 @@ function getToolInlineHint(tool: ToolId | null): string {
 		return t('Stores file references inside extension. Open another folder on same host to paste.');
 	}
 	if (tool === 'update-packages') {
-		return t('Updates selected taskbots using package defaults from this Control Room.');
+		return isCurrentTaskbotPackageSelectionMode()
+			? t('Select outdated packages to update to Control Room defaults.')
+			: t('Updates selected taskbots using package defaults from this Control Room.');
 	}
 	if (tool === 'export-bots') {
 		return getActiveExportFormat() === 'zip'
@@ -1280,12 +1297,80 @@ async function findCurrentTaskbotInFolder(
 	}
 }
 
+async function loadCurrentTaskbotPackagePage(
+	activeRuntime: ToolsRuntime,
+	selectedTool: ToolId,
+	fileId: string,
+	reset: boolean
+): Promise<void> {
+	setBusy(loadMoreButton, true, t('Loading...'));
+	packageListLoading = true;
+	if (reset) {
+		loadedItems = [];
+		selectedIds = new Set<string>();
+		loadedOffset = 0;
+		loadedTotal = 0;
+		lastRawPageLength = 0;
+		searchInput.value = '';
+		currentTaskbotPackageEmptyText = '';
+	}
+	renderFileList();
+	setToolStatus(t('Loading outdated packages...'));
+
+	try {
+		const [content, defaults] = await Promise.all([
+			activeRuntime.api.getBotContent(fileId),
+			activeRuntime.api.getDefaultPackageVersions(),
+		]);
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		if (!defaults.size) {
+			currentTaskbotPackageEmptyText = t('No default package versions found.');
+			setToolStatus(currentTaskbotPackageEmptyText, 'error');
+			return;
+		}
+
+		const updates = getAutomationAnywherePackageUpdates(
+			extractAutomationAnywherePackages(content),
+			defaults
+		);
+		loadedItems = updates.map((update) => ({
+			packageName: update.name,
+			packageVersion: update.currentVersion,
+			targetVersion: update.targetVersion,
+		}));
+		selectedIds = new Set(loadedItems.map(getToolItemId));
+		loadedOffset = loadedItems.length;
+		loadedTotal = loadedItems.length;
+		lastRawPageLength = loadedItems.length;
+		currentTaskbotPackageEmptyText = t('All package versions are current.');
+		setSelectedToolPanel(selectedTool);
+		setToolStatus(
+			t('{count} outdated package(s) loaded.', { count: loadedItems.length })
+		);
+	} catch (error) {
+		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
+		currentTaskbotPackageEmptyText =
+			error instanceof Error ? error.message : t('Package list failed.');
+		setToolStatus(currentTaskbotPackageEmptyText, 'error');
+	} finally {
+		if (runtime === activeRuntime && currentTool === selectedTool) {
+			packageListLoading = false;
+			renderFileList();
+			setBusy(loadMoreButton, false, t('Load more'));
+		}
+	}
+}
+
 async function loadCurrentTaskbotPage(reset: boolean): Promise<void> {
 	const activeRuntime = runtime;
 	const context = activeRuntime?.context;
 	const fileId = context?.fileId;
 	const selectedTool = currentTool;
 	if (!activeRuntime || !context || !fileId || !isCurrentTaskbotTool(selectedTool)) return;
+	if (isCurrentTaskbotPackageSelectionMode()) {
+		await loadCurrentTaskbotPackagePage(activeRuntime, selectedTool, fileId, reset);
+		return;
+	}
 
 	setBusy(loadMoreButton, true, t('Loading current bot...'));
 	if (reset) {
@@ -1627,6 +1712,10 @@ function getAutomationAnywherePackageVersion(pkg: AutomationAnywherePackage): st
 	return String(pkg.packageVersion ?? pkg.version ?? pkg.package_version ?? '').trim();
 }
 
+function getAutomationAnywherePackageTargetVersion(pkg: AutomationAnywherePackage): string {
+	return String(pkg.targetVersion ?? '').trim();
+}
+
 function getAutomationAnywherePackageStatus(
 	pkg: AutomationAnywherePackage
 ): AutomationAnywherePackageUsageStatus {
@@ -1672,6 +1761,12 @@ function getToolItemMeta(item: ToolListItem): string {
 	}
 	if (!isAutomationAnywherePackageItem(item)) return getItemMeta(item);
 	const version = getAutomationAnywherePackageVersion(item) || t('unknown');
+	if (isCurrentTaskbotPackageSelectionMode()) {
+		return t('Version {current} to {target}', {
+			current: version,
+			target: getAutomationAnywherePackageTargetVersion(item),
+		});
+	}
 	if (currentTool === 'package-usage') {
 		return t('Version {version} | {status}', {
 			version,
@@ -1691,6 +1786,8 @@ function pruneSelection(): void {
 
 function renderFileList(): void {
 	const currentTaskbotMode = isCurrentTaskbotMode();
+	const packageSelectionMode = isCurrentTaskbotPackageSelectionMode();
+	const currentTaskbotFileMode = currentTaskbotMode && !packageSelectionMode;
 	const packageUsageMode = currentTool === 'package-usage';
 	const packageDetailsName = getPackageDetailsName();
 	const packageDetailsUsageMode = isPackageDetailsUsageMode();
@@ -1707,11 +1804,14 @@ function renderFileList(): void {
 	searchInput.hidden = currentTaskbotMode || Boolean(packageDetailsName);
 	const selectAllLabel = selectAllInput.closest<HTMLElement>('.tools-select-all');
 	if (selectAllLabel) {
-		selectAllLabel.hidden = currentTaskbotMode || packageUsageMode || packageDetailsUsageMode;
+		selectAllLabel.hidden =
+			currentTaskbotFileMode || packageUsageMode || packageDetailsUsageMode;
 	}
 
 	listTitle.textContent =
-		currentTaskbotMode
+		packageSelectionMode
+			? t('Outdated packages')
+			: currentTaskbotMode
 			? t('Current bot')
 			: currentTool === 'copy-files'
 			? t('Copy Files')
@@ -1724,7 +1824,7 @@ function renderFileList(): void {
 						: t('Download Packages');
 	selectedCountText.textContent = packageDetailsUsageMode && packageDetailsName
 		? t('Package {name}', { name: packageDetailsName })
-		: currentTaskbotMode
+		: currentTaskbotFileMode
 		? t('Current bot selected')
 		: t('{selected} selected / {loaded} loaded', {
 				selected: selectedIds.size,
@@ -1732,12 +1832,14 @@ function renderFileList(): void {
 			});
 	fileList.textContent = '';
 
-	if (packageListLoading && isPackageTool() && !loadedItems.length) {
+	if (packageListLoading && (isPackageTool() || packageSelectionMode) && !loadedItems.length) {
 		appendSkeletonRows(fileList, 6, 'package-list');
 	} else if (!packageDetailsUsageMode && !visible.length) {
 		const empty = document.createElement('p');
 		empty.className = 'tools-empty';
-		empty.textContent = currentTaskbotMode
+		empty.textContent = packageSelectionMode
+			? currentTaskbotPackageEmptyText || t('All package versions are current.')
+			: currentTaskbotMode
 			? t('Current bot not found.')
 			: loadedItems.length
 			? t('No matches.')
@@ -1749,9 +1851,9 @@ function renderFileList(): void {
 
 	for (const item of visible) {
 		const id = getToolItemId(item);
-		const row = document.createElement(currentTaskbotMode ? 'div' : 'label');
+		const row = document.createElement(currentTaskbotFileMode ? 'div' : 'label');
 		row.className = 'tool-file-row';
-		row.classList.toggle('is-current-taskbot', currentTaskbotMode);
+		row.classList.toggle('is-current-taskbot', currentTaskbotFileMode);
 		const checkbox = document.createElement('input');
 		checkbox.type = 'checkbox';
 		checkbox.checked = selectedIds.has(id);
@@ -1770,7 +1872,7 @@ function renderFileList(): void {
 		const text = document.createElement('span');
 		text.className = 'tool-file-text';
 		text.append(name, meta);
-		if (currentTaskbotMode) row.append(text);
+		if (currentTaskbotFileMode) row.append(text);
 		else row.append(checkbox, text);
 		fileList.appendChild(row);
 	}
@@ -1824,7 +1926,9 @@ function updateActionBar(): void {
 		currentTool === 'package-usage' ? !usagePackage && !packageDetailsName : count === 0;
 	if (currentTool === 'copy-files') primaryActionButton.textContent = t('Copy {count} file(s)', { count });
 	if (currentTool === 'update-packages') {
-		primaryActionButton.textContent = currentTaskbotMode
+		primaryActionButton.textContent = isCurrentTaskbotPackageSelectionMode()
+			? t('Update {count} package(s)', { count })
+			: currentTaskbotMode
 			? t('Update current bot')
 			: t('Update {count} bot(s)', { count });
 	}
@@ -2269,9 +2373,83 @@ async function loadAllFolderItems(
 	return all;
 }
 
+async function updateCurrentTaskbotPackages(activeRuntime: ToolsRuntime): Promise<void> {
+	const fileId = activeRuntime.context.fileId;
+	if (!fileId) return;
+	const versions = new Map<string, string>();
+	for (const pkg of getSelectedPackages()) {
+		const name = getAutomationAnywherePackageName(pkg);
+		const targetVersion = getAutomationAnywherePackageTargetVersion(pkg);
+		if (name && targetVersion) versions.set(name, targetVersion);
+	}
+	if (!versions.size) return;
+
+	const selectedNames = new Set(versions.keys());
+	const removeUpdatedRows = (): void => {
+		loadedItems = loadedItems.filter(
+			(item) => !selectedNames.has(getToolItemName(item))
+		);
+		selectedIds = new Set<string>();
+		loadedOffset = loadedItems.length;
+		loadedTotal = loadedItems.length;
+		lastRawPageLength = loadedItems.length;
+		currentTaskbotPackageEmptyText = t('All package versions are current.');
+		renderFileList();
+	};
+
+	setBusy(primaryActionButton, true, t('Updating...'));
+	startToolRun(
+		t('Update Packages'),
+		1,
+		t('Updating {count} package(s)...', { count: versions.size })
+	);
+	try {
+		const content = await activeRuntime.api.getBotContent(fileId);
+		const updates = getAutomationAnywherePackageUpdates(
+			extractAutomationAnywherePackages(content),
+			versions
+		);
+		const result = applyPackageVersionsToContent(content, versions);
+		if (!updates.length || !result.changed) {
+			removeUpdatedRows();
+			const message = t('Selected packages are already current.');
+			setToolProgress(1, 1, message);
+			setToolStatus(message);
+			finishToolRun(message, 'info');
+			return;
+		}
+
+		await activeRuntime.api.updateBotContent(fileId, result.content);
+		removeUpdatedRows();
+		const message = t('Updated {count} package(s) in current bot.', {
+			count: updates.length,
+		});
+		appendToolLog(message);
+		setToolProgress(1, 1, message);
+		setToolStatus(message);
+		finishToolRun(message, 'info');
+		try {
+			await browser.tabs.reload(activeRuntime.tabId);
+		} catch {
+			// Successful package writes must not appear as failures.
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : t('Update packages failed.');
+		setToolStatus(message, 'error');
+		finishToolRun(message, 'error');
+	} finally {
+		setBusy(primaryActionButton, false);
+		updateActionBar();
+	}
+}
+
 async function updateSelectedPackages(): Promise<void> {
 	const activeRuntime = runtime;
 	if (!activeRuntime) return;
+	if (isCurrentTaskbotPackageSelectionMode()) {
+		await updateCurrentTaskbotPackages(activeRuntime);
+		return;
+	}
 	const bots = getSelectedFiles();
 	if (!bots.length) return;
 
