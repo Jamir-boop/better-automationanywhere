@@ -1,5 +1,16 @@
 # AGENTS.md
 
+## Feature And Selector Documentation
+
+When adding or changing a feature or external Automation Anywhere selector:
+
+- Update `docs/FEATURE_CHECKLIST.md` with its source, selectors, validation,
+  expected behavior, status, and delete condition.
+- Add or update the corresponding Doctor entry in
+  `src/ts/automation-anywhere-selectors.ts` for every external selector used by
+  the feature.
+- Reuse the same exported selector constant in runtime code and Doctor checks.
+
 ## Firefox Sidebar Opening
 
 Firefox only allows `browser.sidebarAction.open()` from a direct user input

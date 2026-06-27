@@ -122,8 +122,8 @@ Selector source of truth:
   - Source: `src/ts/ui.ts`, `src/styl/editorActionsVariablesTriggers.styl`
   - Setting/id: `customPaletteButtons`
   - Selectors: `editor-palette`, `editor-palette-scroller`, palette actions/variables/triggers
-  - Validate: open taskbot editor and switch Actions, Variables, Triggers.
-  - Expected: compact custom buttons render and active section highlights.
+  - Validate: switch Actions, Variables, Triggers on `/edit`; open private and public taskbots on `/view`.
+  - Expected: compact custom buttons render only on editable taskbots; `/view` keeps native Automation Anywhere palette selectors visible.
   - Status: active
   - Delete condition: Automation Anywhere palette redesign makes buttons redundant.
 
@@ -344,8 +344,8 @@ Selector source of truth:
   - Source: `entrypoints/content.ts`, `src/ts/variable-metadata.ts`
   - Setting/id: implicit taskbot editor feature
   - Selectors: `editor-palette-variables`, `variable-row`, `variable-label`
-  - Validate: open Variables panel in taskbot editor.
-  - Expected: bot content loads once per file and labels update.
+  - Validate: open Variables on private/public taskbots in `/edit` and `/view`.
+  - Expected: bot content loads once per file and labels update under the active Variables header, including the disabled read-only button on `/view`.
   - Status: active
   - Delete condition: variable metadata feature removed.
 

@@ -15,9 +15,8 @@ import {
 	isTextFileUrl,
 } from '../src/ts/automation-anywhere';
 import {
-	ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR,
+	ACTIVE_EDITOR_PALETTE_VARIABLES_SELECTOR,
 	EDITOR_PALETTE_SECTION_SELECTOR,
-	EDITOR_PALETTE_VARIABLES_SELECTOR,
 	FOLDER_REFRESH_SELECTOR,
 	SHARED_COPY_BUTTON_SELECTOR,
 	SHARED_PASTE_BUTTON_SELECTOR,
@@ -309,7 +308,7 @@ function restoreVariableMetadataLabels(root: ParentNode = document): void {
 
 function getActiveVariablesSection(): HTMLElement | null {
 	const button = document.querySelector<HTMLButtonElement>(
-		`${ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR} ${EDITOR_PALETTE_VARIABLES_SELECTOR}`
+		ACTIVE_EDITOR_PALETTE_VARIABLES_SELECTOR
 	);
 	return button?.closest<HTMLElement>(EDITOR_PALETTE_SECTION_SELECTOR) ?? null;
 }

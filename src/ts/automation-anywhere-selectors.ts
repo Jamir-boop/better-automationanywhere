@@ -81,6 +81,8 @@ export const LEGACY_EDITOR_PALETTE_ACTIONS_SELECTOR =
 	'div.editor-palette__accordion button[aria-label="Actions"]';
 export const EDITOR_PALETTE_VARIABLES_SELECTOR =
 	'button[data-path="EditorPalette.section.button"][aria-label="Variables"]';
+export const ACTIVE_EDITOR_PALETTE_VARIABLES_SELECTOR =
+	`${ACTIVE_EDITOR_PALETTE_HEADER_SELECTOR} ${EDITOR_PALETTE_VARIABLES_SELECTOR}`;
 export const EDITOR_PALETTE_TRIGGERS_SELECTOR =
 	'button.editor-palette-section__header-button[data-path="EditorPalette.section.button"][aria-label="Triggers"]';
 export const EDITOR_PALETTE_SEARCH_CANCEL_SELECTOR =
@@ -314,10 +316,10 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		id: 'editor-palette-variables',
 		view: 'taskbot-editor',
 		group: 'taskbot-editor',
-		label: 'Variables palette button',
+		label: 'Active Variables palette button',
 		feature: 'Variable metadata',
-		selector: EDITOR_PALETTE_VARIABLES_SELECTOR,
-		source: 'src/ts/commands.ts',
+		selector: ACTIVE_EDITOR_PALETTE_VARIABLES_SELECTOR,
+		source: 'entrypoints/content.ts',
 		severity: 'optional',
 		status: 'active',
 	},

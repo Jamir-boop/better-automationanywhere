@@ -38,6 +38,19 @@ assert.ok(checkBlocks.length > 10, `registry has ${checkBlocks.length} checks (e
 const ids = checkBlocks.map((block) => block.match(/id:\s*'([^']+)'/)?.[1]).filter(Boolean);
 assert.equal(new Set(ids).size, ids.length, 'registry check ids are unique');
 
+const variableMetadataCheck = checkBlocks.find((block) =>
+	block.includes("id: 'editor-palette-variables'")
+);
+assert.ok(variableMetadataCheck, 'Variable metadata Doctor check exists');
+assert.ok(
+	variableMetadataCheck.includes('selector: ACTIVE_EDITOR_PALETTE_VARIABLES_SELECTOR'),
+	'Variable metadata Doctor check validates active Variables selector'
+);
+assert.ok(
+	variableMetadataCheck.includes("source: 'entrypoints/content.ts'"),
+	'Variable metadata Doctor check points to runtime source'
+);
+
 for (const block of checkBlocks) {
 	const id = block.match(/id:\s*'([^']+)'/)?.[1] ?? 'unknown';
 	for (const field of ['view', 'group', 'label', 'feature', 'selector', 'source', 'severity', 'status']) {
