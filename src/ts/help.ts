@@ -68,7 +68,7 @@ export function getCommandHelp(): Record<string, HelpCommandInfo> {
 	};
 }
 
-export function escapeHelpHtml(value: unknown): string {
+function escapeHelpHtml(value: unknown): string {
 	return String(value).replace(/[&<>"']/g, (char) => {
 		const map: Record<string, string> = {
 			'&': '&amp;',

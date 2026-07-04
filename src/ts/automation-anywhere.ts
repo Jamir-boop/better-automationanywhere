@@ -1,4 +1,4 @@
-export const AUTOMATION_ANYWHERE_URL_RE = /.*automationanywhere\.digital.*/i;
+const AUTOMATION_ANYWHERE_HOSTNAME = 'automationanywhere.digital';
 
 export const AUTOMATION_ANYWHERE_MATCHES = [
 	'*://automationanywhere.digital/*',
@@ -20,8 +20,32 @@ export const AUTOMATION_ANYWHERE_TASK_EDITOR_URL_RE =
 export const AUTOMATION_ANYWHERE_TEXT_FILE_URL_RE =
 	/.*automationanywhere\.digital.*\/(?:bots\/repository\/)?(private|public)\/(?:folders\/[^/?#]+\/)?files\/text\/([^/?#]+)(?:\/(?:edit|view))?(?:[/?#]|$)/i;
 
+function parseAutomationAnywhereUrl(url: unknown): URL | null {
+	if (typeof url !== 'string') return null;
+	try {
+		return new URL(url);
+	} catch {
+		return null;
+	}
+}
+
+function isAutomationAnywhereHostname(hostname: string): boolean {
+	return (
+		hostname === AUTOMATION_ANYWHERE_HOSTNAME ||
+		hostname.endsWith(`.${AUTOMATION_ANYWHERE_HOSTNAME}`)
+	);
+}
+
 export function isAutomationAnywhereUrl(url: unknown): url is string {
-	return typeof url === 'string' && AUTOMATION_ANYWHERE_URL_RE.test(url);
+	const parsed = parseAutomationAnywhereUrl(url);
+	return parsed !== null && isAutomationAnywhereHostname(parsed.hostname);
+}
+
+export function isAutomationAnywhereApiUrl(url: unknown): url is string {
+	const parsed = parseAutomationAnywhereUrl(url);
+	return (
+		parsed?.protocol === 'https:' && isAutomationAnywhereHostname(parsed.hostname)
+	);
 }
 
 function getAutomationAnywhereRoute(url: string): string {
@@ -44,8 +68,15 @@ export interface AutomationAnywherePackageRoute {
 	packageName?: string;
 }
 
-function decodeAutomationAnywhereRoutePart(value: string | undefined): string | undefined {
-	return value ? decodeURIComponent(value) : undefined;
+export function decodeAutomationAnywhereRoutePart(
+	value: string | undefined
+): string | undefined {
+	if (!value) return undefined;
+	try {
+		return decodeURIComponent(value);
+	} catch {
+		return value;
+	}
 }
 
 export function parseAutomationAnywhereTaskEditorRoute(

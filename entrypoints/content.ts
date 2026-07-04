@@ -880,10 +880,11 @@ export default defineContentScript({
 		applyRouteClasses();
 		watchRouteChanges();
 		browser.runtime.onMessage.addListener((message: RuntimeMessage) => {
+			if (message.type === 'GET_AA_AUTH_TOKEN' && !isTopFrame()) return;
 			return handleRuntimeMessage(message);
 		});
 		await applyInitialSettings();
-		startGlobalClipboardWatcher();
+		if (isTopFrame()) startGlobalClipboardWatcher();
 
 		stylesEnabled.watch(() => {
 			void applyStyleClasses();

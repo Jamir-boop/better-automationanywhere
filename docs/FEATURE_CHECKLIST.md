@@ -12,6 +12,7 @@ Selector source of truth:
 - External Automation Anywhere DOM selectors live in `src/ts/automation-anywhere-selectors.ts`.
 - Extension-owned sidepanel selectors, generated ids, classes, and data attributes stay local to their component.
 - Delete rule: do not delete selectors/features until this checklist has a dated manual validation note.
+- Validation format: `Validated: YYYY-MM-DD — browser, Control Room build, result.` Use `Validated: pending — reason` until checked.
 
 ## Core Extension Lifecycle
 
@@ -52,11 +53,11 @@ Selector source of truth:
   - Delete condition: Firefox removes user-action restriction.
 
 - [ ] Route change watcher
-  - Source: `entrypoints/content.ts`
-  - Setting/id: `AA_ROUTE_CHANGED`
+  - Source: `entrypoints/content.ts`, `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/tools.ts`
+  - Setting/id: `AA_ROUTE_CHANGED`, `scheduleActiveTabRefresh`
   - Selectors: route/url based
   - Validate: navigate between Control Room pages without full reload.
-  - Expected: sidepanel tools refresh and page classes update.
+  - Expected: one sidepanel listener set refreshes tools and active health/build state; page classes update.
   - Status: active
   - Delete condition: WXT route/content lifecycle replaces manual watcher.
 
@@ -145,6 +146,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: animation removed or browser performance issue confirmed.
 
+- [ ] Sounds
+  - Source: `src/ts/sounds.ts`
+  - Setting/id: `local:soundsEnabled`
+  - Selectors: `run-button`, `error-modal`, `error-badge-icon`, `done-modal`, `done-badge-icon`
+  - Validate: enable Sounds; click Run; complete one bot and trigger one bot error.
+  - Expected: Run starts immediately while its tone plays; done and error tones play once per result.
+  - Status: active
+  - Delete condition: sound setting removed.
+
 - [ ] Custom background gradient
   - Source: `src/styl/background.styl`, `src/styl/utils.styl`, `entrypoints/content.ts`
   - Setting/id: `bgStyle`, `backgroundColor1`, `backgroundColor3`
@@ -224,6 +234,7 @@ Selector source of truth:
   - Validate: open taskbot page.
   - Expected: Resource Center button hidden.
   - Status: watch
+  - Validated: pending — 0/2 required release validations recorded.
   - Delete condition: selector no longer appears for two release validations.
 
 - [ ] Close button/background tweaks
@@ -245,6 +256,16 @@ Selector source of truth:
   - Expected: palette opens, predictions render, closes cleanly.
   - Status: active
   - Delete condition: command palette removed.
+
+- [ ] Palette commands
+  - Source: `src/ts/commands.ts`, `src/ts/utils.ts`
+  - Setting/id: show Actions, Variables, and Triggers commands
+  - Selectors: `editor-palette-toggle`, `editor-palette-actions`, `editor-palette-variables`, `editor-palette-triggers`, `editor-palette-search-cancel`
+  - Validate: run Actions, Variables, and Triggers commands with palette open and closed, including active search.
+  - Expected: palette opens when needed, selected section activates, and search cancellation remains optional/transient.
+  - Status: watch
+  - Validated: pending — manual Control Room validation required for both watch selectors.
+  - Delete condition: commands stop depending on Automation Anywhere palette controls.
 
 - [ ] Static bot commands
   - Source: `src/ts/commands.ts`, `src/ts/help.ts`
@@ -294,25 +315,25 @@ Selector source of truth:
 ## Clipboard And Action JSON
 
 - [ ] Universal clipboard auto slot
-  - Source: `src/ts/clipboard.ts`, `src/ts/universal-clipboard-storage.ts`
+  - Source: `entrypoints/content.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`, `src/ts/universal-clipboard-storage.ts`
   - Setting/id: `local:universalClipboard`, slot `0`
   - Selectors: `shared-copy-button`, `shared-paste-button`, task editor capability selector
-  - Validate: use native AA shared copy.
-  - Expected: auto slot updates from `globalClipboard` watcher.
+  - Validate: use native AA shared copy on a task editor containing an iframe.
+  - Expected: only the top frame polls `globalClipboard` and updates the auto slot.
   - Status: active
   - Delete condition: AA shared clipboard mechanism removed.
 
 - [ ] Clipboard slots 0 to 3
-  - Source: `entrypoints/sidepanel/main.ts`, `src/ts/clipboard.ts`
+  - Source: `entrypoints/sidepanel/main.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
   - Setting/id: `local:universalClipboardSlot1..3`
   - Selectors: shared copy/paste
-  - Validate: copy selection to each slot, paste each slot.
-  - Expected: correct slot content is pasted with fresh uid.
+  - Validate: copy selection to each slot, paste each slot, and reject malformed non-object clipboard JSON.
+  - Expected: correct slot content is pasted with fresh uid; malformed values do not overwrite slots.
   - Status: active
   - Delete condition: slot UI removed.
 
 - [ ] Export action JSON
-  - Source: `src/ts/commands.ts`, `src/ts/clipboard.ts`
+  - Source: `src/ts/commands.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
   - Setting/id: command `exportActionToClipboard`
   - Selectors: shared copy button
   - Validate: copy an action and run export command.
@@ -321,7 +342,7 @@ Selector source of truth:
   - Delete condition: import/export workflow replaced by tools.
 
 - [ ] Import action JSON
-  - Source: `src/ts/commands.ts`, `entrypoints/sidepanel/main.ts`, `src/ts/clipboard.ts`
+  - Source: `src/ts/commands.ts`, `entrypoints/sidepanel/main.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
   - Setting/id: command `importActionFromJson`, `IMPORT_ACTION_JSON`
   - Selectors: shared paste button
   - Validate: paste valid and invalid JSON into Action JSON field.
@@ -330,7 +351,7 @@ Selector source of truth:
   - Delete condition: workflow replaced by Taskbot JSON tool.
 
 - [ ] Sensitive field cleanup
-  - Source: `src/ts/clipboard.ts`
+  - Source: `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
   - Setting/id: `clearSensitiveFields`
   - Selectors: none
   - Validate: export copied action with blobs/screenshots.
@@ -379,11 +400,11 @@ Selector source of truth:
   - Delete condition: tools panel removed.
 
 - [ ] Copy Files
-  - Source: `entrypoints/sidepanel/tools.ts`
+  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `copy-files`
   - Selectors: none; API/list based
-  - Validate: select files in folder and copy.
-  - Expected: copied file refs stored in extension memory and paste available in other folder on same host.
+  - Validate: select files in a folder containing subfolders, use Load more, and copy.
+  - Expected: only files load, Load more hides after the last page, and copied refs can be pasted in another folder on the same host.
   - Status: active
   - Delete condition: copy-file API unavailable.
 
@@ -406,20 +427,20 @@ Selector source of truth:
   - Delete condition: AA package schema changes beyond repair.
 
 - [ ] Export Bots ZIP
-  - Source: `entrypoints/sidepanel/tools.ts`
+  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `export-bots`, format `zip`
   - Selectors: none; API/content/dependency based
-  - Validate: export taskbot with dependencies and uploaded files.
-  - Expected: ZIP downloads with manifest, metadata, content, package list.
+  - Validate: export a taskbot with dependencies, uploaded files, nested paths, and folder siblings.
+  - Expected: ZIP downloads with manifest, metadata, content, and package list; archive paths contain no `.` or `..` segments and Load more terminates.
   - Status: active
   - Delete condition: export feature replaced by native AA export.
 
 - [ ] Export Bots separate files
-  - Source: `entrypoints/sidepanel/tools.ts`
+  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`
   - Setting/id: tool `export-bots`, format `separate`
   - Selectors: none; API/blob based
-  - Validate: enable legacy mode or choose Separate files.
-  - Expected: selected files download individually.
+  - Validate: choose Separate files; include a name with invalid/trailing or Windows-reserved filename text.
+  - Expected: selected files download individually with safe filenames.
   - Status: active
   - Delete condition: separate export removed.
 
@@ -428,7 +449,7 @@ Selector source of truth:
   - Setting/id: tool `download-packages`
   - Selectors: none; API/package list based
   - Validate: open Packages page, search packages, load more, select packages, download; open package detail page and download package versions.
-  - Expected: first load is capped, search fetches matching package rows, progress updates during fallback scans, package detail page scopes to opened package, missing download URL is reported.
+  - Expected: first load is capped, search fetches matching package rows, progress updates during fallback scans, package detail page scopes to opened package, missing download URL is reported, and valid URLs are reported as started rather than completed.
   - Status: active
   - Delete condition: packages API unavailable.
 

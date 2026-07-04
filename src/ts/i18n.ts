@@ -593,9 +593,9 @@ const ES: Record<string, string> = {
 		'Descargando {count} paquete(s)...',
 	'Skipped: {label} - missing pkgDownloadUrl':
 		'Omitido: {label} - falta pkgDownloadUrl',
-	'download failed': 'descarga fallida',
-	'Download packages done. Downloaded {downloaded}, skipped {skipped}, failed {failed}.':
-		'Descarga de paquetes terminada. Descargados {downloaded}, omitidos {skipped}, fallidos {failed}.',
+	'Download started: {fileName}': 'Descarga iniciada: {fileName}',
+	'Package downloads started. Started {started}, skipped {skipped}.':
+		'Descargas de paquetes iniciadas. Iniciadas {started}, omitidas {skipped}.',
 	'Download packages failed.': 'Descarga de paquetes fallo.',
 	'{count} usage row(s)': '{count} fila(s) de uso',
 	'No usage found for selected package version.':

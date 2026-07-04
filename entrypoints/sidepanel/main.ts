@@ -5,7 +5,11 @@ import {
 	renderJsonWorkbenchSearchTools,
 	type JsonWorkbench,
 } from './json-workbench';
-import { initializeToolsPanel, renderToolsPanel } from './tools';
+import {
+	initializeToolsPanel,
+	renderToolsPanel,
+	scheduleToolsContextRefresh,
+} from './tools';
 import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
 import {
 	setActiveLanguagePreference,
@@ -532,7 +536,7 @@ replaceChildrenFromHtml(app, `
 					<strong>${extensionVersion}</strong>
 				</div>
 				<div id="aboutHelp" class="help-content"></div>
-				<a class="github-link" href="https://github.com/Jamir-boop/automationanywhere-improvements.git" target="_blank" rel="noreferrer" aria-label="${t('GitHub repository')}" title="${t('GitHub repository')}">
+				<a class="github-link" href="https://github.com/Jamir-boop/better-automationanywhere" target="_blank" rel="noreferrer" aria-label="${t('GitHub repository')}" title="${t('GitHub repository')}">
 					<svg aria-hidden="true" viewBox="0 0 24 24">
 						<path d="M12 .5C5.65.5.75 5.65.75 12.02c0 5.1 3.29 9.42 7.86 10.94.58.1.79-.25.79-.56v-2.14c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18.92-.26 1.91-.38 2.9-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.56A11.54 11.54 0 0 0 23.25 12C23.25 5.65 18.35.5 12 .5Z"></path>
 					</svg>
@@ -1733,20 +1737,25 @@ function scheduleBuildCheckerRefresh(): void {
 	}, 250);
 }
 
+function scheduleActiveTabRefresh(): void {
+	scheduleBuildCheckerRefresh();
+	scheduleToolsContextRefresh();
+}
+
 browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 	if (message.type !== 'AA_ROUTE_CHANGED') return;
 	if (sender.tab?.active === false) return;
-	scheduleBuildCheckerRefresh();
+	scheduleActiveTabRefresh();
 });
 
 browser.tabs.onActivated.addListener(() => {
-	scheduleBuildCheckerRefresh();
+	scheduleActiveTabRefresh();
 });
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
 	if (!changeInfo.url && changeInfo.status !== 'complete') return;
 	void browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-		if (tab?.id === tabId) scheduleBuildCheckerRefresh();
+		if (tab?.id === tabId) scheduleActiveTabRefresh();
 	});
 });
 

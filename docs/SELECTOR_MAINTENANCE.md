@@ -16,6 +16,15 @@ Extension-owned selectors can stay local:
 - generated extension UI classes
 - internal test-only selectors
 
+## Validation Records
+
+Record manual checks in `docs/FEATURE_CHECKLIST.md` using one of these lines:
+
+- `Validated: YYYY-MM-DD — browser, Control Room build, result.`
+- `Validated: pending — reason manual validation has not run.`
+
+Only a dated successful manual validation satisfies the selector delete rule.
+
 ## Selector Status
 
 Use these values in `AUTOMATION_ANYWHERE_SELECTOR_CHECKS`:
@@ -47,7 +56,7 @@ export const NEW_FEATURE_SELECTOR = '.automation-anywhere-selector';
 ```
 
 2. Import and use const in runtime code.
-3. Add Doctor check only if selector should be manually validated:
+3. Add Doctor check:
 
 ```ts
 {
@@ -108,16 +117,12 @@ rtk rg "OLD_SELECTOR|old-css-fragment"
 rtk corepack pnpm check:maintenance
 ```
 
-## Known Exception
+## Stylus-Only Exception
 
-Palette toggle selector also exists inline in `src/ts/automation-anywhere.ts`.
-
-Reason: current test loader imports that module through a `data:` URL, so relative selector-registry imports fail there.
-
-If changing palette toggle selector, update both:
-
-- `src/ts/automation-anywhere-selectors.ts`
-- `src/ts/automation-anywhere.ts`
+`button[data-pendo-stashed-aria-label="Open Resource Center"]` lives only in
+`src/styl/taskbot.styl`. Stylus cannot import the TypeScript selector registry,
+so this selector is intentionally excluded from Doctor and tracked manually in
+`docs/FEATURE_CHECKLIST.md`. Do not duplicate it in runtime TypeScript.
 
 ## Doctor Rules
 

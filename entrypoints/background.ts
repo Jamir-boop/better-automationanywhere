@@ -14,6 +14,7 @@ import {
 } from '../src/ts/sidepanel-state';
 import {
 	AUTOMATION_ANYWHERE_MATCHES,
+	isAutomationAnywhereApiUrl,
 	isAutomationAnywhereUrl,
 } from '../src/ts/automation-anywhere';
 import {
@@ -54,6 +55,11 @@ import {
 	stylesEnabled,
 } from '../src/ts/settings';
 import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
+import {
+	extractApiErrorMessage,
+	parseContentDispositionFileName,
+	parseJsonLike,
+} from '../src/ts/automation-anywhere-response';
 
 const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
 const CONTROL_ROOM_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -600,14 +606,6 @@ async function updateNativeOpenSidebarShortcut(
 	}
 }
 
-function parseContentDispositionFileName(disposition: string | null): string | undefined {
-	if (!disposition) return undefined;
-	const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
-	if (encoded) return decodeURIComponent(encoded.replace(/"/g, ''));
-	const plain = disposition.match(/filename="?([^";]+)"?/i)?.[1];
-	return plain ? plain.trim() : undefined;
-}
-
 async function blobToDataUrl(blob: Blob): Promise<string> {
 	const bytes = new Uint8Array(await blob.arrayBuffer());
 	let binary = '';
@@ -617,20 +615,6 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 		binary += String.fromCharCode(...chunk);
 	}
 	return `data:${blob.type || 'application/octet-stream'};base64,${btoa(binary)}`;
-}
-
-function parseJsonLike(value: string): unknown {
-	const trimmed = value.trim();
-	if (!trimmed) return '';
-	try {
-		return JSON.parse(trimmed);
-	} catch {
-		try {
-			return JSON.parse(decodeURIComponent(trimmed));
-		} catch {
-			return trimmed;
-		}
-	}
 }
 
 function getApiRequestTarget(url: string, includeFullUrl = false): Record<string, string> {
@@ -675,23 +659,6 @@ function getApiRequestLogDetails(
 	};
 }
 
-function extractApiErrorMessage(data: unknown): string | null {
-	if (!data || typeof data !== 'object') return null;
-	const record = data as Record<string, unknown>;
-	for (const key of ['message', 'error', 'errorMessage', 'detail']) {
-		if (typeof record[key] === 'string' && record[key]) return record[key];
-	}
-	if (Array.isArray(record.errors) && record.errors.length) {
-		const first = record.errors[0];
-		if (typeof first === 'string') return first;
-		if (first && typeof first === 'object') {
-			const nested = first as Record<string, unknown>;
-			if (typeof nested.message === 'string') return nested.message;
-		}
-	}
-	return null;
-}
-
 async function readApiError(response: Response): Promise<string> {
 	const text = await response.text().catch(() => '');
 	let message = text.trim();
@@ -705,6 +672,9 @@ async function readApiError(response: Response): Promise<string> {
 async function handleApiRequest(
 	message: AutomationAnywhereApiRequestMessage
 ): Promise<AutomationAnywhereApiResponse> {
+	if (!isAutomationAnywhereApiUrl(message.config.url)) {
+		return { ok: false, error: 'Blocked non-Control-Room URL.' };
+	}
 	const requestId = createNonce();
 	const startedAt = Date.now();
 	const method = message.config.method ?? 'GET';

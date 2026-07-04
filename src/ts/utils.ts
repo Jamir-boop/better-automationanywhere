@@ -27,7 +27,7 @@ function reportSelectorFailure(
 	);
 }
 
-export function safeQuery(
+function safeQuery(
 	selector: string,
 	context = '',
 	options: SelectorDebugOptions = {}

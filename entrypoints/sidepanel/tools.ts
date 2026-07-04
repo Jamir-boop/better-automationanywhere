@@ -29,16 +29,23 @@ import {
 } from './json-workbench';
 import { t } from '@/src/ts/i18n';
 import {
+	createDependencyManifestEntry,
+	createMetadataManifestEntry,
 	getAvailableAutomationAnywhereTools,
 	getAutomationAnywherePackageUpdates,
 	getAutomationAnywherePackageUsageStatusFilter,
 	getDefaultTaskbotTool,
+	getMetadataZipPath,
+	hasMoreAutomationAnywhereItems,
 	hasMoreAutomationAnywherePackageUsage,
+	packageMatchesFilter,
+	sanitizeDownloadFileName,
+	splitAutomationPath,
+	type AutomationAnywhereExportManifestEntry,
 	type AutomationAnywhereToolId,
 } from '@/src/ts/automation-anywhere-tools';
 import type {
 	ContentActionResponse,
-	RuntimeMessage,
 	ToolCapabilities,
 } from '@/src/ts/messages';
 type FeedbackSeverity = 'info' | 'warn' | 'error';
@@ -85,23 +92,8 @@ interface ExportMetadataReference {
 	fileName: string;
 }
 
-interface ExportManifestEntry {
-	path: string;
-	newPath: null;
-	contentType: string;
-	metadataForFile: string | null;
-	manualDependencies: string[] | null;
-	scannedDependencies: string[] | null;
-	manualDependenciesNewPaths: string[];
-	scannedDependenciesNewPaths: string[];
-	description: string;
-	author: string;
-	tags: string[];
-	excluded: boolean;
-}
-
 interface ExportManifest {
-	files: ExportManifestEntry[];
+	files: AutomationAnywhereExportManifestEntry[];
 	packages: [];
 	globalValues: [];
 	exportSummary: {
@@ -137,7 +129,6 @@ const PACKAGE_SEARCH_DEBOUNCE_MS = 300;
 const EXPORT_BATCH_SIZE = 20;
 const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
 const CURRENT_TASKBOT_FALLBACK_NAME = 'Current bot';
-const EXPORT_BOTS_LEGACY_MODE_KEY = 'exportBotsLegacyMode';
 const EMPTY_TOOL_CAPABILITIES: ToolCapabilities = {
 	universalClipboard: false,
 };
@@ -219,7 +210,6 @@ let taskbotJsonWorkbench: JsonWorkbench;
 let taskbotJsonSaveButton: HTMLButtonElement;
 let exportPackageListText = '';
 let exportFormat: ExportFormat = 'zip';
-let exportBotsLegacyMode = false;
 let packageUsageItems: AutomationAnywherePackageUsage[] = [];
 let packageUsagePackageKey = '';
 let packageQuery = '';
@@ -449,20 +439,6 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 		void saveTaskbotJson();
 	});
 	resetExportFormatToDefault();
-	browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
-		if (message.type !== 'AA_ROUTE_CHANGED') return;
-		if (sender.tab?.active === false) return;
-		scheduleToolsContextRefresh();
-	});
-	browser.tabs.onActivated.addListener(() => {
-		scheduleToolsContextRefresh();
-	});
-	browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-		if (!changeInfo.url && changeInfo.status !== 'complete') return;
-		void browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-			if (tab?.id === tabId) scheduleToolsContextRefresh();
-		});
-	});
 
 	void refreshToolsContext();
 }
@@ -486,7 +462,8 @@ function clearPackageSearchTimer(): void {
 	packageSearchTimer = null;
 }
 
-function scheduleToolsContextRefresh(): void {
+export function scheduleToolsContextRefresh(): void {
+	if (!options) return;
 	if (refreshToolsContextTimer) clearTimeout(refreshToolsContextTimer);
 	refreshToolsContextTimer = setTimeout(() => {
 		refreshToolsContextTimer = null;
@@ -570,34 +547,14 @@ function handleToolsSearchInput(): void {
 	}, PACKAGE_SEARCH_DEBOUNCE_MS);
 }
 
-function readExportBotsLegacyMode(): boolean {
-	try {
-		const value = window.localStorage.getItem(EXPORT_BOTS_LEGACY_MODE_KEY);
-		return value === 'true' || value === '1';
-	} catch {
-		return false;
-	}
-}
-
-function getDefaultExportFormat(): ExportFormat {
-	return readExportBotsLegacyMode() ? 'separate' : 'zip';
-}
-
 function resetExportFormatToDefault(): void {
-	exportBotsLegacyMode = readExportBotsLegacyMode();
-	exportFormat = getDefaultExportFormat();
+	exportFormat = 'zip';
 	updateExportFormatControls();
 }
 
 function updateExportFormatControls(): void {
-	const zipDisabled = exportBotsLegacyMode;
-	if (zipDisabled && exportFormat === 'zip') exportFormat = 'separate';
 	toolsExportFormatZip.checked = exportFormat === 'zip';
 	toolsExportFormatSeparate.checked = exportFormat === 'separate';
-	toolsExportFormatZip.disabled = zipDisabled;
-	const zipLabel = toolsExportFormatZip.closest('.tools-export-format-option');
-	zipLabel?.classList.toggle('is-disabled', zipDisabled);
-	zipLabel?.setAttribute('aria-disabled', String(zipDisabled));
 }
 
 function updateExportFormatFromInput(): void {
@@ -607,7 +564,7 @@ function updateExportFormatFromInput(): void {
 }
 
 function getActiveExportFormat(): ExportFormat {
-	return exportBotsLegacyMode ? 'separate' : exportFormat;
+	return exportFormat;
 }
 
 function setExportFormatVisible(visible: boolean): void {
@@ -1430,19 +1387,12 @@ function getResponseTotal(response: {
 	return response.page?.totalFilter ?? response.page?.total ?? response.total ?? 0;
 }
 
-function packageMatchesQuery(pkg: AutomationAnywherePackage, query: string): boolean {
-	const name = getAutomationAnywherePackageName(pkg).toLowerCase();
-	return name.includes(query.toLowerCase());
-}
-
-function packageMatchesFilter(
+function automationAnywherePackageMatchesFilter(
 	pkg: AutomationAnywherePackage,
 	query: string,
 	exactName: string | null
 ): boolean {
-	return exactName
-		? getAutomationAnywherePackageName(pkg) === exactName
-		: !query || packageMatchesQuery(pkg, query);
+	return packageMatchesFilter(getAutomationAnywherePackageName(pkg), query, exactName);
 }
 
 function getPackageListCacheKey(
@@ -1486,12 +1436,12 @@ async function refreshPackageListCache(
 		});
 		const responseList = response.list ?? [];
 		const filterIgnored = responseList.some(
-			(item) => !packageMatchesFilter(item, query, exactName)
+			(item) => !automationAnywherePackageMatchesFilter(item, query, exactName)
 		);
 		if (filterIgnored || (exactName && !responseList.length)) return;
 
 		const rawList = responseList.filter((item) =>
-			packageMatchesFilter(item, query, exactName)
+			automationAnywherePackageMatchesFilter(item, query, exactName)
 		);
 		packageListCache.set(cacheKey, rawList);
 		if (
@@ -1538,7 +1488,7 @@ async function scanPackagesFallback(
 		loadedTotal = getResponseTotal(response);
 		packageScanOffset += PAGE_LENGTH;
 		for (const item of rawList) {
-			if (packageMatchesFilter(item, query, exactName)) {
+			if (automationAnywherePackageMatchesFilter(item, query, exactName)) {
 				byId.set(getToolItemId(item), item);
 			}
 		}
@@ -1629,14 +1579,15 @@ async function loadPackagePage(
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		const responseList = response.list ?? [];
 		const filterIgnored = responseList.some(
-			(item) => !packageMatchesFilter(item, packageQuery, packageDetailsName)
+			(item) =>
+				!automationAnywherePackageMatchesFilter(item, packageQuery, packageDetailsName)
 		);
 		if (filterIgnored || (packageDetailsName && reset && !responseList.length)) {
 			await scanPackagesFallback(activeRuntime, selectedTool, packageQuery, packageDetailsName);
 			return;
 		}
 		const rawList = responseList.filter((item) =>
-			packageMatchesFilter(item, packageQuery, packageDetailsName)
+			automationAnywherePackageMatchesFilter(item, packageQuery, packageDetailsName)
 		);
 		lastRawPageLength = responseList.length;
 		const byId = new Map(loadedItems.map((item) => [getToolItemId(item), item]));
@@ -1992,12 +1943,15 @@ function updateActionBar(): void {
 }
 
 function hasMoreItems(): boolean {
-	if (isPackageTool() && loadedTotal > 0) return loadedItems.length < loadedTotal;
-	if (isPackageTool() && packageFallbackScan) return lastRawPageLength >= PAGE_LENGTH;
-	if (isPackageTool()) {
-		return lastRawPageLength >= PACKAGE_PAGE_LENGTH;
-	}
-	return lastRawPageLength >= PAGE_LENGTH || loadedItems.length < loadedTotal;
+	return hasMoreAutomationAnywhereItems({
+		isPackageTool: isPackageTool(),
+		packageFallbackScan,
+		loadedCount: loadedItems.length,
+		loadedTotal,
+		lastRawPageLength,
+		pageLength: PAGE_LENGTH,
+		packagePageLength: PACKAGE_PAGE_LENGTH,
+	});
 }
 
 function getSelectedItems(): ToolListItem[] {
@@ -2631,7 +2585,7 @@ async function exportSelectedFilesSeparately(
 	for (let index = 0; index < files.length; index += 1) {
 		const file = files[index];
 		const fileId = getAutomationAnywhereFileId(file);
-		const fileName = getAutomationAnywhereFileName(file);
+		const fileName = sanitizeDownloadFileName(getAutomationAnywhereFileName(file));
 		setToolProgress(index, files.length, t('Downloading file {count} of {total}: {name}', {
 			count: index + 1,
 			total: files.length,
@@ -2756,9 +2710,8 @@ async function downloadSelectedPackages(): Promise<void> {
 		t('Downloading {count} package(s)...', { count: packages.length })
 	);
 	try {
-		let downloaded = 0;
+		let started = 0;
 		let skipped = 0;
-		let failed = 0;
 
 		for (let index = 0; index < packages.length; index += 1) {
 			const pkg = packages[index];
@@ -2775,21 +2728,10 @@ async function downloadSelectedPackages(): Promise<void> {
 				continue;
 			}
 
-			try {
-				const fileName = getPackageJarFileName(pkg);
-				downloadUrlFile(downloadUrl, fileName);
-				downloaded += 1;
-				appendToolLog(t('Downloaded: {fileName}', { fileName }));
-			} catch (error) {
-				failed += 1;
-				appendToolLog(
-					t('Failed: {name} - {message}', {
-						name: label,
-						message: error instanceof Error ? error.message : t('download failed'),
-					}),
-					'error'
-				);
-			}
+			const fileName = getPackageJarFileName(pkg);
+			downloadUrlFile(downloadUrl, fileName);
+			started += 1;
+			appendToolLog(t('Download started: {fileName}', { fileName }));
 			setToolProgress(index + 1, packages.length, t('Processed {count}/{total}', {
 				count: index + 1,
 				total: packages.length,
@@ -2797,11 +2739,11 @@ async function downloadSelectedPackages(): Promise<void> {
 			if (index < packages.length - 1) await delay(300);
 		}
 
-		const summary = t(
-			'Download packages done. Downloaded {downloaded}, skipped {skipped}, failed {failed}.',
-			{ downloaded, skipped, failed }
-		);
-		const severity = skipped || failed ? 'warn' : 'info';
+		const summary = t('Package downloads started. Started {started}, skipped {skipped}.', {
+			started,
+			skipped,
+		});
+		const severity = skipped ? 'warn' : 'info';
 		setToolStatus(summary, severity);
 		finishToolRun(summary, severity);
 	} catch (error) {
@@ -2903,8 +2845,7 @@ async function saveTaskbotJson(): Promise<void> {
 
 		await activeRuntime.api.updateBotContent(fileId, parsed);
 		taskbotJsonBaseline = normalizeTaskbotJsonContent(parsed);
-		const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-		if (tab?.id) await browser.tabs.reload(tab.id);
+		await browser.tabs.reload(activeRuntime.tabId);
 		setToolStatus(t('Taskbot JSON imported to Control Room.'));
 		void options.addFeedback(
 			'info',
@@ -3110,8 +3051,8 @@ async function createExportArchive(
 ): Promise<Blob> {
 	const { default: JSZip } = await import('jszip');
 	const zip = new JSZip();
-	const fileEntries: ExportManifestEntry[] = [];
-	const metadataEntries: ExportManifestEntry[] = [];
+	const fileEntries: AutomationAnywhereExportManifestEntry[] = [];
+	const metadataEntries: AutomationAnywhereExportManifestEntry[] = [];
 	const scannedDependencies = buildScannedDependencyPaths(items);
 
 	for (const item of items) {
@@ -3120,14 +3061,26 @@ async function createExportArchive(
 		if (!blob) continue;
 		const path = getAutomationAnywherePath(item);
 		addBlobToZip(zip, path, blob);
-		fileEntries.push(createDependencyManifestEntry(item, scannedDependencies.get(id) ?? []));
+		fileEntries.push(
+			createDependencyManifestEntry({
+				path: getAutomationAnywherePath(item),
+				contentType: getFileContentType(item),
+				scannedDependencies: scannedDependencies.get(id) ?? [],
+				tags: getFileTags(item),
+			})
+		);
 	}
 
 	for (const reference of metadataReferences) {
 		const blob = metadataBlobs.get(getMetadataKey(reference));
 		if (!blob) continue;
 		addBlobToZip(zip, getMetadataZipPath(reference), blob);
-		metadataEntries.push(createMetadataManifestEntry(reference));
+		metadataEntries.push(
+			createMetadataManifestEntry(
+				reference,
+				getContentTypeFromPath(reference.fileName)
+			)
+		);
 	}
 
 	const manifest: ExportManifest = {
@@ -3180,43 +3133,6 @@ function buildScannedDependencyPaths(
 	return dependencies;
 }
 
-function createDependencyManifestEntry(
-	item: AutomationAnywhereFile,
-	scannedDependencies: string[]
-): ExportManifestEntry {
-	return {
-		path: getAutomationAnywherePath(item),
-		newPath: null,
-		contentType: getFileContentType(item),
-		metadataForFile: null,
-		manualDependencies: [],
-		scannedDependencies,
-		manualDependenciesNewPaths: [],
-		scannedDependenciesNewPaths: [],
-		description: '',
-		author: '',
-		tags: getFileTags(item),
-		excluded: false,
-	};
-}
-
-function createMetadataManifestEntry(reference: ExportMetadataReference): ExportManifestEntry {
-	return {
-		path: `${reference.botPath}\\${reference.fileName}`,
-		newPath: null,
-		contentType: getContentTypeFromPath(reference.fileName),
-		metadataForFile: reference.botPath,
-		manualDependencies: null,
-		scannedDependencies: null,
-		manualDependenciesNewPaths: [],
-		scannedDependenciesNewPaths: [],
-		description: '',
-		author: '',
-		tags: [],
-		excluded: false,
-	};
-}
-
 function getFileContentType(item: AutomationAnywhereFile): string {
 	return (
 		getAutomationAnywhereFileType(item) ||
@@ -3236,18 +3152,8 @@ function getAutomationAnywherePath(item: AutomationAnywhereFile): string {
 	return getAutomationAnywhereFileName(item);
 }
 
-function splitAutomationPath(path: string): string[] {
-	return path.split(/[\\/]+/).filter(Boolean);
-}
-
 function getPathFileName(path: string): string {
 	return splitAutomationPath(path).pop() || path;
-}
-
-function getMetadataZipPath(reference: ExportMetadataReference): string {
-	const botPath = splitAutomationPath(reference.botPath);
-	const botFileName = botPath.pop() || reference.botPath;
-	return [...botPath, `${botFileName}Metadata`, reference.fileName].join('\\');
 }
 
 function getOptionalString(value: unknown): string | null {
@@ -3281,15 +3187,6 @@ function getPackageLabel(pkg: AutomationAnywherePackage): string {
 	const name = getAutomationAnywherePackageName(pkg) || 'package';
 	const version = getAutomationAnywherePackageVersion(pkg) || 'unknown';
 	return `${name} ${version}`;
-}
-
-function sanitizeDownloadFileName(value: string): string {
-	const sanitized = value
-		.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-		.replace(/\s+/g, ' ')
-		.trim()
-		.replace(/[. ]+$/g, '');
-	return sanitized || 'package';
 }
 
 function getPackageJarFileName(pkg: AutomationAnywherePackage): string {

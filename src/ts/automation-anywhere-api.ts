@@ -4,6 +4,7 @@ import type {
 	ContentActionResponse,
 } from './messages';
 import {
+	decodeAutomationAnywhereRoutePart,
 	parseAutomationAnywherePackageRoute,
 	parseAutomationAnywhereTaskEditorRoute,
 } from './automation-anywhere';
@@ -128,10 +129,6 @@ export interface ActiveAutomationAnywhereContext {
 	tabId: number;
 }
 
-function decodeRouteId(id: string | undefined): string | undefined {
-	return id ? decodeURIComponent(id) : undefined;
-}
-
 export function parseAutomationAnywherePageContext(
 	url: string
 ): AutomationAnywherePageContext {
@@ -181,7 +178,7 @@ export function parseAutomationAnywherePageContext(
 			baseUrl: parsed.origin,
 			hostname: parsed.hostname,
 			pageType: 'private-folder',
-			folderId: decodeRouteId(privateFolder[1]),
+			folderId: decodeAutomationAnywhereRoutePart(privateFolder[1]),
 		};
 	}
 
@@ -194,7 +191,7 @@ export function parseAutomationAnywherePageContext(
 			baseUrl: parsed.origin,
 			hostname: parsed.hostname,
 			pageType: 'public-folder',
-			folderId: decodeRouteId(publicFolder[1]),
+			folderId: decodeAutomationAnywhereRoutePart(publicFolder[1]),
 		};
 	}
 
@@ -491,7 +488,14 @@ export class AutomationAnywhereApi {
 		const filter = params.taskbotsOnly
 			? { operator: 'eq', field: 'type', value: AUTOMATION_ANYWHERE_TASKBOT_TYPE }
 			: params.filesOnly
-				? { operator: 'ne', field: 'type', value: 'application/vnd.aa.folder' }
+				? {
+						operator: 'and',
+						operands: [...AUTOMATION_ANYWHERE_DIRECTORY_TYPES].map((value) => ({
+							operator: 'ne',
+							field: 'type',
+							value,
+						})),
+					}
 				: undefined;
 		const response = await this.request<AutomationAnywhereFolderListResponse>(
 			`/v2/repository/folders/${params.folderId}/list`,

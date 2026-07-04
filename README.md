@@ -4,9 +4,9 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.16.15          | A360 v.40+                       | Chrome / Edge   | Supported |
+| 1.17.0           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
-[Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · Report issue
+[Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
 ------
 
@@ -51,7 +51,7 @@ Open fast command search with `Alt + P`.
 
 Use it to navigate Control Room, manage variables, copy actions, paste actions, export action JSON, import action JSON, and jump to specific bot lines.
 
-https://github.com/Jamir-boop/automationanywhere-improvements/assets/73477811/f7c6eec2-409f-495d-88e3-028e5b6d4593
+https://github.com/Jamir-boop/better-automationanywhere/assets/73477811/f7c6eec2-409f-495d-88e3-028e5b6d4593
 
 ------
 
@@ -182,16 +182,13 @@ Examples:
 ### Requirements
 
 - Automation Anywhere Control Room language must be set to English.
-- Supported browser: Chrome or Edge.
+- Supported browsers: Chrome, Edge, and Firefox.
 - Supported Automation Anywhere version: A360 v.40+.
 
 ### Install from browser store
 
-TODO: Add Chrome Web Store or Edge Add-ons link.
-
-```text
-TODO: Browser store link
-```
+- [Chrome Web Store](https://chromewebstore.google.com/detail/better-aa-developer-exper/kgedphocnonmdjgnnhkljfgmhdnabgho) for Chrome and Edge.
+- [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/better-aa-developer-experience/) for Firefox.
 
 ------
 
@@ -208,18 +205,11 @@ TODO: Browser store link
 
 ## Configuration
 
-TODO: Add screenshots and describe settings page.
+Open the extension sidebar from the toolbar or configured shortcut.
 
-Recommended settings fields:
-
-| Setting                     | Description                                            | Default |
-| --------------------------- | ------------------------------------------------------ | ------- |
-| Enable command palette      | Enables `Alt + P` command launcher                     | On      |
-| Enable universal copy/paste | Enables action copy/paste between Control Rooms        | On      |
-| Enable text area expansion  | Converts supported long fields into wrapped text areas | On      |
-| Enable picker redesign      | Updates action, variable, and trigger picker buttons   | On      |
-| Enable sidebar fixes        | Applies scroll and layout fixes                        | On      |
-| Builder background color    | Custom Bot Builder background color                    | Default |
+- **Config:** shortcuts, sounds, suggestions, keep-alive, language, and debug controls.
+- **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.
+- **Tools:** context-aware Control Room tools; export format appears when Export Bots is selected.
 
 ------
 

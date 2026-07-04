@@ -4,7 +4,7 @@ import {
 	DONE_MODAL_SELECTOR,
 	ERROR_BADGE_ICON_SELECTOR,
 	ERROR_MODAL_SELECTOR,
-	RUN_BUTTON_NAME_SELECTOR,
+	RUN_BUTTON_SELECTOR,
 } from './automation-anywhere-selectors';
 import { debugInfo, debugWarn } from './debug';
 
@@ -145,28 +145,17 @@ function wireRunButton(runButton: HTMLButtonElement): void {
 	if (wiredRunButtons.has(runButton)) return;
 	wiredRunButtons.add(runButton);
 
-	let replaying = false;
 	runButton.addEventListener(
 		'click',
-		(event) => {
-			if (!enabled || !shouldRun() || replaying) {
-				replaying = false;
-				return;
-			}
-
-			event.preventDefault();
-			event.stopImmediatePropagation();
-			void playRunSound().finally(() => {
-				replaying = true;
-				runButton.click();
-			});
+		() => {
+			if (enabled && shouldRun()) void playRunSound();
 		},
 		true
 	);
 }
 
 function captureRunButton(attempts = 5): void {
-	const runButton = document.querySelector<HTMLButtonElement>(RUN_BUTTON_NAME_SELECTOR);
+	const runButton = document.querySelector<HTMLButtonElement>(RUN_BUTTON_SELECTOR);
 	if (runButton) {
 		wireRunButton(runButton);
 		return;

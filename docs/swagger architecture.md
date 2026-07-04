@@ -1,6 +1,6 @@
 # Automation Anywhere Control Room API Architecture for LLM Agents
 
-Source Control Room: `https://aa-se-latam-2.my.automationanywhere.digital/swagger/`
+Source Control Room: `https://tenant.my.automationanywhere.digital/swagger/`
 
 Generated: 2026-06-05
 
@@ -313,7 +313,7 @@ Required safeguards:
 
 ### 9.1 HTTP client behavior
 
-- Base URL: `https://aa-se-latam-2.my.automationanywhere.digital`
+- Base URL: `https://tenant.my.automationanywhere.digital`
 - Add API path exactly as documented.
 - Use JSON request bodies unless endpoint expects binary or vendor media type.
 - Normalize errors into `{ status, code, message, endpoint, requestId }`.

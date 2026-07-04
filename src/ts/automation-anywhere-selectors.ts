@@ -101,7 +101,6 @@ export const EDITOR_TABS_SELECTOR =
 	'.taskbot-editor__toolbar__tabs > .editortabs[role="tablist"][data-path="EditorTabs"]';
 export const RUN_BUTTON_SELECTOR =
 	'button[aria-label="Run"][name="run"], button[name="run"]';
-export const RUN_BUTTON_NAME_SELECTOR = 'button[name="run"]';
 export const RUN_BUTTON_HOST_SELECTOR = '.icon-button, [data-path="IconButton"]';
 export const RUN_BUTTON_PLAY_ICON_SELECTOR = '.rio-icon--icon_play-triangle';
 export const CODE_INPUT_SELECTOR = '[data-path="CodeInput"]';
@@ -344,6 +343,7 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		source: 'src/ts/commands.ts',
 		severity: 'transient',
 		status: 'watch',
+		notes: 'Transient control exists only while palette search is active.',
 	},
 	{
 		id: 'editor-draggable-child',
@@ -372,11 +372,12 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		view: 'taskbot-editor',
 		group: 'taskbot-editor',
 		label: 'Run button',
-		feature: 'Run button style',
+		feature: 'Run button style and sounds',
 		selector: RUN_BUTTON_SELECTOR,
 		source: 'src/ts/run-button-animation.ts',
 		severity: 'optional',
 		status: 'active',
+		notes: 'Also used by src/ts/sounds.ts.',
 	},
 	{
 		id: 'code-input',
@@ -477,6 +478,19 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		triggerHint: 'Run a taskbot that triggers an error to see this modal.',
 	},
 	{
+		id: 'error-badge-icon',
+		view: 'taskbot-editor',
+		group: 'taskbot-transient',
+		label: 'Error badge icon',
+		feature: 'Sounds',
+		selector: ERROR_BADGE_ICON_SELECTOR,
+		source: 'src/ts/sounds.ts',
+		severity: 'transient',
+		status: 'active',
+		requires: 'error-modal',
+		triggerHint: 'Run a taskbot that triggers an error to see this icon.',
+	},
+	{
 		id: 'done-modal',
 		view: 'taskbot-editor',
 		group: 'taskbot-transient',
@@ -488,6 +502,19 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		status: 'active',
 		requires: 'done-modal',
 		triggerHint: 'Run a taskbot to completion to see the done modal.',
+	},
+	{
+		id: 'done-badge-icon',
+		view: 'taskbot-editor',
+		group: 'taskbot-transient',
+		label: 'Done badge icon',
+		feature: 'Sounds',
+		selector: DONE_BADGE_ICON_SELECTOR,
+		source: 'src/ts/sounds.ts',
+		severity: 'transient',
+		status: 'active',
+		requires: 'done-modal',
+		triggerHint: 'Run a taskbot to completion to see this icon.',
 	},
 	{
 		id: 'folder-list',

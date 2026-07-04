@@ -18,6 +18,130 @@ export interface AutomationAnywherePackageUpdate {
 	targetVersion: string;
 }
 
+export interface AutomationAnywhereExportManifestEntry {
+	path: string;
+	newPath: null;
+	contentType: string;
+	metadataForFile: string | null;
+	manualDependencies: string[] | null;
+	scannedDependencies: string[] | null;
+	manualDependenciesNewPaths: string[];
+	scannedDependenciesNewPaths: string[];
+	description: string;
+	author: string;
+	tags: string[];
+	excluded: boolean;
+}
+
+export interface AutomationAnywherePaginationState {
+	isPackageTool: boolean;
+	packageFallbackScan: boolean;
+	loadedCount: number;
+	loadedTotal: number;
+	lastRawPageLength: number;
+	pageLength: number;
+	packagePageLength: number;
+}
+
+const WINDOWS_RESERVED_FILE_NAME_RE =
+	/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+
+export function splitAutomationPath(path: string): string[] {
+	return path
+		.split(/[\\/]+/)
+		.filter((part) => part && part !== '.' && part !== '..');
+}
+
+export function sanitizeDownloadFileName(value: string): string {
+	const sanitized = value
+		.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.replace(/[. ]+$/g, '');
+	if (!sanitized) return 'package';
+	return WINDOWS_RESERVED_FILE_NAME_RE.test(sanitized) ? `_${sanitized}` : sanitized;
+}
+
+export function getMetadataZipPath(reference: {
+	botPath: string;
+	fileName: string;
+}): string {
+	const botPath = splitAutomationPath(reference.botPath);
+	const botFileName = botPath.pop() || 'bot';
+	const metadataFileName = splitAutomationPath(reference.fileName).pop() || 'metadata';
+	return [...botPath, `${botFileName}Metadata`, metadataFileName].join('\\');
+}
+
+export function createDependencyManifestEntry(input: {
+	path: string;
+	contentType: string;
+	scannedDependencies: string[];
+	tags: string[];
+}): AutomationAnywhereExportManifestEntry {
+	return {
+		path: input.path,
+		newPath: null,
+		contentType: input.contentType,
+		metadataForFile: null,
+		manualDependencies: [],
+		scannedDependencies: input.scannedDependencies,
+		manualDependenciesNewPaths: [],
+		scannedDependenciesNewPaths: [],
+		description: '',
+		author: '',
+		tags: input.tags,
+		excluded: false,
+	};
+}
+
+export function createMetadataManifestEntry(
+	reference: { botPath: string; fileName: string },
+	contentType: string
+): AutomationAnywhereExportManifestEntry {
+	return {
+		path: `${reference.botPath}\\${reference.fileName}`,
+		newPath: null,
+		contentType,
+		metadataForFile: reference.botPath,
+		manualDependencies: null,
+		scannedDependencies: null,
+		manualDependenciesNewPaths: [],
+		scannedDependenciesNewPaths: [],
+		description: '',
+		author: '',
+		tags: [],
+		excluded: false,
+	};
+}
+
+export function packageMatchesFilter(
+	packageName: string,
+	query: string,
+	exactName: string | null
+): boolean {
+	return exactName
+		? packageName === exactName
+		: !query || packageName.toLowerCase().includes(query.toLowerCase());
+}
+
+export function hasMoreAutomationAnywhereItems(
+	state: AutomationAnywherePaginationState
+): boolean {
+	if (state.isPackageTool && state.loadedTotal > 0) {
+		return state.loadedCount < state.loadedTotal;
+	}
+	if (state.isPackageTool && state.packageFallbackScan) {
+		return state.lastRawPageLength >= state.pageLength;
+	}
+	if (state.isPackageTool) {
+		return state.lastRawPageLength >= state.packagePageLength;
+	}
+	return (
+		state.lastRawPageLength >= state.pageLength ||
+		state.loadedCount < state.loadedTotal
+	);
+}
+
 export function getAutomationAnywherePackageUpdates(
 	packages: ReadonlyArray<{ name: string; version: string }>,
 	defaultVersions: ReadonlyMap<string, string>
