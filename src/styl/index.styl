@@ -38,6 +38,96 @@
 		outline: 2px solid #000000
 		outline-offset: 2px
 
+@keyframes betterToastIn
+	0%
+		opacity: 0
+		transform: translateX(-20px)
+	100%
+		opacity: 1
+		transform: translateX(0)
+
+#better-aa-toast-host
+	position: fixed
+	top: 50px
+	left: 50%
+	transform: translateX(-50%)
+	z-index: 2147483647
+	pointer-events: none
+	max-width: calc(100vw - 24px)
+
+	.toasttray-toast
+		position: static !important
+		display: block !important
+		margin-bottom: 8px
+		opacity: 0
+		transform: translateX(-20px)
+		animation: betterToastIn 180ms ease-out forwards
+
+	.toast
+		position: relative
+		display: flex
+		gap: 8px
+		align-items: flex-start
+		inline-size: unquote('min(460px, calc(100vw - 24px))') !important
+		max-inline-size: unquote('min(460px, calc(100vw - 24px))') !important
+		width: 300px !important
+		padding: 10px 12px
+		border: 1px solid #664A00 !important
+		border-radius: 4px
+		background: #000000 !important
+		color: #FFFFFF !important
+		box-shadow: 0 8px 24px rgba(0, 0, 0, .95) !important
+		pointer-events: auto
+
+	.toast-content
+		flex: 1 1 auto
+		min-inline-size: 0
+		font-size: 12px
+		line-height: 1.35
+
+	.toast-title
+		font-weight: 700
+		color: #FFFFFF !important
+
+	.toast-message
+		margin-top: 2px
+		color: #A0A0A0 !important
+		word-break: break-word
+
+	.toast-close
+		all: unset
+		box-sizing: border-box
+		flex: 0 0 auto
+		display: inline-flex
+		align-items: center
+		justify-content: center
+		min-width: 20px
+		height: 20px
+		padding: 0 6px
+		border: 1px solid #FFB900 !important
+		border-radius: 4px
+		background: #000000 !important
+		color: #FFB900 !important
+		font-size: 14px
+		font-weight: 700
+		line-height: 1
+		cursor: pointer
+		transition: background-color .15s ease, color .15s ease, border-color .15s ease
+
+		&:hover
+			background: #FFB900 !important
+			color: #000000 !important
+			border-color: #FFB900 !important
+
+		&:focus-visible
+			outline: 2px solid #FFB900
+			outline-offset: 2px
+
+		svg,
+		svg *
+			fill: currentColor !important
+			stroke: currentColor !important
+
 html.better-aa-styles-enabled.better-aa-route-taskbot
 	@import './editorMain.styl'
 	@import './taskbot.styl'

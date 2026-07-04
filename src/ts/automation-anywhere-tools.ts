@@ -53,11 +53,7 @@ export function getAvailableAutomationAnywhereTools(
 ): AutomationAnywhereToolId[] {
 	const tools: AutomationAnywhereToolId[] = [];
 	if (capabilities.universalClipboard) tools.push('universal-clipboard');
-	if (context.pageType === 'private-folder') {
-		tools.push('copy-files', 'update-packages', 'export-bots');
-		return tools;
-	}
-	if (context.pageType === 'public-folder') {
+	if (context.pageType === 'private-folder' || context.pageType === 'public-folder') {
 		tools.push('copy-files', 'update-packages', 'export-bots');
 		return tools;
 	}

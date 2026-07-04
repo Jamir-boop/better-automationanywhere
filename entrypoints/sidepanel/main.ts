@@ -135,25 +135,10 @@ import { replaceChildrenFromHtml } from '@/src/ts/utils';
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root.');
 
-const EXTENSION_LANGUAGE_CACHE_KEY = 'betterAaExtensionLanguage';
-
-function getCachedExtensionLanguage(): LanguagePreference {
-	try {
-		return normalizeExtensionLanguage(localStorage.getItem(EXTENSION_LANGUAGE_CACHE_KEY));
-	} catch {
-		return DEFAULT_EXTENSION_LANGUAGE;
-	}
-}
-
-function cacheExtensionLanguage(language: LanguagePreference): void {
-	try {
-		localStorage.setItem(EXTENSION_LANGUAGE_CACHE_KEY, language);
-	} catch {
-		// Storage cache is best-effort; browser extension storage remains authoritative.
-	}
-}
-
-setActiveLanguagePreference(getCachedExtensionLanguage());
+void (async () => {
+setActiveLanguagePreference(
+	await getExtensionLanguage().catch(() => DEFAULT_EXTENSION_LANGUAGE)
+);
 
 const extensionVersion = browser.runtime.getManifest().version;
 const defaultLoadingImageCss = `url("${browser.runtime.getURL('media/loading.gif' as any)}")`;
@@ -1564,14 +1549,6 @@ async function loadState(): Promise<void> {
 		getStyleValues(),
 	]);
 
-	const cachedLanguage = getCachedExtensionLanguage();
-	cacheExtensionLanguage(language);
-	if (language !== cachedLanguage) {
-		setActiveLanguagePreference(language);
-		window.location.reload();
-		return;
-	}
-
 	stylesInput.checked = styles;
 	soundsInput.checked = sounds;
 	showSuggestionsInput.checked = suggestions;
@@ -1853,7 +1830,6 @@ extensionLanguageSelect.addEventListener('change', () => {
 	) as LanguagePreference;
 	extensionLanguageSelect.value = language;
 	setActiveLanguagePreference(language);
-	cacheExtensionLanguage(language);
 	void sendBackgroundMessage({
 		type: 'SET_EXTENSION_LANGUAGE',
 		language,
@@ -2278,7 +2254,6 @@ forceUnsupportedControlRoomStyles.watch((value) => {
 extensionLanguage.watch((value) => {
 	const language = normalizeExtensionLanguage(value);
 	extensionLanguageSelect.value = language;
-	cacheExtensionLanguage(language);
 });
 debugEnabled.watch((value) => {
 	currentDebugEnabled = value ?? DEFAULT_DEBUG_ENABLED;
@@ -2344,3 +2319,4 @@ sidepanelRequest.watch((value) => {
 initializeToolsPanel({ setStatus, addFeedback });
 void loadState();
 void sidepanelRequest.getValue().then(handleSidepanelRequest);
+})();

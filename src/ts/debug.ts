@@ -109,15 +109,6 @@ export async function debugLog(
 	}
 }
 
-export function debugDebug(
-	source: string,
-	message: string,
-	details?: Record<string, unknown>,
-	options?: DebugOptions
-): Promise<void> {
-	return debugLog('debug', source, message, details, options);
-}
-
 export function debugInfo(
 	source: string,
 	message: string,

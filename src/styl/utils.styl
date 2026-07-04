@@ -1,29 +1,7 @@
-// Global variables
-generalFontSize = 1rem
-normalFontSize = .75rem
-
-
-// Common adjustments for datatable columns, varying by context
-datatableCommonAdjustments(widthValue)
-	.datatable-header-container:not(.modal-form-content .datatable-header-container),
-	.datatable-row:not(.modal-form-content .datatable-row)
-		.datatable-column:nth-child(3):not(.modal-form-content .datatable-column)
-			width: widthValue !important
-		.datatable-column:nth-child(2):not(.modal-form-content .datatable-column)
-			width: 40px !important
-
-
 customLoadingGif()
 	background: var(--better-aa-user-bg, var(--better-aa-loading-image-url))
 	background-size: var(--better-aa-user-bg-size, contain)
 	background-repeat: no-repeat
-
-
-darkGradientBackground()
-	background: radial-gradient(circle, #ff8c002b 20%, transparent 20%), radial-gradient(circle, #8000801c 20%, transparent 20%), radial-gradient(circle, #ff450014 20%, transparent 20%), linear-gradient(45deg, #ff8c0024 0%, #80008038 50%, #ff450003 100%)
-	background-size: 10px 10px, 10px 10px, 10px 10px, auto
-	background-position: 0 0, 5px 5px, 2.5px 2.5px, 0 0
-
 
 customGradientBackground()
 	background:
@@ -36,9 +14,3 @@ customGradientBackground()
 		) !important
 	background-size: 10px 10px, 10px 10px, auto !important
 	background-position: 0 0, 5px 5px, 0 0 !important
-
-
-cursiveCascadiaFont()
-	font-family: Cascadia Code monospace !important
-	font-feature-settings: 'ss01' !important
-	font-style: italic

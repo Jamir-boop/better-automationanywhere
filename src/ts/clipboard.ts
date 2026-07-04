@@ -170,12 +170,6 @@ async function saveGlobalClipboardValueToDefaultSlot(
 	}
 }
 
-export async function saveGlobalClipboardToDefaultSlot(
-	source: string
-): Promise<string | null> {
-	return saveGlobalClipboardValueToDefaultSlot(getGlobalClipboardValue(), source);
-}
-
 export function startGlobalClipboardWatcher(): void {
 	if (globalClipboardWatcherStarted) return;
 	globalClipboardWatcherStarted = true;

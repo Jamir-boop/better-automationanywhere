@@ -65,3 +65,33 @@
 	margin-top -30px !important
 .editor-palette-section__scroller-top
 	background transparent !important
+
+#customActionVariableButtons
+	display: flex
+	width: 100%
+	height: 38px !important
+	background: white
+
+	button
+		all: unset
+		font-size: .85rem
+		font-weight: 300
+		cursor: pointer
+		margin: 4px
+		border-radius: 5px
+		border: 1px solid transparent
+		background-color: transparent
+		color: #3c5e83
+		flex-grow: 1
+		text-align: center
+		transition: background-color .3s
+
+		&:hover
+			background-color: #dae9f3
+
+.buttonToolbarActive
+	border: 1px solid #3c5e83 !important
+	text-shadow: .5px 0 0 #3c5e83, -.01px 0 0 #3c5e83 !important
+
+.editor-palette.g-box-sizing_border-box
+	margin-top: 38px

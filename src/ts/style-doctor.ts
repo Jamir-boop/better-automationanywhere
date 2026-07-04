@@ -13,14 +13,12 @@ import {
 	type AutomationAnywhereSelectorCheck,
 	type AutomationAnywhereSelectorGroup,
 	type AutomationAnywhereSelectorRequirement,
-	type AutomationAnywhereSelectorSeverity,
 	type AutomationAnywhereSelectorStatus,
 } from './automation-anywhere-selectors';
 import { debugInfo, debugWarn } from './debug';
 
 export type StyleDoctorView = 'taskbot-editor' | 'folder-navigation' | 'unsupported';
 export type StyleDoctorResultStatus = 'pass' | 'fail' | 'warn' | 'skip';
-export type StyleDoctorSeverity = AutomationAnywhereSelectorSeverity;
 export type DoctorCheckGroup = AutomationAnywhereSelectorGroup;
 
 export interface StyleDoctorCheck
@@ -54,13 +52,6 @@ export interface DoctorComparisonResult {
 	currentStatus: StyleDoctorResultStatus;
 	delta: 'fixed' | 'regressed' | 'unchanged' | 'new';
 }
-
-export const DOCTOR_CHECK_GROUPS: { key: DoctorCheckGroup; label: string }[] = [
-	{ key: 'general', label: 'General' },
-	{ key: 'taskbot-editor', label: 'Taskbot Editor' },
-	{ key: 'taskbot-transient', label: 'Taskbot Transient' },
-	{ key: 'folder-navigation', label: 'Folder Navigation' },
-];
 
 export const CHECKS: StyleDoctorCheck[] = AUTOMATION_ANYWHERE_SELECTOR_CHECKS.map(
 	({ status, ...check }) => ({ ...check, selectorStatus: status })
@@ -203,10 +194,6 @@ export function runSingleCheck(checkId: string): StyleDoctorCheckResult | null {
 
 export function getChecksForGroup(group: DoctorCheckGroup): StyleDoctorCheck[] {
 	return CHECKS.filter((c) => c.group === group);
-}
-
-export function getChecksForView(view: StyleDoctorView): StyleDoctorCheck[] {
-	return CHECKS.filter((c) => shouldRunCheck(c, view));
 }
 
 export function compareResults(

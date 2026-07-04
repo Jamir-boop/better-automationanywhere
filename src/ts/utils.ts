@@ -46,19 +46,6 @@ export function safeAddClick(
 	if (el) el.addEventListener('click', handler);
 }
 
-export function escapeHtml(value: unknown): string {
-	return String(value).replace(/[&<>"']/g, (char) => {
-		const map: Record<string, string> = {
-			'&': '&amp;',
-			'<': '&lt;',
-			'>': '&gt;',
-			'"': '&quot;',
-			"'": '&#39;',
-		};
-		return map[char];
-	});
-}
-
 // ponytail: extension-owned markup; build DOM manually if validator flags parsing.
 export function htmlToFragment(html: string): DocumentFragment {
 	const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -79,34 +66,6 @@ export function normalizeCommandText(value: unknown): string {
 		.replace(/\s+/g, ' ')
 		.trim()
 		.toLowerCase();
-}
-
-export function waitForElement(
-	selector: string,
-	timeout = 5000,
-	context = '',
-	options: SelectorDebugOptions = {}
-): Promise<Element | null> {
-	return new Promise((resolve) => {
-		const el = document.querySelector(selector);
-		if (el) return resolve(el);
-
-		const observer = new MutationObserver(() => {
-			const found = document.querySelector(selector);
-			if (found) {
-				observer.disconnect();
-				resolve(found);
-			}
-		});
-
-		observer.observe(document.body, { childList: true, subtree: true });
-
-		setTimeout(() => {
-			observer.disconnect();
-			reportSelectorFailure(selector, context, options);
-			resolve(null);
-		}, timeout);
-	});
 }
 
 export async function waitForClipboardJson(

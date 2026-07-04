@@ -3277,16 +3277,6 @@ function getErrorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error || 'request failed');
 }
 
-function stringifyForFeedback(value: unknown): string {
-	if (value === undefined) return '';
-	if (typeof value === 'string') return value;
-	try {
-		return JSON.stringify(value);
-	} catch {
-		return String(value);
-	}
-}
-
 function getPackageLabel(pkg: AutomationAnywherePackage): string {
 	const name = getAutomationAnywherePackageName(pkg) || 'package';
 	const version = getAutomationAnywherePackageVersion(pkg) || 'unknown';

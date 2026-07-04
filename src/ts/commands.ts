@@ -137,7 +137,7 @@ export function scrollToLineNumber(lineNumber: number): void {
 	}, 2000);
 }
 
-export function redirectToPath(targetPath: string): void {
+function redirectToPath(targetPath: string): void {
 	const currentUrl = window.location.href;
 	const pattern = /^(https:\/\/[^/]*\.automationanywhere\.digital)/;
 	const match = currentUrl.match(pattern);
@@ -148,37 +148,6 @@ export function redirectToPath(targetPath: string): void {
 		return;
 	}
 	window.location.href = match[1] + targetPath;
-}
-
-export function redirectToPrivateRepository(): void {
-	redirectToPath('/#/bots/repository/private/');
-}
-export function redirectToPublicRepository(): void {
-	redirectToPath('/#/bots/repository/public/');
-}
-export function redirectToActivityHistorical(): void {
-	redirectToPath('/#/activity/historical/');
-}
-export function redirectToInProgress(): void {
-	redirectToPath('/#/activity/inprogress/');
-}
-export function redirectToAuditLog(): void {
-	redirectToPath('/#/audit');
-}
-export function redirectToAdminUsers(): void {
-	redirectToPath('/#/admin/users/');
-}
-export function redirectToAdminRoles(): void {
-	redirectToPath('/#/admin/roles/');
-}
-export function redirectToAdminDevices(): void {
-	redirectToPath('/#/devices/');
-}
-export function redirectToPackages(): void {
-	redirectToPath('/#/bots/packages/');
-}
-export function redirectToHome(): void {
-	redirectToPath('/#/dashboard/home/overview');
 }
 
 async function openSidebar(

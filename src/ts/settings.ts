@@ -256,10 +256,6 @@ export async function getStylesEnabled(): Promise<boolean> {
 	return (await stylesEnabled.getValue()) ?? DEFAULT_STYLES_ENABLED;
 }
 
-export async function getRunButtonEnabled(): Promise<boolean> {
-	return (await runButton.getValue()) ?? DEFAULT_RUN_BUTTON;
-}
-
 export async function getRunButtonWavesEnabled(): Promise<boolean> {
 	return (await runButtonWaves.getValue()) ?? DEFAULT_RUN_BUTTON_WAVES;
 }
@@ -360,12 +356,6 @@ export function getCommandPaletteShortcutLabel(
 
 export function getOpenSidebarShortcutLabel(value: OpenSidebarShortcut): string {
 	return OPEN_SIDEBAR_SHORTCUT_LABELS[value];
-}
-
-export function getBotExecutionModalPositionLabel(
-	value: BotExecutionModalPosition
-): string {
-	return BOT_EXECUTION_MODAL_POSITION_LABELS[value];
 }
 
 export function getStyleFeatureDefault(key: StyleFeatureKey): boolean {
