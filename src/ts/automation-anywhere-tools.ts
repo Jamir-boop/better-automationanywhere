@@ -8,7 +8,8 @@ export type AutomationAnywhereToolId =
 	| 'export-bots'
 	| 'download-packages'
 	| 'package-usage'
-	| 'taskbot-json';
+	| 'taskbot-json'
+	| 'import-taskbot';
 
 export type AutomationAnywherePackageUsageStatusFilter = 'ENABLED' | 'DISABLED';
 
@@ -171,6 +172,42 @@ export function hasMoreAutomationAnywherePackageUsage(
 	return pageLength > 0 && (total > 0 ? loadedCount < total : pageLength >= requestedLength);
 }
 
+// Control Room caps bot names at 50 characters (create dialog limit).
+const TASKBOT_NAME_MAX_LENGTH = 50;
+
+export function getImportTaskbotBaseName(fileName: string): string {
+	const withoutExtension = fileName.replace(/\.json$/i, '').trim();
+	if (!withoutExtension) return 'imported-taskbot';
+	const sanitized = sanitizeDownloadFileName(withoutExtension);
+	return sanitized.slice(0, TASKBOT_NAME_MAX_LENGTH).trim() || 'imported-taskbot';
+}
+
+export function pickAvailableTaskbotName(
+	baseName: string,
+	existingNames: Iterable<string>
+): string {
+	const taken = new Set<string>();
+	for (const name of existingNames) taken.add(name.trim().toLocaleLowerCase());
+	if (!taken.has(baseName.toLocaleLowerCase())) return baseName;
+	for (let suffix = 1; suffix <= 99; suffix++) {
+		const tail = `_${suffix}`;
+		const candidate =
+			baseName.slice(0, TASKBOT_NAME_MAX_LENGTH - tail.length) + tail;
+		if (!taken.has(candidate.toLocaleLowerCase())) return candidate;
+	}
+	// ponytail: 99 collisions means something else is wrong; timestamp breaks the tie.
+	return `${baseName.slice(0, TASKBOT_NAME_MAX_LENGTH - 14)}_${Date.now()}`;
+}
+
+export function isTaskbotContentJson(value: unknown): value is Record<string, unknown> {
+	return Boolean(
+		value &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Array.isArray((value as Record<string, unknown>).nodes)
+	);
+}
+
 export function getAvailableAutomationAnywhereTools(
 	context: AutomationAnywherePageContext,
 	capabilities: ToolCapabilities = { universalClipboard: false }
@@ -179,6 +216,8 @@ export function getAvailableAutomationAnywhereTools(
 	if (capabilities.universalClipboard) tools.push('universal-clipboard');
 	if (context.pageType === 'private-folder' || context.pageType === 'public-folder') {
 		tools.push('copy-files', 'update-packages', 'export-bots');
+		// Public workspace does not allow direct file creation/edit.
+		if (context.pageType === 'private-folder') tools.push('import-taskbot');
 		return tools;
 	}
 	if (context.pageType === 'private-taskbot') {

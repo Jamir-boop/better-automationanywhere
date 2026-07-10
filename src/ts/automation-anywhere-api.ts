@@ -537,6 +537,28 @@ export class AutomationAnywhereApi {
 		});
 	}
 
+	// Same request the Control Room UI sends from its Create Task Bot dialog.
+	async createTaskbotFile(folderId: string, name: string): Promise<{ id: string }> {
+		const response = await this.request<{ id?: number | string }>(
+			'/v2/repository/files',
+			{
+				method: 'POST',
+				body: {
+					contentType: AUTOMATION_ANYWHERE_TASKBOT_TYPE,
+					name,
+					description: '',
+					parentFolderId: folderId,
+					tags: [{ namespace: 'INTENDED_TARGET', value: 'WINDOWS' }],
+				},
+			}
+		);
+		const id = response?.id;
+		if (id === undefined || id === null || id === '') {
+			throw new Error('Create taskbot response missing id.');
+		}
+		return { id: String(id) };
+	}
+
 	async getDefaultPackageVersions(): Promise<Map<string, string>> {
 		const response = await this.request<{ list?: unknown[]; items?: unknown[] }>(
 			'/v2/packages/package/list',

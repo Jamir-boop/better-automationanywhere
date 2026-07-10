@@ -384,8 +384,34 @@ assert.deepEqual(
 		},
 		{ universalClipboard: false }
 	),
-	['copy-files', 'update-packages', 'export-bots']
+	['copy-files', 'update-packages', 'export-bots', 'import-taskbot']
 );
+
+// Import taskbot helpers
+assert.equal(tools.getImportTaskbotBaseName('My Bot.JSON'), 'My Bot');
+assert.equal(tools.getImportTaskbotBaseName('in<va|id?.json'), 'in_va_id_');
+assert.equal(tools.getImportTaskbotBaseName('.json'), 'imported-taskbot');
+assert.equal(
+	tools.getImportTaskbotBaseName(`${'x'.repeat(80)}.json`).length,
+	50
+);
+
+assert.equal(tools.pickAvailableTaskbotName('Bot', ['Other']), 'Bot');
+assert.equal(tools.pickAvailableTaskbotName('Bot', ['bot']), 'Bot_1');
+assert.equal(tools.pickAvailableTaskbotName('Bot', ['BOT', 'Bot_1 ']), 'Bot_2');
+{
+	const longBase = 'x'.repeat(50);
+	const next = tools.pickAvailableTaskbotName(longBase, [longBase]);
+	assert.equal(next.length, 50);
+	assert.ok(next.endsWith('_1'));
+}
+
+assert.equal(tools.isTaskbotContentJson({ nodes: [] }), true);
+assert.equal(tools.isTaskbotContentJson({ nodes: [], variables: [] }), true);
+assert.equal(tools.isTaskbotContentJson({ variables: [] }), false);
+assert.equal(tools.isTaskbotContentJson([]), false);
+assert.equal(tools.isTaskbotContentJson('{"nodes":[]}'), false);
+assert.equal(tools.isTaskbotContentJson(null), false);
 
 assert.deepEqual(
 	tools.getAvailableAutomationAnywhereTools(

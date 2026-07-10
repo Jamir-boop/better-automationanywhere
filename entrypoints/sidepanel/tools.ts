@@ -35,10 +35,13 @@ import {
 	getAutomationAnywherePackageUpdates,
 	getAutomationAnywherePackageUsageStatusFilter,
 	getDefaultTaskbotTool,
+	getImportTaskbotBaseName,
 	getMetadataZipPath,
 	hasMoreAutomationAnywhereItems,
 	hasMoreAutomationAnywherePackageUsage,
+	isTaskbotContentJson,
 	packageMatchesFilter,
+	pickAvailableTaskbotName,
 	sanitizeDownloadFileName,
 	splitAutomationPath,
 	type AutomationAnywhereExportManifestEntry,
@@ -204,6 +207,9 @@ let toolsFinishSummary: HTMLElement;
 let toolsFinishLog: HTMLElement;
 let toolsFinishClose: HTMLButtonElement;
 let taskbotSection: HTMLElement;
+let importTaskbotSection: HTMLElement;
+let importTaskbotFileInput: HTMLInputElement;
+let importTaskbotRunButton: HTMLButtonElement;
 let taskbotJson: HTMLTextAreaElement;
 let taskbotJsonMeta: HTMLElement;
 let taskbotJsonWorkbench: JsonWorkbench;
@@ -247,7 +253,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						</div>
 						<div>
 							<dt>${t('Folder view')}</dt>
-							<dd>${t('Copy Files, Update Packages, Export Bots')}</dd>
+							<dd>${t('Copy Files, Update Packages, Export Bots, Import Taskbot')}</dd>
 						</div>
 						<div>
 							<dt>${t('Packages page')}</dt>
@@ -352,6 +358,17 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				</div>
 			</section>
 
+			<section id="importTaskbotSection" class="panel-section" hidden>
+				<div class="section-heading-row">
+					<h2>${t('Import Taskbot')}</h2>
+				</div>
+				<p class="inline-hint">${t('Creates a new taskbot in the current folder from a taskbot JSON file. Existing bots are never overwritten.')}</p>
+				<input id="importTaskbotFile" type="file" accept=".json,application/json" aria-label="${t('Taskbot JSON file')}">
+				<div class="button-grid">
+					<button id="importTaskbotRun" type="button" disabled title="${t('Create a new taskbot in this folder from a JSON file.')}">${t('Import to current folder')}</button>
+				</div>
+			</section>
+
 		</section>
 	`;
 }
@@ -437,6 +454,15 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	});
 	taskbotJsonSaveButton.addEventListener('click', () => {
 		void saveTaskbotJson();
+	});
+	importTaskbotSection = getRequiredElement('#importTaskbotSection');
+	importTaskbotFileInput = getRequiredElement<HTMLInputElement>('#importTaskbotFile');
+	importTaskbotRunButton = getRequiredElement<HTMLButtonElement>('#importTaskbotRun');
+	importTaskbotFileInput.addEventListener('change', () => {
+		importTaskbotRunButton.disabled = !importTaskbotFileInput.files?.length;
+	});
+	importTaskbotRunButton.addEventListener('click', () => {
+		void importTaskbotFromFile();
 	});
 	resetExportFormatToDefault();
 
@@ -811,6 +837,7 @@ function setToolPanelHidden(panel: HTMLElement, hidden: boolean): void {
 function setSelectedToolPanel(tool: ToolId | null): void {
 	setToolPanelHidden(universalClipboardSection, tool !== 'universal-clipboard');
 	setToolPanelHidden(taskbotSection, tool !== 'taskbot-json');
+	setToolPanelHidden(importTaskbotSection, tool !== 'import-taskbot');
 	setToolPanelHidden(fileSection, !isListTool(tool));
 	setExportFormatVisible(tool === 'export-bots');
 }
@@ -1042,6 +1069,7 @@ function getToolLabel(tool: ToolId): string {
 	if (tool === 'export-bots') return t('Export Bots');
 	if (tool === 'download-packages') return t('Download Packages');
 	if (tool === 'package-usage') return t('Package Usage');
+	if (tool === 'import-taskbot') return t('Import Taskbot');
 	return t('Taskbot JSON');
 }
 
@@ -1052,6 +1080,7 @@ function getToolActionHelp(tool: ToolId): string {
 	if (tool === 'export-bots') return t('Export selected files as a ZIP or separate downloads.');
 	if (tool === 'download-packages') return t('Download packages from this page.');
 	if (tool === 'package-usage') return t('Find bots using selected package version.');
+	if (tool === 'import-taskbot') return t('Create a new taskbot in this folder from a JSON file.');
 	return t('Load and edit raw taskbot JSON.');
 }
 
@@ -1128,6 +1157,11 @@ async function selectTool(tool: ToolId): Promise<void> {
 	setSelectedToolPanel(tool);
 
 	if (tool === 'universal-clipboard') return;
+
+	if (tool === 'import-taskbot') {
+		importTaskbotRunButton.disabled = !importTaskbotFileInput.files?.length;
+		return;
+	}
 
 	if (tool === 'taskbot-json') {
 		await loadTaskbotJson();
@@ -2861,6 +2895,98 @@ async function saveTaskbotJson(): Promise<void> {
 		);
 	} catch (error) {
 		setToolStatus(error instanceof Error ? error.message : t('Taskbot JSON import failed.'), 'error');
+	}
+}
+
+async function loadFolderFileNames(
+	activeRuntime: ToolsRuntime,
+	folderId: string
+): Promise<string[]> {
+	const names: string[] = [];
+	let offset = 0;
+	// ponytail: 50 pages x 200 = 10k entries; raise if real folders exceed it.
+	for (let page = 0; page < 50; page++) {
+		const response = await activeRuntime.api.listFolderContents({
+			folderId,
+			offset,
+			length: PAGE_LENGTH,
+		});
+		const list = response.list ?? [];
+		for (const file of list) names.push(getAutomationAnywhereFileName(file));
+		if (list.length < PAGE_LENGTH) break;
+		offset += PAGE_LENGTH;
+	}
+	return names;
+}
+
+async function importTaskbotFromFile(): Promise<void> {
+	const activeRuntime = runtime;
+	const folderId = getCurrentFolderId();
+	if (!activeRuntime || !folderId || currentTool !== 'import-taskbot') return;
+
+	const file = importTaskbotFileInput.files?.[0];
+	if (!file) {
+		setToolStatus(t('Choose a taskbot JSON file first.'), 'error');
+		return;
+	}
+
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(await file.text());
+	} catch (error) {
+		setToolStatus(error instanceof Error ? error.message : t('Invalid JSON.'), 'error');
+		return;
+	}
+	if (!isTaskbotContentJson(parsed)) {
+		setToolStatus(
+			t('Not taskbot content JSON. Expected an object with a nodes array.'),
+			'error'
+		);
+		return;
+	}
+
+	const baseName = getImportTaskbotBaseName(file.name);
+	setBusy(importTaskbotRunButton, true, t('Importing...'));
+	try {
+		const existingNames = await loadFolderFileNames(activeRuntime, folderId);
+		const finalName = pickAvailableTaskbotName(baseName, existingNames);
+		const created = await activeRuntime.api.createTaskbotFile(folderId, finalName);
+		await activeRuntime.api.updateBotContent(created.id, parsed);
+		await refreshAutomationAnywhereFolderList(activeRuntime.tabId);
+		importTaskbotFileInput.value = '';
+		setToolStatus(
+			finalName === baseName
+				? t('Imported {name}.', { name: finalName })
+				: t('Name taken. Imported as {name}.', { name: finalName })
+		);
+		void options.addFeedback(
+			'info',
+			'tools',
+			t('Taskbot imported to Control Room.'),
+			{
+				tool: 'import-taskbot',
+				folderId,
+				fileId: created.id,
+				name: finalName,
+				renamed: finalName !== baseName,
+			},
+			{ keepDetails: true, debugOnly: true }
+		);
+	} catch (error) {
+		setToolStatus(error instanceof Error ? error.message : t('Import failed.'), 'error');
+		void options.addFeedback(
+			'error',
+			'tools',
+			t('Taskbot import failed.'),
+			{ tool: 'import-taskbot', folderId, error },
+			{ keepDetails: true }
+		);
+	} finally {
+		setBusy(
+			importTaskbotRunButton,
+			!importTaskbotFileInput.files?.length,
+			t('Import to current folder')
+		);
 	}
 }
 

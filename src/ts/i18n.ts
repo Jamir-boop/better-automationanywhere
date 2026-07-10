@@ -392,6 +392,24 @@ const ES: Record<string, string> = {
 		'Portapapeles universal, JSON de taskbot, Actualizar paquetes, Exportar bots',
 	'Copy Files, Update Packages, Export Bots':
 		'Copiar archivos, Actualizar paquetes, Exportar bots',
+	'Copy Files, Update Packages, Export Bots, Import Taskbot':
+		'Copiar archivos, Actualizar paquetes, Exportar bots, Importar taskbot',
+	'Import Taskbot': 'Importar Taskbot',
+	'Create a new taskbot in this folder from a JSON file.':
+		'Crea un nuevo taskbot en esta carpeta desde un archivo JSON.',
+	'Creates a new taskbot in the current folder from a taskbot JSON file. Existing bots are never overwritten.':
+		'Crea un nuevo taskbot en la carpeta actual desde un archivo JSON de taskbot. Nunca sobrescribe bots existentes.',
+	'Taskbot JSON file': 'Archivo JSON de taskbot',
+	'Import to current folder': 'Importar a carpeta actual',
+	'Choose a taskbot JSON file first.': 'Primero elige un archivo JSON de taskbot.',
+	'Not taskbot content JSON. Expected an object with a nodes array.':
+		'No es JSON de contenido de taskbot. Se espera un objeto con un array nodes.',
+	'Importing...': 'Importando...',
+	'Imported {name}.': 'Importado {name}.',
+	'Name taken. Imported as {name}.': 'Nombre ocupado. Importado como {name}.',
+	'Import failed.': 'Importacion fallida.',
+	'Taskbot imported to Control Room.': 'Taskbot importado a Control Room.',
+	'Taskbot import failed.': 'Importacion de taskbot fallida.',
 	'Download Packages, Package Usage':
 		'Descargar paquetes, Uso de paquetes',
 	Files: 'Archivos',
