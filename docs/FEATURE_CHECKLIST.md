@@ -379,6 +379,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: feature removed.
 
+- [ ] Variable metadata revalidation
+  - Source: `entrypoints/content.ts`
+  - Setting/id: `VARIABLE_METADATA_TTL_MS`
+  - Selectors: variable row/label selectors
+  - Validate: toggle input/output without rename; rename a variable; save taskbot JSON via tool; paste actions from clipboard.
+  - Expected: arrows/labels update within ~10s; no duplicated variable names after palette re-render.
+  - Status: active
+  - Delete condition: metadata source becomes push-based/reliable.
+
 - [ ] Missing metadata retry
   - Source: `entrypoints/content.ts`
   - Setting/id: retry counter/signature

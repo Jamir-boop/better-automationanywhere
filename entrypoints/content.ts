@@ -136,7 +136,13 @@ let variableMetadataMissingSignature: string | null = null;
 let variableMetadataExhaustedSignature: string | null = null;
 let variableMetadataMissingRetryCount = 0;
 let variableMetadataRetryTimer: ReturnType<typeof setTimeout> | undefined;
-const variableMetadataCache = new Map<string, Promise<VariableMetadataLookup | null>>();
+// ponytail: 10s stale-while-revalidate; tune if Control Room write lag proves longer.
+const VARIABLE_METADATA_TTL_MS = 10_000;
+interface VariableMetadataCacheEntry {
+	promise: Promise<VariableMetadataLookup | null>;
+	fetchedAt: number;
+}
+const variableMetadataCache = new Map<string, VariableMetadataCacheEntry>();
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -347,7 +353,9 @@ async function loadVariableMetadata(
 	baseUrl: string
 ): Promise<VariableMetadataLookup | null> {
 	const existing = variableMetadataCache.get(fileId);
-	if (existing) return existing;
+	if (existing && Date.now() - existing.fetchedAt <= VARIABLE_METADATA_TTL_MS) {
+		return existing.promise;
+	}
 
 	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
 	if (!authToken) {
@@ -373,7 +381,9 @@ async function loadVariableMetadata(
 			return lookup;
 		})
 		.catch((error) => {
-			variableMetadataCache.delete(fileId);
+			if (variableMetadataCache.get(fileId)?.promise === promise) {
+				variableMetadataCache.delete(fileId);
+			}
 			void debugWarn(
 				'variable-metadata',
 				'Variable metadata load failed.',
@@ -384,7 +394,7 @@ async function loadVariableMetadata(
 		})
 		.finally(scheduleVariableMetadataSync);
 
-	variableMetadataCache.set(fileId, promise);
+	variableMetadataCache.set(fileId, { promise, fetchedAt: Date.now() });
 	return promise;
 }
 
@@ -469,11 +479,21 @@ function applyVariableMetadataLabels(
 		}
 		appliedCount += 1;
 
-		if (!label.hasAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR)) {
+		const normalizedRowName = (rowName ?? '').replace(/\s+/g, ' ').trim();
+		const stashedOriginal = label.getAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR);
+		if (stashedOriginal === null) {
 			label.setAttribute(
 				VARIABLE_METADATA_ORIGINAL_TEXT_ATTR,
 				getLabelTextElement(label).textContent ?? ''
 			);
+		} else if (
+			normalizedRowName &&
+			stashedOriginal.replace(/\s+/g, ' ').trim().toLocaleLowerCase() !==
+				normalizedRowName.toLocaleLowerCase()
+		) {
+			// Row was re-rendered under a different variable name; stale stash would
+			// restore the old name and show duplicates.
+			label.setAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR, normalizedRowName);
 		}
 
 		const textElement = getLabelTextElement(label);
