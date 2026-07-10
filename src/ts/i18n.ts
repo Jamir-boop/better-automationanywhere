@@ -388,12 +388,10 @@ const ES: Record<string, string> = {
 	'Taskbot editor': 'Editor de taskbot',
 	'Folder view': 'Vista de carpeta',
 	'Packages page': 'Pagina de paquetes',
-	'Universal Clipboard, Taskbot JSON, Update Packages, Export Bots':
-		'Portapapeles universal, JSON de taskbot, Actualizar paquetes, Exportar bots',
-	'Copy Files, Update Packages, Export Bots':
-		'Copiar archivos, Actualizar paquetes, Exportar bots',
-	'Copy Files, Update Packages, Export Bots, Import Taskbot':
-		'Copiar archivos, Actualizar paquetes, Exportar bots, Importar taskbot',
+	'Universal Clipboard, Taskbot JSON, Update Packages, Export Bots/Files':
+		'Portapapeles universal, JSON de taskbot, Actualizar paquetes, Exportar bots/archivos',
+	'Copy Files, Update Packages, Export Bots/Files, Import Taskbot':
+		'Copiar archivos, Actualizar paquetes, Exportar bots/archivos, Importar taskbot',
 	'Import Taskbot': 'Importar Taskbot',
 	'Create a new taskbot in this folder from a JSON file.':
 		'Crea un nuevo taskbot en esta carpeta desde un archivo JSON.',
@@ -441,7 +439,7 @@ const ES: Record<string, string> = {
 	'Taskbot JSON': 'JSON de taskbot',
 	'Copy Files': 'Copiar archivos',
 	'Update Packages': 'Actualizar paquetes',
-	'Export Bots': 'Exportar bots',
+	'Export Bots/Files': 'Exportar bots/archivos',
 	'Download Packages': 'Descargar paquetes',
 	'Package Usage': 'Uso de paquetes',
 	'Use saved AA clipboard slots.': 'Usa espacios guardados del portapapeles AA.',

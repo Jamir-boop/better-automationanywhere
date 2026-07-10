@@ -493,7 +493,7 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `import-taskbot`, `createTaskbotFile` (`POST /v2/repository/files`)
   - Selectors: none; API/content based
-  - Validate: on private folder pick a valid taskbot JSON and import; import same file again; import invalid JSON and non-taskbot JSON.
+  - Validate: on private folder pick a valid taskbot JSON and import; import same file again; import invalid JSON and non-taskbot JSON; select an extensionless exported file (imports when valid JSON).
   - Expected: new bot created in current folder and folder refreshes; duplicate name auto-suffixes `_1` with info status; invalid/non-taskbot JSON rejected with error; tool absent on public folders.
   - Status: active
   - Delete condition: create-file endpoint removed or native import covers JSON.

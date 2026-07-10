@@ -249,11 +249,11 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 					<dl>
 						<div>
 							<dt>${t('Taskbot editor')}</dt>
-							<dd>${t('Universal Clipboard, Taskbot JSON, Update Packages, Export Bots')}</dd>
+							<dd>${t('Universal Clipboard, Taskbot JSON, Update Packages, Export Bots/Files')}</dd>
 						</div>
 						<div>
 							<dt>${t('Folder view')}</dt>
-							<dd>${t('Copy Files, Update Packages, Export Bots, Import Taskbot')}</dd>
+							<dd>${t('Copy Files, Update Packages, Export Bots/Files, Import Taskbot')}</dd>
 						</div>
 						<div>
 							<dt>${t('Packages page')}</dt>
@@ -363,7 +363,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 					<h2>${t('Import Taskbot')}</h2>
 				</div>
 				<p class="inline-hint">${t('Creates a new taskbot in the current folder from a taskbot JSON file. Existing bots are never overwritten.')}</p>
-				<input id="importTaskbotFile" type="file" accept=".json,application/json" aria-label="${t('Taskbot JSON file')}">
+				<input id="importTaskbotFile" type="file" aria-label="${t('Taskbot JSON file')}">
 				<div class="button-grid">
 					<button id="importTaskbotRun" type="button" disabled title="${t('Create a new taskbot in this folder from a JSON file.')}">${t('Import to current folder')}</button>
 				</div>
@@ -1066,7 +1066,7 @@ function getToolLabel(tool: ToolId): string {
 	if (tool === 'universal-clipboard') return t('Universal Clipboard');
 	if (tool === 'copy-files') return t('Copy Files');
 	if (tool === 'update-packages') return t('Update Packages');
-	if (tool === 'export-bots') return t('Export Bots');
+	if (tool === 'export-bots') return t('Export Bots/Files');
 	if (tool === 'download-packages') return t('Download Packages');
 	if (tool === 'package-usage') return t('Package Usage');
 	if (tool === 'import-taskbot') return t('Import Taskbot');
@@ -1803,7 +1803,7 @@ function renderFileList(): void {
 			: currentTool === 'update-packages'
 				? t('Update Packages')
 				: currentTool === 'export-bots'
-					? t('Export Bots')
+					? t('Export Bots/Files')
 					: packageUsageMode
 						? t('Package Usage')
 						: t('Download Packages');
@@ -2572,7 +2572,7 @@ async function exportSelectedBots(): Promise<void> {
 	try {
 		if (getActiveExportFormat() === 'zip') {
 			startToolRun(
-				t('Export Bots'),
+				t('Export Bots/Files'),
 				5,
 				t('Creating ZIP export for {count} file(s). Do not close sidepanel.', {
 					count: files.length,
@@ -2588,7 +2588,7 @@ async function exportSelectedBots(): Promise<void> {
 			}
 		} else {
 			startToolRun(
-				t('Export Bots'),
+				t('Export Bots/Files'),
 				files.length,
 				t('Exporting {count} file(s). Do not close sidepanel.', {
 					count: files.length,
