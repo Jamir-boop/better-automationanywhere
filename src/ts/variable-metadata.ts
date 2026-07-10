@@ -84,17 +84,25 @@ function getVariables(content: unknown): unknown[] {
 	return content.variables;
 }
 
-// Matches $var$, $list[0]$, $dict{key}$, and the inner var of $list[$i$]$.
-// ponytail: regex heuristic; extend if AA adds reference syntax.
-const VARIABLE_REFERENCE_RE = /\$([A-Za-z_][A-Za-z0-9_\-]*)(?=[$\[{])/g;
+// Mirrors Control Room's expression tokenizer: name = WORD_PATTERN
+// [^\[\]{}$.:"]+ ending at one of $ [ { . : — covers $var$, $list[0]$,
+// $dict{key}$, $var.Number:toString$, and the inner var of $list[$i$]$.
+// ponytail: regex heuristic (CR uses a full parser); extra junk matches
+// are harmless since only declared names are compared.
+const VARIABLE_REFERENCE_RE = /\$([^\[\]{}$.:"]+)(?=[$\[{.:])/g;
 
 export function collectUsedVariableNames(content: unknown): Set<string> {
 	const used = new Set<string>();
+	const addName = (value: unknown): void => {
+		if (typeof value !== 'string') return;
+		const name = collapseWhitespace(value);
+		if (name) used.add(name.toLocaleLowerCase());
+	};
 
 	const visit = (value: unknown): void => {
 		if (typeof value === 'string') {
 			for (const match of value.matchAll(VARIABLE_REFERENCE_RE)) {
-				used.add(match[1].toLocaleLowerCase());
+				addName(match[1]);
 			}
 			return;
 		}
@@ -104,8 +112,13 @@ export function collectUsedVariableNames(content: unknown): Set<string> {
 		}
 		if (!isRecord(value)) return;
 		if (value.objectTypeName === 'VARIABLE' && typeof value.string === 'string') {
-			const name = collapseWhitespace(value.string);
-			if (name) used.add(name.toLocaleLowerCase());
+			addName(value.string);
+		}
+		// CR value shapes: {type: 'VARIABLE', variableName} and
+		// {type: 'VARIABLE_MAP', variableMapNames: [...]}.
+		addName(value.variableName);
+		if (Array.isArray(value.variableMapNames)) {
+			value.variableMapNames.forEach(addName);
 		}
 		for (const child of Object.values(value)) visit(child);
 	};
@@ -126,7 +139,11 @@ function createVariableMetadata(
 	const name = readText(record.name);
 	if (!name) return null;
 
-	const unused = !usedNames.has(name.toLocaleLowerCase());
+	// Control Room parity: output and workItem variables are never unused.
+	const unused =
+		record.output !== true &&
+		!record.workItem &&
+		!usedNames.has(name.toLocaleLowerCase());
 	const prefix =
 		`${record.output === true ? '\u2191' : ''}${record.input === true ? '\u2193' : ''}`;
 	const segments = [`${prefix}${name}${unused ? ` ${unusedBadge}` : ''}`];

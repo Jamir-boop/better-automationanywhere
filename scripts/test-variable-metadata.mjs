@@ -289,6 +289,48 @@ assert.equal(
 	assert.ok(mod.findVariableMetadata(esLookup, 'iOrphan').label.includes('(sin uso)'));
 }
 
+// Method-call expressions, returnTo variableName, variableMapNames, and
+// Control Room parity exemptions (output/workItem never unused).
+{
+	const content = {
+		variables: [
+			{ name: 'iNumMinScore', input: true },
+			{ name: 'oStrEstado' },
+			{ name: 'mapped' },
+			{ name: 'oStrNeverRef', output: true },
+			{ name: 'wiItem', workItem: {} },
+			{ name: 'iDead', input: true },
+		],
+		nodes: [
+			{
+				attributes: [
+					{
+						value: {
+							type: 'STRING',
+							expression: '-MinScore $iNumMinScore.Number:toString$',
+						},
+					},
+					{ value: { type: 'VARIABLE_MAP', variableMapNames: ['Mapped'] } },
+				],
+				returnTo: { type: 'VARIABLE', variableName: 'oStrEstado' },
+			},
+		],
+	};
+
+	const used = mod.collectUsedVariableNames(content);
+	assert.ok(used.has('inumminscore'));
+	assert.ok(used.has('ostrestado'));
+	assert.ok(used.has('mapped'));
+
+	const lookup = mod.extractVariableMetadataLookup(content);
+	assert.equal(mod.findVariableMetadata(lookup, 'iNumMinScore').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'oStrEstado').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'mapped').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'oStrNeverRef').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'wiItem').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'iDead').unused, true);
+}
+
 // References inside the variables array itself do not count as usage.
 {
 	const content = {

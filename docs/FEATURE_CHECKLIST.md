@@ -392,8 +392,8 @@ Selector source of truth:
   - Source: `src/ts/variable-metadata.ts`, `entrypoints/content.ts`, `src/styl/taskbot.styl`
   - Setting/id: `collectUsedVariableNames`, class `better-aa-variable-metadata-unused`
   - Selectors: variable row/label selectors
-  - Validate: bot with one variable unreferenced in code (input/output flags do not count as usage); then reference it and wait for revalidation.
-  - Expected: unreferenced variable row is greyed with `(unused)` badge and tooltip; badge clears within ~10s after a reference is added.
+  - Validate: bot with one variable unreferenced in code; then reference it and wait for revalidation. Include `$var.Method:call$` expressions and assignment targets.
+  - Expected: unreferenced variable row is greyed with `(unused)` badge and tooltip; badge clears within ~10s after a reference is added; output and workItem variables are never flagged (Control Room parity).
   - Status: active
   - Delete condition: feature removed or AA adds native unused indicator.
 
