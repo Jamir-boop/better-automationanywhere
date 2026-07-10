@@ -388,6 +388,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: metadata source becomes push-based/reliable.
 
+- [ ] Unused variable indicator
+  - Source: `src/ts/variable-metadata.ts`, `entrypoints/content.ts`, `src/styl/taskbot.styl`
+  - Setting/id: `collectUsedVariableNames`, class `better-aa-variable-metadata-unused`
+  - Selectors: variable row/label selectors
+  - Validate: bot with one variable unreferenced in code (input/output flags do not count as usage); then reference it and wait for revalidation.
+  - Expected: unreferenced variable row is greyed with `(unused)` badge and tooltip; badge clears within ~10s after a reference is added.
+  - Status: active
+  - Delete condition: feature removed or AA adds native unused indicator.
+
 - [ ] Missing metadata retry
   - Source: `entrypoints/content.ts`
   - Setting/id: retry counter/signature

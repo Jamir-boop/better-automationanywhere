@@ -301,7 +301,9 @@ function restoreVariableMetadataLabel(label: HTMLElement): void {
 	label.setAttribute('title', originalText);
 	label.removeAttribute(VARIABLE_METADATA_ORIGINAL_TEXT_ATTR);
 	label.classList.remove('better-aa-variable-metadata-label');
-	label.closest(VARIABLE_ROW_SELECTOR)?.classList.remove('better-aa-variable-metadata-row');
+	const row = label.closest(VARIABLE_ROW_SELECTOR);
+	row?.classList.remove('better-aa-variable-metadata-row');
+	row?.classList.remove('better-aa-variable-metadata-unused');
 }
 
 function restoreVariableMetadataLabels(root: ParentNode = document): void {
@@ -371,7 +373,7 @@ async function loadVariableMetadata(
 	const promise = new AutomationAnywhereApi(baseUrl, authToken)
 		.getBotContent(fileId)
 		.then((content) => {
-			const lookup = extractVariableMetadataLookup(content);
+			const lookup = extractVariableMetadataLookup(content, t('(unused)'));
 			void debugInfo(
 				'variable-metadata',
 				'Variable metadata loaded.',
@@ -508,6 +510,7 @@ function applyVariableMetadataLabels(
 		}
 		label.classList.add('better-aa-variable-metadata-label');
 		row.classList.add('better-aa-variable-metadata-row');
+		row.classList.toggle('better-aa-variable-metadata-unused', metadata.unused);
 	});
 
 	void debugInfo(

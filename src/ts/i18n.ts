@@ -5,6 +5,7 @@ type I18nParams = Record<string, string | number>;
 
 const ES: Record<string, string> = {
 	'Auto (browser)': 'Auto (navegador)',
+	'(unused)': '(sin uso)',
 	English: 'Ingles',
 	Spanish: 'Espanol',
 	'Extension language': 'Idioma de la extension',
@@ -720,10 +721,16 @@ const ES: Record<string, string> = {
 let activeLocale: AppLocale = detectBrowserLocale();
 
 export function detectBrowserLocale(): AppLocale {
-	const browserLanguage =
-		typeof browser !== 'undefined' && browser.i18n?.getUILanguage
-			? browser.i18n.getUILanguage()
-			: navigator.language;
+	let browserLanguage: string | undefined;
+	try {
+		browserLanguage =
+			typeof browser !== 'undefined' && browser.i18n?.getUILanguage
+				? browser.i18n.getUILanguage()
+				: navigator.language;
+	} catch {
+		// wxt prepare's fake browser defines getUILanguage but throws on call.
+		browserLanguage = typeof navigator !== 'undefined' ? navigator.language : undefined;
+	}
 	return browserLanguage?.toLowerCase().startsWith('es') ? 'es' : 'en';
 }
 

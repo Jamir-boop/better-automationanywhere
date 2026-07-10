@@ -6,7 +6,18 @@ import { importTsModule, root } from './lib/ts-module-loader.mjs';
 const mod = await importTsModule(join(root, 'src', 'ts', 'variable-metadata.ts'));
 
 function labelFor(content, rowName) {
-	const lookup = mod.extractVariableMetadataLookup(content);
+	// Reference every variable from a node so label tests stay badge-free.
+	const variables = Array.isArray(content?.variables) ? content.variables : [];
+	const refs = variables
+		.map((variable) =>
+			variable && typeof variable.name === 'string' ? `$${variable.name}$` : ''
+		)
+		.join(' ');
+	const withNodes = {
+		...content,
+		nodes: [{ attributes: [{ value: { objectTypeName: 'STRING', string: refs } }] }],
+	};
+	const lookup = mod.extractVariableMetadataLookup(withNodes);
 	return mod.findVariableMetadata(lookup, rowName)?.label ?? null;
 }
 
@@ -228,5 +239,69 @@ assert.equal(
 	),
 	`iDictFilled ${'\u2022'} [{"key":"a","value":"1"}]`
 );
+
+// Unused variable detection
+{
+	const content = {
+		variables: [
+			{ name: 'used', defaultValue: 'x' },
+			{ name: 'assigned' },
+			{ name: 'iOrphan', input: true },
+			{ name: 'listUsed' },
+			{ name: 'dictUsed' },
+			{ name: 'outer' },
+			{ name: 'i' },
+		],
+		nodes: [
+			{
+				attributes: [
+					{
+						value: {
+							objectTypeName: 'STRING',
+							string: 'prefix $Used$ mid $listUsed[0]$ and $dictUsed{key}$ nested $outer[$i$]$',
+						},
+					},
+					{ value: { objectTypeName: 'VARIABLE', string: 'Assigned' } },
+				],
+			},
+		],
+	};
+
+	const used = mod.collectUsedVariableNames(content);
+	assert.ok(used.has('used'));
+	assert.ok(used.has('assigned'));
+	assert.ok(used.has('listused'));
+	assert.ok(used.has('dictused'));
+	assert.ok(used.has('outer'));
+	assert.ok(used.has('i'));
+	assert.ok(!used.has('iorphan'));
+
+	const lookup = mod.extractVariableMetadataLookup(content);
+	assert.equal(mod.findVariableMetadata(lookup, 'used').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'assigned').unused, false);
+	assert.equal(mod.findVariableMetadata(lookup, 'listUsed').unused, false);
+
+	const orphan = mod.findVariableMetadata(lookup, 'iOrphan');
+	assert.equal(orphan.unused, true);
+	assert.equal(orphan.label, `${'↓'}iOrphan (unused)`);
+
+	const esLookup = mod.extractVariableMetadataLookup(content, '(sin uso)');
+	assert.ok(mod.findVariableMetadata(esLookup, 'iOrphan').label.includes('(sin uso)'));
+}
+
+// References inside the variables array itself do not count as usage.
+{
+	const content = {
+		variables: [
+			{ name: 'a', defaultValue: '$b$' },
+			{ name: 'b' },
+		],
+		nodes: [],
+	};
+	const used = mod.collectUsedVariableNames(content);
+	assert.equal(used.size, 0);
+	const lookup = mod.extractVariableMetadataLookup(content);
+	assert.equal(mod.findVariableMetadata(lookup, 'b').unused, true);
+}
 
 console.log('Variable metadata tests passed.');

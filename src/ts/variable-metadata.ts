@@ -4,6 +4,7 @@ export interface VariableMetadata {
 	name: string;
 	label: string;
 	title: string;
+	unused: boolean;
 }
 
 export type VariableMetadataLookup = Map<string, VariableMetadata>;
@@ -83,13 +84,52 @@ function getVariables(content: unknown): unknown[] {
 	return content.variables;
 }
 
-function createVariableMetadata(record: JsonRecord): VariableMetadata | null {
+// Matches $var$, $list[0]$, $dict{key}$, and the inner var of $list[$i$]$.
+// ponytail: regex heuristic; extend if AA adds reference syntax.
+const VARIABLE_REFERENCE_RE = /\$([A-Za-z_][A-Za-z0-9_\-]*)(?=[$\[{])/g;
+
+export function collectUsedVariableNames(content: unknown): Set<string> {
+	const used = new Set<string>();
+
+	const visit = (value: unknown): void => {
+		if (typeof value === 'string') {
+			for (const match of value.matchAll(VARIABLE_REFERENCE_RE)) {
+				used.add(match[1].toLocaleLowerCase());
+			}
+			return;
+		}
+		if (Array.isArray(value)) {
+			value.forEach(visit);
+			return;
+		}
+		if (!isRecord(value)) return;
+		if (value.objectTypeName === 'VARIABLE' && typeof value.string === 'string') {
+			const name = collapseWhitespace(value.string);
+			if (name) used.add(name.toLocaleLowerCase());
+		}
+		for (const child of Object.values(value)) visit(child);
+	};
+
+	if (!isRecord(content)) return used;
+	for (const [key, child] of Object.entries(content)) {
+		if (key === 'variables') continue;
+		visit(child);
+	}
+	return used;
+}
+
+function createVariableMetadata(
+	record: JsonRecord,
+	usedNames: Set<string>,
+	unusedBadge: string
+): VariableMetadata | null {
 	const name = readText(record.name);
 	if (!name) return null;
 
+	const unused = !usedNames.has(name.toLocaleLowerCase());
 	const prefix =
 		`${record.output === true ? '\u2191' : ''}${record.input === true ? '\u2193' : ''}`;
-	const segments = [`${prefix}${name}`];
+	const segments = [`${prefix}${name}${unused ? ` ${unusedBadge}` : ''}`];
 
 	const defaultValue = Object.prototype.hasOwnProperty.call(record, 'defaultValue')
 		? formatDefaultValue(record.defaultValue)
@@ -102,15 +142,19 @@ function createVariableMetadata(record: JsonRecord): VariableMetadata | null {
 	}
 
 	const label = segments.join(' \u2022 ');
-	return { name, label, title: label };
+	return { name, label, title: label, unused };
 }
 
-export function extractVariableMetadataLookup(content: unknown): VariableMetadataLookup {
+export function extractVariableMetadataLookup(
+	content: unknown,
+	unusedBadge = '(unused)'
+): VariableMetadataLookup {
 	const lookup = new Map<string, VariableMetadata>();
+	const usedNames = collectUsedVariableNames(content);
 
 	for (const variable of getVariables(content)) {
 		if (!isRecord(variable)) continue;
-		const metadata = createVariableMetadata(variable);
+		const metadata = createVariableMetadata(variable, usedNames, unusedBadge);
 		if (metadata) lookup.set(metadata.name.toLocaleLowerCase(), metadata);
 	}
 
