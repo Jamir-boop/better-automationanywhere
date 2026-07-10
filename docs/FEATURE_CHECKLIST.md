@@ -618,7 +618,7 @@ Selector source of truth:
   - Source: `scripts/update-version.mjs`
   - Setting/id: package/manifest version
   - Selectors: none
-  - Validate: run version update in dry manual review.
+  - Validate: run `node scripts/update-version.mjs --dry-run` to preview, then run with `-y` to apply.
   - Expected: package and generated manifests align.
   - Status: active
   - Delete condition: release automation replaces script.

@@ -11,6 +11,28 @@ When adding or changing a feature or external Automation Anywhere selector:
   the feature.
 - Reuse the same exported selector constant in runtime code and Doctor checks.
 
+## Version Bumping
+
+After completing a modification or implementing a new feature, update the
+extension version using:
+
+```bash
+node scripts/update-version.mjs <new-version> -y
+```
+
+Flags:
+
+- `-y` — auto-approve, skip interactive prompt.
+- `--dry-run` — show current version and files that would change, exit without writing.
+
+Rules:
+
+- Refactor or fix (no new user-facing behavior): stay on `main`, bump patch
+  (`x.x.+1`). Example: `0.3.2` → `0.3.3`.
+- New feature or addition to existing feature: stay on `main`, bump minor
+  (`x.+1.0`). Example: `0.3.3` → `0.4.0`.
+- Never create a new branch unless the user explicitly asks for one.
+
 ## Firefox Sidebar Opening
 
 Firefox only allows `browser.sidebarAction.open()` from a direct user input

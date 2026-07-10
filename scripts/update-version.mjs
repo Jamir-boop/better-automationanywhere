@@ -14,6 +14,11 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const README_VERSION_ROW_RE =
 	/^(\|\s*)(?:TODO|\d+\.\d+\.\d+)(\s*)(\|\s*A360 v\.40\+\s*\|)/m;
 
+const args = process.argv.slice(2);
+const flags = new Set(args.filter((a) => a.startsWith('-')));
+const dryRun = flags.has('--dry-run');
+const yes = flags.has('-y');
+
 function relativePath(path) {
 	return relative(root, path).replaceAll('\\', '/');
 }
@@ -83,7 +88,7 @@ async function collectWrites(newVersion) {
 	return { currentVersion, writes };
 }
 
-async function confirm(currentVersion, newVersion, writes) {
+function printPlan(currentVersion, newVersion, writes) {
 	console.log(`Current package: ${currentVersion}`);
 	console.log(`New version:     ${newVersion}`);
 	console.log('Files:');
@@ -91,6 +96,10 @@ async function confirm(currentVersion, newVersion, writes) {
 		const suffix = write.from ? ` (${write.from} -> ${newVersion})` : '';
 		console.log(`- ${relativePath(write.path)}${suffix}`);
 	});
+}
+
+async function confirm(currentVersion, newVersion, writes) {
+	printPlan(currentVersion, newVersion, writes);
 
 	const rl = createInterface({ input: stdin, output: stdout });
 	try {
@@ -102,11 +111,13 @@ async function confirm(currentVersion, newVersion, writes) {
 }
 
 async function main() {
-	const newVersion = process.argv[2];
+	const newVersion = args.find((a) => !a.startsWith('-'));
 
 	if (!newVersion || !SEMVER_RE.test(newVersion)) {
-		console.error('Usage: node scripts/update-version.mjs <semver>');
-		console.error('Example: node scripts/update-version.mjs 1.10.8');
+		console.error(
+			'Usage: node scripts/update-version.mjs <semver> [-y] [--dry-run]',
+		);
+		console.error('Example: node scripts/update-version.mjs 1.10.8 -y');
 		process.exit(1);
 	}
 
@@ -116,7 +127,12 @@ async function main() {
 		return;
 	}
 
-	if (!(await confirm(currentVersion, newVersion, writes))) {
+	if (dryRun) {
+		printPlan(currentVersion, newVersion, writes);
+		return;
+	}
+
+	if (!yes && !(await confirm(currentVersion, newVersion, writes))) {
 		console.log('Aborted');
 		process.exit(2);
 	}
