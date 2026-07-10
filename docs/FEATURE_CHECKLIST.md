@@ -444,7 +444,7 @@ Selector source of truth:
   - Status: active
   - Delete condition: AA package schema changes beyond repair.
 
-- [ ] Export Bots ZIP
+- [ ] Export Bots/Files ZIP
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `export-bots`, format `zip`
   - Selectors: none; API/content/dependency based
@@ -453,7 +453,7 @@ Selector source of truth:
   - Status: active
   - Delete condition: export feature replaced by native AA export.
 
-- [ ] Export Bots separate files
+- [ ] Export Bots/Files separate files
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`
   - Setting/id: tool `export-bots`, format `separate`
   - Selectors: none; API/blob based

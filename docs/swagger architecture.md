@@ -129,12 +129,15 @@ Base server: `/v2/repository`
 | PUT | `/v2/repository/role/{roleid}/permissions` | Add/update repository role permissions. | Admin-only. Use only in permission-management workflows. |
 | GET | `/v2/repository/role/{roleid}/folder/{folderid}/permissions` | View role permissions for folder. | Diagnose access issues before modifying content. |
 | GET | `/v2/repository/files/{fileid}/content` | Download file content. | Key endpoint for reading a single bot/form/file from Control Room. Use instead of BLM zip export when single-file content is needed. |
+| PUT | `/v2/repository/files/{fileid}/content` | Upload/replace file content. | Write bot JSON after create or to update existing bot. Body is raw taskbot JSON (not wrapped). |
 | GET | `/v2/repository/files/{fileid}/parents` | Get immediate parent folders. | Resolve path/tree context for a file ID. |
 | GET | `/v2/repository/files/{fileid}/dependencies` | Get file dependencies. | Required before editing/deploying bots. Use to identify package/files needed. |
 | PUT | `/v2/repository/files/{fileid}/dependencies/{workspaceId}` | Update manual dependencies. | Use only after dependency diff and preview. |
 | POST | `/v2/repository/files/packagesVersionUpdate` | Execute package version update. | Bulk package remediation workflow. Require preview first. |
 | POST | `/v2/repository/recover` | Recover bots/files from repository. | Recovery workflow. Requires exact IDs and reason. |
 | POST | `/v2/repository/files/version/assignLabel` | Assign production label to bot version. | Release-management operation. Require explicit target version. |
+| POST | `/v2/repository/files` | Create a new file/bot in repository. **Undocumented** — captured from Control Room UI. | Create new taskbot. Requires `{ contentType, name, parentFolderId, description, tags }`. Returns `{ id }`. |
+| POST | `/v2/repository/files/{fileId}/copy` | Copy an existing repository file. **Undocumented** — used by CR UI's copy-paste flow. | Duplicate bot. Requires `{ name, parentId }`. Server-side copy; cannot inject external content. |
 
 ### 4.3 Deployment
 
@@ -177,6 +180,9 @@ Base server: `/v2`
 | Stop/manage run | `POST /v3/activity/manage` | `GET /v3/activity/execution/{id}` | Confirm action before manage. |
 | Package impact scan | `POST /v2/packages/{name}/versions/usage` | `POST /v2/repository/files/packagesVersionUpdate` | Role may block package usage lookup. |
 | Assign release label | `POST /v2/repository/files/version/assignLabel` | `POST /v2/repository/file/list` | Confirm version and target bot. |
+| Create new bot | `POST /v2/repository/files` | `PUT /v2/repository/files/{id}/content` | Two-step: create empty bot, then PUT content. Requires `{ contentType, name, parentFolderId }`. |
+| Update bot content | `PUT /v2/repository/files/{id}/content` | none | Overwrite existing bot JSON. Body is raw taskbot JSON. |
+| Copy file | `POST /v2/repository/files/{fileId}/copy` | none | Server-side duplicate. Requires `{ name, parentId }`. Cannot inject external content. |
 
 ## 6. Recommended LLM Tool Surface
 
@@ -200,6 +206,8 @@ a360_get_package_usage(packageName, versionFilter)
 ```text
 a360_create_folder(parentFolderId, name, description)
 a360_update_folder(folderId, patch)
+a360_create_file(parentFolderId, name, contentType, tags)   // POST /v2/repository/files
+a360_copy_file(fileId, newName, targetFolderId)             // POST /v2/repository/files/{id}/copy
 a360_update_file_dependencies(fileId, workspaceId, dependencies)
 a360_assign_bot_version_label(fileId, versionId, label)
 a360_deploy_automation(fileId, runnerSpec, botInput)
@@ -226,6 +234,30 @@ a360_write_bot_json(fileId, botJson)
 ```
 
 Treat `a360_write_bot_json` as implementation-specific unless an update-content endpoint is verified in the active tenant Swagger or internal client implementation.
+
+To import an external taskbot JSON, use the two-step create-then-write flow:
+
+```text
+POST /v2/repository/files
+  body: {
+    contentType: "application/vnd.aa.taskbot",
+    name: "<bot-name>",
+    parentFolderId: "<folder-id>",
+    description: "",
+    tags: [{ namespace: "INTENDED_TARGET", value: "WINDOWS" }]
+  }
+  -> { id }
+
+PUT /v2/repository/files/{id}/content
+  body: <taskbot JSON>
+```
+
+To duplicate an existing CR file:
+
+```text
+POST /v2/repository/files/{fileId}/copy
+  body: { name: "<new-name>", parentId: "<target-folder-id>" }
+```
 
 ## 7. Bot-Building Architecture
 
@@ -359,18 +391,20 @@ Highest value:
 4. `GET /v2/repository/files/{fileid}/content`
 5. `GET /v2/repository/files/{fileid}/dependencies`
 6. `PUT /v2/repository/files/{fileid}/dependencies/{workspaceId}`
-7. `POST /v3/automations/deploy`
-8. `POST /v3/activity/list`
-9. `GET /v3/activity/execution/{id}`
-10. `POST /v2/packages/{name}/versions/usage`
+7. `POST /v2/repository/files` (create bot — undocumented)
+8. `POST /v2/repository/files/{fileId}/copy` (copy file — undocumented)
+9. `POST /v3/automations/deploy`
+10. `POST /v3/activity/list`
+11. `GET /v3/activity/execution/{id}`
+12. `POST /v2/packages/{name}/versions/usage`
 
 ## 11. Gaps to Verify in Active Tenant
 
 The exported inventory covers concrete operations for core bot-building surfaces, but an LLM production architecture should still verify these against the active tenant before enabling write tools:
 
 - exact schema for repository filter requests
-- content write/update endpoint availability
-- bot creation endpoint availability
+- content write/update endpoint availability (`PUT /v2/repository/files/{fileid}/content` confirmed working — see §4.2)
+- bot creation endpoint availability (`POST /v2/repository/files` confirmed working — undocumented, see §4.2)
 - v4 deploy behavior compared with v3 deploy
 - package metadata/list endpoints if needed beyond package usage
 - role permissions needed for package usage lookup
