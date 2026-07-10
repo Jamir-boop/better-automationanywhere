@@ -24,6 +24,12 @@ export type AutomationAnywherePageType =
 	| 'public-taskbot'
 	| 'packages';
 
+export interface AutomationAnywhereApiProbeResult {
+	ok: boolean;
+	status: number | null;
+	error?: string;
+}
+
 export interface AutomationAnywherePageContext {
 	url: string;
 	baseUrl: string;
@@ -557,6 +563,35 @@ export class AutomationAnywhereApi {
 			throw new Error('Create taskbot response missing id.');
 		}
 		return { id: String(id) };
+	}
+
+	// Non-throwing request used by API health probes; exposes the HTTP status.
+	async probe(
+		path: string,
+		options: { method?: string; body?: unknown } = {}
+	): Promise<AutomationAnywhereApiProbeResult> {
+		const headers: Record<string, string> = { 'X-Authorization': this.authToken };
+		let body: string | undefined;
+		if (options.body !== undefined) {
+			body = JSON.stringify(options.body);
+			headers['Content-Type'] = 'application/json';
+		}
+		const response = (await browser.runtime.sendMessage({
+			type: 'AA_API_REQUEST',
+			config: {
+				url: `${this.baseUrl}${path}`,
+				method: options.method ?? (body ? 'POST' : 'GET'),
+				headers,
+				body,
+				responseType: 'json',
+			},
+		})) as AutomationAnywhereApiResponse;
+		if (response?.ok) return { ok: true, status: 200 };
+		return {
+			ok: false,
+			status: response && 'status' in response ? response.status ?? null : null,
+			error: response?.error,
+		};
 	}
 
 	async getDefaultPackageVersions(): Promise<Map<string, string>> {

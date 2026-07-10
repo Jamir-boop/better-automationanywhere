@@ -38,6 +38,16 @@ import {
 	type DoctorCheckGroup,
 } from '@/src/ts/style-doctor';
 import {
+	runApiHealthChecks,
+	skipAllApiHealthChecks,
+	type ApiHealthResult,
+} from '@/src/ts/api-health';
+import {
+	AutomationAnywhereApi,
+	getActiveAutomationAnywhereContext,
+	getAutomationAnywhereAuthToken,
+} from '@/src/ts/automation-anywhere-api';
+import {
 	isAutomationAnywhereJson,
 	summarizeAutomationAnywhereJson,
 } from '@/src/ts/automation-anywhere-json';
@@ -107,6 +117,7 @@ import {
 	styleValueItems,
 	stylesEnabled,
 	styleDoctorLastResults,
+	apiHealthLastResults,
 	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
 	type OpenSidebarShortcut,
@@ -529,6 +540,17 @@ replaceChildrenFromHtml(app, `
 
 		<section class="tab-panel" role="tabpanel" data-panel="settings" hidden>
 			${renderToolsConfigSection()}
+			<section class="panel-section">
+				<div class="section-heading-row">
+					<h2>${t('Supported Builds')}</h2>
+				</div>
+				<div id="supportedBuildsList" class="supported-builds-list"></div>
+				<div id="buildCandidate" class="build-candidate" hidden>
+					<p id="buildCandidateMessage" class="inline-hint"></p>
+					<pre id="buildCandidateSnippet" class="build-candidate-snippet"></pre>
+					<button id="copyBuildCandidate" type="button">${t('Copy candidate')}</button>
+				</div>
+			</section>
 			<section class="panel-section info-panel">
 				<h2>${t('About')}</h2>
 				<div class="info-row">
@@ -546,13 +568,14 @@ replaceChildrenFromHtml(app, `
 
 		<section class="tab-panel doctor-panel" role="tabpanel" data-panel="doctor" hidden>
 			<div class="health-subtabs" role="tablist" aria-label="${t('Health sections')}">
-				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="health">${t('Health')}</button>
+				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="health">${t('UI Health')}</button>
+				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="api">${t('API Health')}</button>
 				<button class="health-subtab is-active" type="button" role="tab" aria-selected="true" data-health-section="logs">${t('Debug Logs')}</button>
 			</div>
 
 			<div class="health-subpanel" data-health-subpanel="health" hidden aria-hidden="true">
 				<section class="panel-section">
-					<h2>${t('Health')}</h2>
+					<h2>${t('UI Health')}</h2>
 					<div class="doctor-view-pills" role="group" aria-label="${t('Health check view selector')}">
 						<button class="doctor-pill is-active" type="button" data-doctor-view="general">${t('General')}</button>
 						<button class="doctor-pill" type="button" data-doctor-view="taskbot-editor">${t('Taskbot Editor')}</button>
@@ -565,15 +588,16 @@ replaceChildrenFromHtml(app, `
 					</div>
 				</section>
 
+			</div>
+
+			<div class="health-subpanel" data-health-subpanel="api" hidden aria-hidden="true">
 				<section class="panel-section">
-					<div class="section-heading-row">
-						<h2>${t('Supported Builds')}</h2>
-					</div>
-					<div id="supportedBuildsList" class="supported-builds-list"></div>
-					<div id="buildCandidate" class="build-candidate" hidden>
-						<p id="buildCandidateMessage" class="inline-hint"></p>
-						<pre id="buildCandidateSnippet" class="build-candidate-snippet"></pre>
-						<button id="copyBuildCandidate" type="button">${t('Copy candidate')}</button>
+					<h2>${t('API Health')}</h2>
+					<p class="inline-hint">${t('Read-only probes of Control Room endpoints this extension depends on. Nothing is created or modified.')}</p>
+					<div id="apiHealthList" class="doctor-checklist"></div>
+					<div class="doctor-actions">
+						<button id="runApiHealth" type="button">${t('Run Checks')}</button>
+						<span id="apiHealthSummary" class="doctor-summary"></span>
 					</div>
 				</section>
 			</div>
@@ -671,7 +695,7 @@ const backgroundPreview =
 	document.querySelector<HTMLElement>('#backgroundPreview')!;
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
-type HealthSection = 'health' | 'logs';
+type HealthSection = 'health' | 'api' | 'logs';
 let activeHealthSection: HealthSection = 'logs';
 let actionJsonWorkbench: JsonWorkbench;
 let currentExtensionShortcuts: ExtensionShortcuts = {
@@ -987,6 +1011,90 @@ healthSubtabs.forEach((button) => {
 	button.addEventListener('click', () => {
 		setHealthSection(button.dataset.healthSection as HealthSection);
 	});
+});
+
+const apiHealthList = document.querySelector<HTMLElement>('#apiHealthList')!;
+const apiHealthSummary = document.querySelector<HTMLElement>('#apiHealthSummary')!;
+const runApiHealthButton =
+	document.querySelector<HTMLButtonElement>('#runApiHealth')!;
+
+const API_HEALTH_STATUS_ICONS: Record<ApiHealthResult['status'], string> = {
+	pass: '✓',
+	fail: '✗',
+	warn: '⚠',
+	skip: '—',
+};
+
+function renderApiHealthResults(results: ApiHealthResult[]): void {
+	apiHealthList.textContent = '';
+	for (const result of results) {
+		const row = document.createElement('details');
+		row.className = `doctor-check-row doctor-status-${result.status}`;
+
+		const summary = document.createElement('summary');
+		summary.className = 'doctor-check-summary';
+		const icon = document.createElement('span');
+		icon.className = 'doctor-check-icon';
+		icon.textContent = API_HEALTH_STATUS_ICONS[result.status];
+		const label = document.createElement('span');
+		label.className = 'doctor-check-label';
+		label.textContent = result.label;
+		const meta = document.createElement('span');
+		meta.className = 'doctor-check-meta';
+		meta.textContent = [result.method, result.status, result.reason].join(' · ');
+		summary.appendChild(icon);
+		summary.appendChild(label);
+		summary.appendChild(meta);
+
+		const body = document.createElement('pre');
+		body.className = 'doctor-check-details';
+		body.textContent = [
+			`${t('Feature')}: ${result.feature}`,
+			`${t('Endpoint')}: ${result.method} ${result.path}`,
+			`${t('Status')}: ${result.status}`,
+			`HTTP: ${result.httpStatus ?? t('Not checked')}`,
+			`${t('Reason')}: ${result.reason}`,
+		].join('\n');
+
+		row.appendChild(summary);
+		row.appendChild(body);
+		apiHealthList.appendChild(row);
+	}
+
+	const counts = { pass: 0, fail: 0, warn: 0, skip: 0 };
+	for (const result of results) counts[result.status]++;
+	apiHealthSummary.textContent = t('{pass} pass, {fail} fail, {warn} warn, {skip} skip', counts);
+}
+
+async function runApiHealthScan(): Promise<void> {
+	runApiHealthButton.disabled = true;
+	apiHealthSummary.textContent = t('Scanning...');
+	try {
+		const active = await getActiveAutomationAnywhereContext();
+		let results: ApiHealthResult[];
+		if (!active || !active.context.baseUrl || active.context.pageType === 'unsupported') {
+			results = skipAllApiHealthChecks(t('Open an Automation Anywhere page.'));
+		} else {
+			const authToken = await getAutomationAnywhereAuthToken(active.tabId);
+			const api = new AutomationAnywhereApi(active.context.baseUrl, authToken);
+			results = await runApiHealthChecks(api, active.context);
+		}
+		renderApiHealthResults(results);
+		await apiHealthLastResults.setValue(results);
+	} catch (error) {
+		apiHealthSummary.textContent =
+			error instanceof Error ? error.message : t('API health scan failed.');
+	} finally {
+		runApiHealthButton.disabled = false;
+	}
+}
+
+runApiHealthButton.addEventListener('click', () => {
+	void runApiHealthScan();
+});
+
+void apiHealthLastResults.getValue().then((saved) => {
+	if (saved?.length) renderApiHealthResults(saved);
 });
 
 function getHealthChecksForView(group: DoctorCheckGroup): StyleDoctorCheck[] {

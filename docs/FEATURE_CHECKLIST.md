@@ -83,10 +83,10 @@ Selector source of truth:
 
 - [ ] Settings/About tab
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/help.ts`
-  - Setting/id: language, shortcuts, debug, suggestions, keep alive
+  - Setting/id: language, shortcuts, debug, suggestions, keep alive, supported builds
   - Selectors: internal sidepanel only
-  - Validate: change each setting and reload sidepanel/page.
-  - Expected: persisted values restore; About help renders current shortcuts.
+  - Validate: change each setting and reload sidepanel/page; review Supported Builds list and build candidate flow.
+  - Expected: persisted values restore; About help renders current shortcuts; Supported Builds renders here (moved from Health).
   - Status: active
   - Delete condition: settings surface replaced.
 
@@ -94,10 +94,19 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/style-doctor.ts`
   - Setting/id: `RUN_STYLE_DOCTOR_CHECK`
   - Selectors: `AUTOMATION_ANYWHERE_SELECTOR_CHECKS`
-  - Validate: run General, Taskbot Editor, Folder Navigation checks.
-  - Expected: rows show feature, selector, source, severity, selector status, count.
+  - Validate: switch UI Health, API Health, and Debug Logs sub-tabs; run General, Taskbot Editor, Folder Navigation checks under UI Health.
+  - Expected: three sub-tabs render; rows show feature, selector, source, severity, selector status, count.
   - Status: active
   - Delete condition: external validation moves elsewhere.
+
+- [ ] API health checks
+  - Source: `entrypoints/sidepanel/main.ts`, `src/ts/api-health.ts`, `src/ts/automation-anywhere-api.ts`
+  - Setting/id: `API_HEALTH_CHECKS`, `local:apiHealthLastResults`
+  - Selectors: none; API probes
+  - Validate: run checks on a private folder page, a taskbot page, and a non-AA tab.
+  - Expected: folder page passes folder-list and skips bot-content (taskbot page inverse); non-AA tab skips all; create-file probe passes via 400 rejection and never creates a bot; results persist across sidepanel reloads.
+  - Status: active
+  - Delete condition: endpoints replaced or probes moved elsewhere.
 
 - [ ] Debug Logs tab
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/debug.ts`

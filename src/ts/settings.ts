@@ -63,6 +63,9 @@ export const botExecutionModalPosition = storage.defineItem<BotExecutionModalPos
 export const styleDoctorLastResults = storage.defineItem<Record<string, import('./style-doctor').StyleDoctorCheckResult[]>>(
 	'local:styleDoctorLastResults'
 );
+export const apiHealthLastResults = storage.defineItem<
+	import('./api-health').ApiHealthResult[]
+>('local:apiHealthLastResults');
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;

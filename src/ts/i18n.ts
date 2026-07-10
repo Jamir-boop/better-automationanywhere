@@ -716,6 +716,13 @@ const ES: Record<string, string> = {
 	'Health check view selector': 'Selector de vista de salud',
 	'Debug Logs': 'Logs debug',
 	'Scanning...': 'Escaneando...',
+	'UI Health': 'Salud UI',
+	'API Health': 'Salud API',
+	'Read-only probes of Control Room endpoints this extension depends on. Nothing is created or modified.':
+		'Sondeos de solo lectura de los endpoints de Control Room que usa esta extension. No se crea ni modifica nada.',
+	Endpoint: 'Endpoint',
+	'API health scan failed.': 'Escaneo de salud API fallido.',
+	'Open an Automation Anywhere page.': 'Abre una pagina de Automation Anywhere.',
 	'Taskbot transient items': 'Items transitorios de Taskbot',
 	Selector: 'Selector',
 	Source: 'Fuente',
