@@ -103,8 +103,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/debug.ts`
   - Setting/id: `local:debugFeedbackHistory`
   - Selectors: internal sidepanel only
-  - Validate: create warn/error/debug events, copy logs, clear logs.
-  - Expected: logs stay local; copy text includes header and redacted details.
+  - Validate: create warn/error/debug events, copy logs, clear logs; expand a log line with details.
+  - Expected: logs stay local; copy text includes header and redacted details; expanded details push following rows down without overlap.
   - Status: active
   - Delete condition: local debugging replaced.
 

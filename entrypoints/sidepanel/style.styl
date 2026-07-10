@@ -781,12 +781,26 @@ button
 .feedback-error
 	border-color: #A33A3A
 
-.feedback-summary
-	display: contents
-	cursor: pointer
+// <details> needs display:block to lay out expanded content; grid moves to summary.
+details.feedback-line
+	display: block
+	padding: 0
 
-.feedback-line details[open] .feedback-summary small,
-.feedback-line details[open] .feedback-summary span
+.feedback-summary
+	display: grid
+	grid-template-columns: minmax(96px, .5fr) minmax(0, 1fr)
+	align-items: center
+	gap: 6px
+	min-height: var(--feedback-row-height)
+	padding: 2px 6px
+	cursor: pointer
+	list-style: none
+
+	&::-webkit-details-marker
+		display: none
+
+details.feedback-line[open] .feedback-summary small,
+details.feedback-line[open] .feedback-summary span
 	color: var(--accent)
 
 .feedback-details,
@@ -807,7 +821,9 @@ button
 	cursor: text
 
 .feedback-details
-	grid-column: 1 / -1
+	border: 0
+	border-top: 1px solid var(--border)
+	border-radius: 0
 
 .doctor-check-details
 	border: 0
