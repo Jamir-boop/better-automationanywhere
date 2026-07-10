@@ -51,6 +51,19 @@ assert.ok(
 	'Variable metadata Doctor check points to runtime source'
 );
 
+const variableMetadataSelectorChecks = [
+	['editor-palette-section', 'EDITOR_PALETTE_SECTION_SELECTOR'],
+	['variable-row', 'VARIABLE_ROW_SELECTOR'],
+	['variable-label', 'VARIABLE_LABEL_SELECTOR'],
+	['variable-label-text', 'VARIABLE_LABEL_TEXT_SELECTOR'],
+];
+for (const [id, constant] of variableMetadataSelectorChecks) {
+	const block = checkBlocks.find((candidate) => candidate.includes(`id: '${id}'`));
+	assert.ok(block, `${id} Doctor check exists`);
+	assert.ok(block.includes(`selector: ${constant}`), `${id} uses ${constant}`);
+	assert.ok(block.includes("feature: 'Variable metadata'"), `${id} tagged Variable metadata`);
+}
+
 for (const block of checkBlocks) {
 	const id = block.match(/id:\s*'([^']+)'/)?.[1] ?? 'unknown';
 	for (const field of ['view', 'group', 'label', 'feature', 'selector', 'source', 'severity', 'status']) {

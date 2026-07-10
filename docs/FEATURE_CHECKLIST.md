@@ -364,7 +364,7 @@ Selector source of truth:
 - [ ] Variable metadata fetch
   - Source: `entrypoints/content.ts`, `src/ts/variable-metadata.ts`
   - Setting/id: implicit taskbot editor feature
-  - Selectors: `editor-palette-variables`, `variable-row`, `variable-label`
+  - Selectors: `editor-palette-variables`, `editor-palette-section`, `variable-row`, `variable-label`, `variable-label-text` (all Doctor-checked)
   - Validate: open Variables on private/public taskbots in `/edit` and `/view`.
   - Expected: bot content loads once per file and labels update under the active Variables header, including the disabled read-only button on `/view`.
   - Status: active
