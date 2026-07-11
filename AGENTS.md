@@ -11,6 +11,14 @@ When adding or changing a feature or external Automation Anywhere selector:
   the feature.
 - Reuse the same exported selector constant in runtime code and Doctor checks.
 
+## Feature Settings Rule
+
+Every new user-facing feature must ship with a user setting unless the user
+explicitly signs off on it being always-on. When adding or planning any
+feature, always ask: does it need a toggle, and what default (prefer OFF for
+anything visible or behavior-changing — vanilla-first)? Record the setting id
+and default in `docs/FEATURE_CHECKLIST.md`.
+
 ## Version Bumping
 
 After completing a modification or implementing a new feature, update the

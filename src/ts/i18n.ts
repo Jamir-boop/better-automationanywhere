@@ -26,6 +26,9 @@ const ES: Record<string, string> = {
 	'Sidebar shortcut': 'Atajo del panel',
 	'Sounds': 'Sonidos',
 	'Notify outdated packages': 'Notificar paquetes desactualizados',
+	'Variable metadata labels': 'Etiquetas de metadatos de variables',
+	'Shows IO arrows, defaults, and unused badges in the Variables palette.':
+		'Muestra flechas de entrada/salida, valores por defecto e indicadores de sin uso en la paleta de Variables.',
 	'Shows a toast when an open taskbot has package updates available.':
 		'Muestra un aviso cuando un taskbot abierto tiene actualizaciones de paquetes disponibles.',
 	'Package updates available': 'Actualizaciones de paquetes disponibles',

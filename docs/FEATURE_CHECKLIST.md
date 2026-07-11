@@ -259,7 +259,7 @@ Selector source of truth:
 
 - [ ] Command palette open/close
   - Source: `src/ts/palette.ts`, `src/ts/initialize.ts`
-  - Setting/id: `commandPaletteEnabled`, `commandPaletteShortcut`
+  - Setting/id: `commandPaletteEnabled` (default off), `commandPaletteShortcut`
   - Selectors: extension-owned `#commandPalette`
   - Validate: `Alt + P`, `/` when configured, outside click, Escape.
   - Expected: palette opens, predictions render, closes cleanly.
@@ -372,7 +372,7 @@ Selector source of truth:
 
 - [ ] Variable metadata fetch
   - Source: `entrypoints/content.ts`, `src/ts/variable-metadata.ts`
-  - Setting/id: implicit taskbot editor feature
+  - Setting/id: `local:variableMetadataEnabled` (default on; also requires master styles)
   - Selectors: `editor-palette-variables`, `editor-palette-section`, `variable-row`, `variable-label`, `variable-label-text` (all Doctor-checked)
   - Validate: open Variables on private/public taskbots in `/edit` and `/view`.
   - Expected: bot content loads once per file and labels update under the active Variables header, including the disabled read-only button on `/view`.
@@ -614,7 +614,7 @@ Selector source of truth:
 
 - [ ] Force English locale
   - Source: `src/ts/initialize.ts`
-  - Setting/id: `forceEnglishLocale`
+  - Setting/id: `forceEnglishLocale` (default off)
   - Selectors: none
   - Validate: enable on Control Room page.
   - Expected: extension attempts to keep English assumptions stable.

@@ -121,6 +121,9 @@ import {
 	packageUpdateToastEnabled,
 	getPackageUpdateToastEnabled,
 	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
+	variableMetadataEnabled,
+	getVariableMetadataEnabled,
+	DEFAULT_VARIABLE_METADATA_ENABLED,
 	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
 	type OpenSidebarShortcut,
@@ -354,6 +357,13 @@ function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): st
 
 function renderBlockTaskbotNodeLabelClicksControl(): string {
 	return `
+		<label class="setting-row">
+			<span>
+				<strong>${t('Variable metadata labels')}</strong>
+				<small>${t('Shows IO arrows, defaults, and unused badges in the Variables palette.')}</small>
+			</span>
+			<input id="variableMetadataEnabled" type="checkbox">
+		</label>
 		<label class="setting-row">
 			<span>
 				<strong>${t('Block taskbot link clicks')}</strong>
@@ -635,6 +645,9 @@ const runButtonWavesRow =
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const packageUpdateToastEnabledInput = document.querySelector<HTMLInputElement>(
 	'#packageUpdateToastEnabled'
+)!;
+const variableMetadataEnabledInput = document.querySelector<HTMLInputElement>(
+	'#variableMetadataEnabled'
 )!;
 const showSuggestionsInput =
 	document.querySelector<HTMLInputElement>('#showSuggestions')!;
@@ -1710,6 +1723,7 @@ async function loadState(): Promise<void> {
 	await refreshFeedbackHistory();
 	renderSupportedBuilds();
 	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
+	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
 	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
 	previousDoctorResults = savedDoctorResults[currentDoctorView] ?? null;
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
@@ -1757,6 +1771,10 @@ soundsInput.addEventListener('change', () => {
 packageUpdateToastEnabledInput.addEventListener('change', () => {
 	// Storage watch in the content script picks this up; no message needed.
 	void packageUpdateToastEnabled.setValue(packageUpdateToastEnabledInput.checked);
+});
+
+variableMetadataEnabledInput.addEventListener('change', () => {
+	void variableMetadataEnabled.setValue(variableMetadataEnabledInput.checked);
 });
 
 showSuggestionsInput.addEventListener('change', () => {
@@ -2369,6 +2387,9 @@ soundsEnabled.watch((value) => {
 packageUpdateToastEnabled.watch((value) => {
 	packageUpdateToastEnabledInput.checked =
 		value ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
+});
+variableMetadataEnabled.watch((value) => {
+	variableMetadataEnabledInput.checked = value ?? DEFAULT_VARIABLE_METADATA_ENABLED;
 });
 showSuggestions.watch((value) => {
 	showSuggestionsInput.checked = value ?? DEFAULT_SHOW_SUGGESTIONS;

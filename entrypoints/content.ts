@@ -72,8 +72,11 @@ import {
 	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_KEEP_ALIVE_ENABLED,
 	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
+	DEFAULT_VARIABLE_METADATA_ENABLED,
 	getPackageUpdateToastEnabled,
+	getVariableMetadataEnabled,
 	packageUpdateToastEnabled,
+	variableMetadataEnabled,
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
@@ -328,11 +331,14 @@ function getActiveVariablesSection(): HTMLElement | null {
 	return button?.closest<HTMLElement>(EDITOR_PALETTE_SECTION_SELECTOR) ?? null;
 }
 
+let variableMetadataActive = DEFAULT_VARIABLE_METADATA_ENABLED;
+
 function getVariableMetadataContext(): {
 	baseUrl: string;
 	fileId: string;
 	section: HTMLElement;
 } | null {
+	if (!variableMetadataActive) return null;
 	if (!document.documentElement.classList.contains(STYLE_CLASS)) return null;
 	const context = parseAutomationAnywherePageContext(location.href);
 	if (
@@ -664,6 +670,8 @@ async function applyInitialSettings(): Promise<void> {
 		setActiveBlockTaskbotNodeLabelClicks(await getBlockTaskbotNodeLabelClicks());
 	packageUpdateToastActive = await getPackageUpdateToastEnabled();
 	void checkPackageUpdateToast();
+	variableMetadataActive = await getVariableMetadataEnabled();
+	scheduleVariableMetadataSync();
 		setForceEnglishLocaleEnabled(await getForceEnglishLocale());
 		setKeepAliveEnabled(await getKeepAliveEnabled());
 		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
@@ -987,6 +995,10 @@ export default defineContentScript({
 		packageUpdateToastEnabled.watch((value) => {
 			packageUpdateToastActive = value ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
 			if (packageUpdateToastActive) void checkPackageUpdateToast();
+		});
+		variableMetadataEnabled.watch((value) => {
+			variableMetadataActive = value ?? DEFAULT_VARIABLE_METADATA_ENABLED;
+			scheduleVariableMetadataSync();
 		});
 		blockTaskbotNodeLabelClicks.watch((value) => {
 			setActiveBlockTaskbotNodeLabelClicks(

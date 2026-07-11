@@ -48,6 +48,9 @@ export const blockTaskbotNodeLabelClicks = storage.defineItem<boolean>(
 export const packageUpdateToastEnabled = storage.defineItem<boolean>(
 	'local:packageUpdateToastEnabled'
 );
+export const variableMetadataEnabled = storage.defineItem<boolean>(
+	'local:variableMetadataEnabled'
+);
 export const forceEnglishLocale = storage.defineItem<boolean>('local:forceEnglishLocale');
 export const forceUnsupportedControlRoomStyles = storage.defineItem<boolean>(
 	'local:forceUnsupportedControlRoomStyles'
@@ -76,11 +79,12 @@ export const DEFAULT_RUN_BUTTON_WAVES = true;
 export const DEFAULT_SOUNDS_ENABLED = false;
 export const DEFAULT_SHOW_SUGGESTIONS = true;
 export const DEFAULT_DEBUG_ENABLED = false;
-export const DEFAULT_COMMAND_PALETTE_ENABLED = true;
+export const DEFAULT_COMMAND_PALETTE_ENABLED = false;
 export const DEFAULT_KEEP_ALIVE_ENABLED = false;
-export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = true;
+export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = false;
 export const DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = false;
-export const DEFAULT_FORCE_ENGLISH_LOCALE = true;
+export const DEFAULT_VARIABLE_METADATA_ENABLED = true;
+export const DEFAULT_FORCE_ENGLISH_LOCALE = false;
 export const DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES = false;
 export const DEFAULT_EXTENSION_LANGUAGE: LanguagePreference = 'auto';
 export const DEFAULT_COMMAND_PALETTE_SHORTCUT = COMMAND_PALETTE_SHORTCUTS.ALT_P;
@@ -297,6 +301,12 @@ export async function getBlockTaskbotNodeLabelClicks(): Promise<boolean> {
 export async function getPackageUpdateToastEnabled(): Promise<boolean> {
 	return (
 		(await packageUpdateToastEnabled.getValue()) ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED
+	);
+}
+
+export async function getVariableMetadataEnabled(): Promise<boolean> {
+	return (
+		(await variableMetadataEnabled.getValue()) ?? DEFAULT_VARIABLE_METADATA_ENABLED
 	);
 }
 
