@@ -41,9 +41,11 @@ import {
 import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
 import {
 	AutomationAnywhereApi,
+	extractAutomationAnywherePackages,
 	parseAutomationAnywherePageContext,
 	readAutomationAnywhereAuthTokenFromLocalStorage,
 } from '../src/ts/automation-anywhere-api';
+import { getAutomationAnywherePackageUpdates } from '../src/ts/automation-anywhere-tools';
 import { setScrollableFoldersAutoScrollEnabled } from '../src/ts/folders';
 import { setActiveLanguagePreference, t } from '../src/ts/i18n';
 import {
@@ -69,6 +71,9 @@ import {
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_KEEP_ALIVE_ENABLED,
+	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
+	getPackageUpdateToastEnabled,
+	packageUpdateToastEnabled,
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
 	commandPaletteEnabled,
@@ -104,6 +109,7 @@ import {
 	styleValueItems,
 	stylesEnabled,
 } from '../src/ts/settings';
+import { showNotification } from '../src/ts/ui';
 import { setRunButtonAnimationEnabled } from '../src/ts/run-button-animation';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
@@ -153,6 +159,7 @@ function applyBundledAssetVariables(): void {
 
 function applyRouteClasses(): void {
 	const href = location.href;
+	void checkPackageUpdateToast();
 	document.documentElement.classList.toggle(FOLDERS_ROUTE_CLASS, isFolderRepositoryUrl(href));
 	document.documentElement.classList.toggle(TASKBOT_ROUTE_CLASS, isTaskEditorUrl(href));
 	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
@@ -564,6 +571,57 @@ function installVariableMetadataObserver(): void {
 	scheduleVariableMetadataSync();
 }
 
+const packageUpdateToastFileIds = new Set<string>();
+let packageUpdateToastActive = DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
+// Defaults change rarely; one fetch per page load is enough.
+let defaultPackageVersionsPromise: Promise<Map<string, string>> | null = null;
+
+async function checkPackageUpdateToast(): Promise<void> {
+	if (!packageUpdateToastActive) return;
+	const context = parseAutomationAnywherePageContext(location.href);
+	if (
+		(context.pageType !== 'private-taskbot' &&
+			context.pageType !== 'public-taskbot') ||
+		!context.fileId ||
+		!context.baseUrl
+	) {
+		return;
+	}
+	if (packageUpdateToastFileIds.has(context.fileId)) return;
+	packageUpdateToastFileIds.add(context.fileId);
+
+	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
+	if (!authToken) return;
+
+	try {
+		const api = new AutomationAnywhereApi(context.baseUrl, authToken);
+		const content = await api.getBotContent(context.fileId);
+		defaultPackageVersionsPromise ??= api.getDefaultPackageVersions();
+		const updates = getAutomationAnywherePackageUpdates(
+			extractAutomationAnywherePackages(content),
+			await defaultPackageVersionsPromise
+		);
+		if (!updates.length) return;
+
+		const shown = updates
+			.slice(0, 3)
+			.map((update) => `${update.name} ${update.currentVersion} → ${update.targetVersion}`)
+			.join(', ');
+		const extra = updates.length > 3 ? ` +${updates.length - 3}` : '';
+		showNotification(
+			t('Package updates available'),
+			`${t('{count} outdated:', { count: updates.length })} ${shown}${extra}`
+		);
+	} catch (error) {
+		void debugWarn(
+			'package-updates',
+			'Package update check failed.',
+			{ fileId: context.fileId, error },
+			{ feedback: true, keepDetails: true }
+		);
+	}
+}
+
 function setStyleValue(key: string, value: string): void {
 	const field = STYLE_VALUE_FIELDS.find((item) => item.key === key);
 	if (!field) return;
@@ -604,6 +662,8 @@ async function applyInitialSettings(): Promise<void> {
 		setSuggestionsEnabled(await getShowSuggestions());
 		setActiveCommandPaletteEnabled(await getCommandPaletteEnabled());
 		setActiveBlockTaskbotNodeLabelClicks(await getBlockTaskbotNodeLabelClicks());
+	packageUpdateToastActive = await getPackageUpdateToastEnabled();
+	void checkPackageUpdateToast();
 		setForceEnglishLocaleEnabled(await getForceEnglishLocale());
 		setKeepAliveEnabled(await getKeepAliveEnabled());
 		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
@@ -923,6 +983,10 @@ export default defineContentScript({
 		});
 		commandPaletteEnabled.watch((value) => {
 			setActiveCommandPaletteEnabled(value ?? DEFAULT_COMMAND_PALETTE_ENABLED);
+		});
+		packageUpdateToastEnabled.watch((value) => {
+			packageUpdateToastActive = value ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
+			if (packageUpdateToastActive) void checkPackageUpdateToast();
 		});
 		blockTaskbotNodeLabelClicks.watch((value) => {
 			setActiveBlockTaskbotNodeLabelClicks(

@@ -45,6 +45,9 @@ export const keepAliveEnabled = storage.defineItem<boolean>('local:keepAliveEnab
 export const blockTaskbotNodeLabelClicks = storage.defineItem<boolean>(
 	'local:blockTaskbotNodeLabelClicks'
 );
+export const packageUpdateToastEnabled = storage.defineItem<boolean>(
+	'local:packageUpdateToastEnabled'
+);
 export const forceEnglishLocale = storage.defineItem<boolean>('local:forceEnglishLocale');
 export const forceUnsupportedControlRoomStyles = storage.defineItem<boolean>(
 	'local:forceUnsupportedControlRoomStyles'
@@ -76,6 +79,7 @@ export const DEFAULT_DEBUG_ENABLED = false;
 export const DEFAULT_COMMAND_PALETTE_ENABLED = true;
 export const DEFAULT_KEEP_ALIVE_ENABLED = false;
 export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = true;
+export const DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = false;
 export const DEFAULT_FORCE_ENGLISH_LOCALE = true;
 export const DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES = false;
 export const DEFAULT_EXTENSION_LANGUAGE: LanguagePreference = 'auto';
@@ -287,6 +291,12 @@ export async function getBlockTaskbotNodeLabelClicks(): Promise<boolean> {
 	return (
 		(await blockTaskbotNodeLabelClicks.getValue()) ??
 		DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS
+	);
+}
+
+export async function getPackageUpdateToastEnabled(): Promise<boolean> {
+	return (
+		(await packageUpdateToastEnabled.getValue()) ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED
 	);
 }
 

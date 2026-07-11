@@ -444,6 +444,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: copy-file API unavailable.
 
+- [ ] Package update toast
+  - Source: `entrypoints/content.ts`, `src/ts/ui.ts`, `src/ts/settings.ts`
+  - Setting/id: `local:packageUpdateToastEnabled` (default off)
+  - Selectors: none; API/content based
+  - Validate: enable in Settings; open taskbot with outdated packages on `/edit` and `/view`; re-open same bot in session; reload; open up-to-date bot; disable toggle.
+  - Expected: one toast per bot per page load listing up to 3 `name current → target` plus `+N`; up-to-date bot silent; toggle off silent.
+  - Status: active
+  - Delete condition: toast setting removed or AA surfaces native update notice.
+
 - [ ] Update Packages
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `update-packages`

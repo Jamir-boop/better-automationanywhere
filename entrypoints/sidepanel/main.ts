@@ -118,6 +118,9 @@ import {
 	stylesEnabled,
 	styleDoctorLastResults,
 	apiHealthLastResults,
+	packageUpdateToastEnabled,
+	getPackageUpdateToastEnabled,
+	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
 	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
 	type OpenSidebarShortcut,
@@ -259,6 +262,13 @@ function renderToolsConfigSection(): string {
 					<small>${t('Run, error, and done tones')}</small>
 				</span>
 				<input id="soundsEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Notify outdated packages')}</strong>
+					<small>${t('Shows a toast when an open taskbot has package updates available.')}</small>
+				</span>
+				<input id="packageUpdateToastEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
@@ -623,6 +633,9 @@ const runButtonWavesInput = document.querySelector<HTMLInputElement>('#runButton
 const runButtonWavesRow =
 	runButtonWavesInput.closest<HTMLElement>('.run-button-waves-dependent')!;
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
+const packageUpdateToastEnabledInput = document.querySelector<HTMLInputElement>(
+	'#packageUpdateToastEnabled'
+)!;
 const showSuggestionsInput =
 	document.querySelector<HTMLInputElement>('#showSuggestions')!;
 const keepAliveEnabledInput =
@@ -1696,6 +1709,7 @@ async function loadState(): Promise<void> {
 	await refreshSlotStates();
 	await refreshFeedbackHistory();
 	renderSupportedBuilds();
+	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
 	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
 	previousDoctorResults = savedDoctorResults[currentDoctorView] ?? null;
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
@@ -1738,6 +1752,11 @@ soundsInput.addEventListener('change', () => {
 		type: 'SET_SOUNDS_ENABLED',
 		enabled: soundsInput.checked,
 	});
+});
+
+packageUpdateToastEnabledInput.addEventListener('change', () => {
+	// Storage watch in the content script picks this up; no message needed.
+	void packageUpdateToastEnabled.setValue(packageUpdateToastEnabledInput.checked);
 });
 
 showSuggestionsInput.addEventListener('change', () => {
@@ -2346,6 +2365,10 @@ stylesEnabled.watch((value) => {
 });
 soundsEnabled.watch((value) => {
 	soundsInput.checked = value ?? DEFAULT_SOUNDS_ENABLED;
+});
+packageUpdateToastEnabled.watch((value) => {
+	packageUpdateToastEnabledInput.checked =
+		value ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
 });
 showSuggestions.watch((value) => {
 	showSuggestionsInput.checked = value ?? DEFAULT_SHOW_SUGGESTIONS;
