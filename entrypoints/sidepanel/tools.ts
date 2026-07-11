@@ -930,6 +930,7 @@ async function refreshToolsContext(): Promise<void> {
 			if (currentTool === 'export-bots') resetExportFormatToDefault();
 			setSelectedToolPanel(currentTool);
 			renderActionButtons();
+			if (runtime) void refreshUpdatePackagesDot(runtime);
 			if (currentTool === 'taskbot-json') await loadTaskbotJson();
 			else if (currentTool !== 'universal-clipboard') await loadListPage(true);
 			return;
@@ -1126,6 +1127,52 @@ function getToolInlineHint(tool: ToolId | null): string {
 	return '';
 }
 
+const updatePackagesDotByFileId = new Map<string, boolean>();
+// Defaults change rarely; one fetch per sidepanel lifetime.
+let sidepanelDefaultVersionsPromise: Promise<Map<string, string>> | null = null;
+
+function applyUpdatePackagesDot(hasUpdates: boolean): void {
+	const button = actionsContainer.querySelector<HTMLButtonElement>(
+		'[data-tool-action="update-packages"]'
+	);
+	if (!button) return;
+	button.dataset.hasUpdates = String(hasUpdates);
+	button.title =
+		getToolActionHelp('update-packages') +
+		(hasUpdates ? ` ${t('Package updates available.')}` : '');
+}
+
+async function refreshUpdatePackagesDot(activeRuntime: ToolsRuntime): Promise<void> {
+	const fileId = activeRuntime.context.fileId;
+	if (!fileId) return;
+
+	const cached = updatePackagesDotByFileId.get(fileId);
+	if (cached !== undefined) {
+		applyUpdatePackagesDot(cached);
+		return;
+	}
+
+	try {
+		const content = await activeRuntime.api.getBotContent(fileId);
+		sidepanelDefaultVersionsPromise ??= activeRuntime.api.getDefaultPackageVersions();
+		const updates = getAutomationAnywherePackageUpdates(
+			extractAutomationAnywherePackages(content),
+			await sidepanelDefaultVersionsPromise
+		);
+		updatePackagesDotByFileId.set(fileId, updates.length > 0);
+		if (runtime !== activeRuntime) return;
+		applyUpdatePackagesDot(updates.length > 0);
+	} catch (error) {
+		void options.addFeedback(
+			'info',
+			'tools',
+			t('Package update check failed.'),
+			{ tool: 'update-packages', fileId, error },
+			{ keepDetails: true, debugOnly: true }
+		);
+	}
+}
+
 function renderActionButtons(): void {
 	const context = runtime?.context;
 	actionsContainer.textContent = '';
@@ -1143,6 +1190,11 @@ function renderActionButtons(): void {
 		});
 		actionsContainer.appendChild(button);
 	}
+
+	const dotState = context.fileId
+		? updatePackagesDotByFileId.get(context.fileId)
+		: undefined;
+	if (dotState !== undefined) applyUpdatePackagesDot(dotState);
 }
 
 async function selectTool(tool: ToolId): Promise<void> {

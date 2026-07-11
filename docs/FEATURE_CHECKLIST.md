@@ -457,8 +457,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `update-packages`
   - Selectors: none; API/content based
-  - Validate: on private taskbot `/edit`, deselect one of multiple outdated packages and update; also test private `/view` and folder mode.
-  - Expected: `/edit` lists outdated packages with current/default versions and updates only selected packages; `/view` and folder mode retain update-all behavior.
+  - Validate: on private taskbot `/edit`, deselect one of multiple outdated packages and update; also test private `/view` and folder mode; open outdated and up-to-date taskbots and hover the tool button.
+  - Expected: `/edit` lists outdated packages with current/default versions and updates only selected packages; `/view` and folder mode retain update-all behavior; outdated taskbot shows a dot on the Update Packages button with tooltip suffix 'Package updates available.' (always-on by design, user sign-off 2026-07-10; sidepanel-internal, no toggle), up-to-date taskbot shows neither.
   - Status: active
   - Delete condition: AA package schema changes beyond repair.
 

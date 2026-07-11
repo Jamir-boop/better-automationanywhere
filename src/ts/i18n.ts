@@ -32,6 +32,8 @@ const ES: Record<string, string> = {
 	'Shows a toast when an open taskbot has package updates available.':
 		'Muestra un aviso cuando un taskbot abierto tiene actualizaciones de paquetes disponibles.',
 	'Package updates available': 'Actualizaciones de paquetes disponibles',
+	'Package updates available.': 'Actualizaciones de paquetes disponibles.',
+	'Package update check failed.': 'Fallo la verificacion de actualizaciones de paquetes.',
 	'{count} outdated:': '{count} desactualizados:',
 	'Run, error, and done tones': 'Tonos de ejecutar, error y terminado',
 	'Show suggestions': 'Mostrar sugerencias',

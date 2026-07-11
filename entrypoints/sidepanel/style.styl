@@ -1077,6 +1077,20 @@ details.feedback-line[open] .feedback-summary span
 	&[data-available='true']
 		background: #3AA35C
 
+.tool-action-button
+	position: relative
+
+	&[data-has-updates='true']::after
+		content: ''
+		position: absolute
+		top: -2px
+		right: -2px
+		width: 8px
+		height: 8px
+		border-radius: 999px
+		background: var(--accent)
+		pointer-events: none
+
 .icon-button
 	display: inline-flex
 	align-items: center
