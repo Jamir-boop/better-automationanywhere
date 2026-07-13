@@ -18,7 +18,7 @@ Selector source of truth:
 
 - [ ] Better Recorder localhost bridge
   - Source: `src/ts/recorder/ws-client.ts`, `entrypoints/recorder.content.ts`, `entrypoints/background.ts`
-  - Setting/id: `local:recorderBridgeEnabled` (default `false`), `local:recorderBridgePort` (default `8765`), `local:recorderBridgeToken`
+  - Setting/id: `local:recorderBridgeEnabled` (default `true`), `local:recorderBridgePort` (default `8765`), `local:recorderBridgeToken`; port/token rows are hidden while disabled.
   - Selectors: web-page selectors are generated at runtime by `src/ts/recorder/selector.ts`; no Automation Anywhere external selector.
   - Validate: enable the bridge, start BetterRecorder on `127.0.0.1:8765`, and confirm `hello` then `ping`; run `executeVerb` against text, checkbox, radio, select, and password controls; verify Chrome debugger click and Firefox's unsupported error.
   - Expected: only the enabled local bridge receives the token; DOM requests return protocol results or `NO_MATCH`/`NOT_VISIBLE`/`NO_TAB`/`TIMEOUT`/`NOT_ALLOWED`/`INTERNAL`; password reads are rejected and debugger clicks detach after use.

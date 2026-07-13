@@ -305,15 +305,15 @@ function renderToolsConfigSection(): string {
 			<label class="setting-row">
 				<span>
 					<strong>Better Recorder bridge</strong>
-					<small>Connects to the local BetterRecorder package. Disabled by default.</small>
+					<small>Connects to the local BetterRecorder package. Enabled by default.</small>
 				</span>
 				<input id="recorderBridgeEnabled" type="checkbox">
 			</label>
-			<label class="select-row">
+			<label id="recorderBridgePortRow" class="select-row">
 				<span><strong>Recorder port</strong><small>Local WebSocket port.</small></span>
 				<input id="recorderBridgePort" type="number" min="1" max="65535" inputmode="numeric">
 			</label>
-			<label class="select-row">
+			<label id="recorderBridgeTokenRow" class="select-row">
 				<span><strong>Recorder token</strong><small>Shared only with localhost.</small></span>
 				<input id="recorderBridgeToken" type="password" autocomplete="off">
 			</label>
@@ -685,8 +685,16 @@ const blockTaskbotNodeLabelClicksInput = document.querySelector<HTMLInputElement
 const forceEnglishLocaleInput =
 	document.querySelector<HTMLInputElement>('#forceEnglishLocale')!;
 const recorderBridgeEnabledInput = document.querySelector<HTMLInputElement>('#recorderBridgeEnabled')!;
+const recorderBridgePortRow = document.querySelector<HTMLElement>('#recorderBridgePortRow')!;
+const recorderBridgeTokenRow = document.querySelector<HTMLElement>('#recorderBridgeTokenRow')!;
 const recorderBridgePortInput = document.querySelector<HTMLInputElement>('#recorderBridgePort')!;
 const recorderBridgeTokenInput = document.querySelector<HTMLInputElement>('#recorderBridgeToken')!;
+
+function updateRecorderBridgeDependentState(): void {
+	const hidden = !recorderBridgeEnabledInput.checked;
+	recorderBridgePortRow.hidden = hidden;
+	recorderBridgeTokenRow.hidden = hidden;
+}
 const forceUnsupportedControlRoomStylesInput =
 	document.querySelector<HTMLInputElement>('#forceUnsupportedControlRoomStyles')!;
 const forceUnsupportedControlRoomRow = document.querySelector<HTMLElement>(
@@ -1757,6 +1765,7 @@ async function loadState(): Promise<void> {
 	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
 	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
 	recorderBridgeEnabledInput.checked = recorderEnabled;
+	updateRecorderBridgeDependentState();
 	recorderBridgePortInput.value = String(recorderPort);
 	recorderBridgeTokenInput.value = recorderToken;
 	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
@@ -1883,6 +1892,7 @@ forceEnglishLocaleInput.addEventListener('change', () => {
 });
 
 recorderBridgeEnabledInput.addEventListener('change', () => {
+	updateRecorderBridgeDependentState();
 	void recorderBridgeEnabled.setValue(recorderBridgeEnabledInput.checked);
 });
 recorderBridgePortInput.addEventListener('change', () => {
@@ -2459,6 +2469,7 @@ forceEnglishLocale.watch((value) => {
 });
 recorderBridgeEnabled.watch((value) => {
 	recorderBridgeEnabledInput.checked = value ?? DEFAULT_RECORDER_BRIDGE_ENABLED;
+	updateRecorderBridgeDependentState();
 });
 recorderBridgePort.watch((value) => {
 	recorderBridgePortInput.value = String(value ?? DEFAULT_RECORDER_BRIDGE_PORT);

@@ -132,6 +132,49 @@ function syntheticClick(element: Element, button = 0, double = false): void {
 	if (double) dispatchMouse(element, 'dblclick', button);
 }
 
+const MAX_KEYSTROKE_DELAY_MS = 5000;
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function appendChar(element: Element, char: string): void {
+	const input = element as HTMLInputElement | HTMLTextAreaElement;
+	if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
+		Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set?.call(input, `${input.value}${char}`);
+	} else if ((element as HTMLElement).isContentEditable) {
+		(element as HTMLElement).textContent = `${(element as HTMLElement).textContent ?? ''}${char}`;
+	}
+}
+
+/** Official Recorder keystroke semantics: per char keydown -> keypress -> value+=c -> input -> keyup. */
+async function typeText(element: Element, value: string, delayMs: number, clear: boolean): Promise<void> {
+	const input = element as HTMLInputElement | HTMLTextAreaElement;
+	const editable = (element as HTMLElement).isContentEditable;
+	if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement || editable)) {
+		fail('NO_MATCH', 'Element cannot accept text.');
+	}
+	input.focus();
+	if (clear) {
+		if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
+			Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set?.call(input, '');
+		} else {
+			(element as HTMLElement).textContent = '';
+		}
+		element.dispatchEvent(new Event('input', { bubbles: true }));
+	}
+	const delay = Math.min(Math.max(0, delayMs), MAX_KEYSTROKE_DELAY_MS);
+	for (const char of value) {
+		element.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true, cancelable: true }));
+		element.dispatchEvent(new KeyboardEvent('keypress', { key: char, bubbles: true, cancelable: true }));
+		appendChar(element, char);
+		element.dispatchEvent(new Event('input', { bubbles: true }));
+		element.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true, cancelable: true }));
+		if (delay > 0) await sleep(delay);
+	}
+	element.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 function setValue(element: Element, value: string): void {
 	const input = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 	const editable = (element as HTMLElement).isContentEditable;
@@ -213,7 +256,7 @@ function propertyValue(element: Element, propertyName: unknown): string {
 	}
 }
 
-function executeVerb(target: Target, verb: RecorderVerb, payload: Record<string, any>) {
+async function executeVerb(target: Target, verb: RecorderVerb, payload: Record<string, any>) {
 	if (verb === 'exists') {
 		try {
 			const element = resolveTarget(target);
@@ -231,8 +274,14 @@ function executeVerb(target: Target, verb: RecorderVerb, payload: Record<string,
 		case 'click': syntheticClick(element); break;
 		case 'doubleClick': syntheticClick(element, 0, true); break;
 		case 'rightClick': syntheticClick(element, 2); break;
-		case 'setText': setValue(element, String(payload.value ?? '')); break;
-		case 'appendText': setValue(element, `${String((element as HTMLInputElement).value ?? element.textContent ?? '')}${String(payload.value ?? '')}`); break;
+		case 'setText':
+			if (Number(payload.delay) > 0) await typeText(element, String(payload.value ?? ''), Number(payload.delay), true);
+			else setValue(element, String(payload.value ?? ''));
+			break;
+		case 'appendText':
+			if (Number(payload.delay) > 0) await typeText(element, String(payload.value ?? ''), Number(payload.delay), false);
+			else setValue(element, `${String((element as HTMLInputElement).value ?? element.textContent ?? '')}${String(payload.value ?? '')}`);
+			break;
 		case 'getText':
 			if (isPassword(element)) fail('NOT_ALLOWED', 'Reading password text is not allowed.');
 			return { ...result, text: (element as HTMLElement).innerText ?? element.textContent ?? '' };
@@ -303,6 +352,9 @@ export default defineContentScript({
 	allFrames: false,
 	runAt: 'document_idle',
 	main() {
+		const page = globalThis as typeof globalThis & { __betterAaRecorderLoaded?: boolean };
+		if (page.__betterAaRecorderLoaded) return;
+		page.__betterAaRecorderLoaded = true;
 		browser.runtime.onMessage.addListener((message: { type?: string; request?: Request; token?: string }) => {
 			if (message.type === 'RECORDER_VIEWPORT') return { devicePixelRatio, viewportW: innerWidth, viewportH: innerHeight };
 			if (message.type === 'RECORDER_PREPARE_DEBUGGER_CLICK' && message.request) {

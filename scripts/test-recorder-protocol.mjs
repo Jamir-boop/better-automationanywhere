@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { importTsModule, root } from './lib/ts-module-loader.mjs';
 
-const { chooseRecorderTab, isRecorderVerb, normalizeRecorderTabUrl, RECORDER_VERBS, unwrapContentResponse } = await importTsModule(
+const { chooseRecorderTab, isMissingRecorderReceiver, isRecorderVerb, normalizeRecorderTabUrl, RECORDER_VERBS, unwrapContentResponse } = await importTsModule(
 	join(root, 'src', 'ts', 'recorder', 'protocol.ts')
 );
 const result = { found: true };
@@ -18,6 +18,8 @@ for (const verb of ['debuggerClick', 'toggle', 'selectItemByIndex', 'exists']) {
 	assert.equal(isRecorderVerb(verb), true, `${verb} is supported`);
 }
 assert.equal(isRecorderVerb('navigate'), false);
+assert.equal(isMissingRecorderReceiver(new Error('Could not establish connection. Receiving end does not exist.')), true);
+assert.equal(isMissingRecorderReceiver(new Error('Navigation timed out.')), false);
 
 assert.equal(normalizeRecorderTabUrl('https://example.com/form#person'), 'https://example.com/form');
 assert.deepEqual(

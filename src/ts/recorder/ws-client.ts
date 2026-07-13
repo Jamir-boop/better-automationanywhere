@@ -5,7 +5,7 @@ import {
 	getRecorderBridgePort,
 	getRecorderBridgeToken,
 } from '../settings';
-import { chooseRecorderTab, unwrapContentResponse } from './protocol';
+import { chooseRecorderTab, isMissingRecorderReceiver, unwrapContentResponse } from './protocol';
 
 type Envelope = { id: string; type: string; payload?: Record<string, unknown> };
 
@@ -46,6 +46,19 @@ export function startRecorderBridge(): void {
 			reconnectTimer = undefined;
 			void connect();
 		}, 3000) as unknown as number;
+	};
+	const ensureContentScript = async () => {
+		if (tabId === undefined) throw new Error('No controlled tab.');
+		try {
+			await browser.tabs.sendMessage(tabId, { type: 'RECORDER_VIEWPORT' });
+		} catch (cause) {
+			if (!isMissingRecorderReceiver(cause)) throw cause;
+			await browser.scripting.executeScript({
+				target: { tabId },
+				files: ['content-scripts/recorder.js'],
+			});
+			await browser.tabs.sendMessage(tabId, { type: 'RECORDER_VIEWPORT' });
+		}
 	};
 	const capture = async () => {
 		if (tabId === undefined) throw new Error('No controlled tab.');
@@ -90,6 +103,7 @@ export function startRecorderBridge(): void {
 		}
 		tabId = tab.id;
 		await browser.tabs.update(tabId, { active: true });
+		await ensureContentScript();
 		return { tabId, url: tab.url };
 	};
 	const debuggerClick = async (message: Envelope) => {

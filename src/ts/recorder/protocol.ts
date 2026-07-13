@@ -38,6 +38,12 @@ export function unwrapContentResponse<T>(value: T | RecorderContentError): T {
 	});
 }
 
+export function isMissingRecorderReceiver(cause: unknown): boolean {
+	const message = cause instanceof Error ? cause.message : String(cause);
+	return message.includes('Receiving end does not exist')
+		|| message.includes('Could not establish connection');
+}
+
 export type RecorderTabCandidate = {
 	id?: number;
 	url?: string;
