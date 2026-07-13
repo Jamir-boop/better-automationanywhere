@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.23.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.25.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -28,6 +28,10 @@ This project replaces the older Tampermonkey userscript and Stylus theme. Everyt
 ------
 
 ## Features
+
+### Better Recorder bridge
+
+The optional Better Recorder bridge connects the extension to a local `BetterRecorder` Automation Anywhere package. Enable it from the sidepanel Settings tab, enter the local port/token, and start the package session. It uses `<all_urls>` and `webNavigation` so capture actions can operate on user-selected web pages; it does not run unless enabled. Chrome's optional trusted-click verb also requires the `debugger` permission; Firefox reports that verb as unsupported.
 
 ### Universal action copy/paste
 

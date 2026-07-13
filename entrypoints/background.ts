@@ -60,6 +60,7 @@ import {
 	parseContentDispositionFileName,
 	parseJsonLike,
 } from '../src/ts/automation-anywhere-response';
+import { startRecorderBridge } from '../src/ts/recorder/ws-client';
 
 const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
 const CONTROL_ROOM_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -818,4 +819,5 @@ export default defineBackground(() => {
 
 	void setPanelActionBehavior();
 	registerOpenSidebarContextMenu();
+	startRecorderBridge();
 });

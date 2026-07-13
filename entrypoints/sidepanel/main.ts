@@ -124,6 +124,14 @@ import {
 	variableMetadataEnabled,
 	getVariableMetadataEnabled,
 	DEFAULT_VARIABLE_METADATA_ENABLED,
+	DEFAULT_RECORDER_BRIDGE_ENABLED,
+	DEFAULT_RECORDER_BRIDGE_PORT,
+	recorderBridgeEnabled,
+	recorderBridgePort,
+	recorderBridgeToken,
+	getRecorderBridgeEnabled,
+	getRecorderBridgePort,
+	getRecorderBridgeToken,
 	type BotExecutionModalPosition,
 	type CommandPaletteShortcut,
 	type OpenSidebarShortcut,
@@ -293,6 +301,21 @@ function renderToolsConfigSection(): string {
 					<small>${t('Set Automation Anywhere locale to en-US and reload when needed. Does not change this extension language.')}</small>
 				</span>
 				<input id="forceEnglishLocale" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>Better Recorder bridge</strong>
+					<small>Connects to the local BetterRecorder package. Disabled by default.</small>
+				</span>
+				<input id="recorderBridgeEnabled" type="checkbox">
+			</label>
+			<label class="select-row">
+				<span><strong>Recorder port</strong><small>Local WebSocket port.</small></span>
+				<input id="recorderBridgePort" type="number" min="1" max="65535" inputmode="numeric">
+			</label>
+			<label class="select-row">
+				<span><strong>Recorder token</strong><small>Shared only with localhost.</small></span>
+				<input id="recorderBridgeToken" type="password" autocomplete="off">
 			</label>
 		</section>
 	`;
@@ -661,6 +684,9 @@ const blockTaskbotNodeLabelClicksInput = document.querySelector<HTMLInputElement
 )!;
 const forceEnglishLocaleInput =
 	document.querySelector<HTMLInputElement>('#forceEnglishLocale')!;
+const recorderBridgeEnabledInput = document.querySelector<HTMLInputElement>('#recorderBridgeEnabled')!;
+const recorderBridgePortInput = document.querySelector<HTMLInputElement>('#recorderBridgePort')!;
+const recorderBridgeTokenInput = document.querySelector<HTMLInputElement>('#recorderBridgeToken')!;
 const forceUnsupportedControlRoomStylesInput =
 	document.querySelector<HTMLInputElement>('#forceUnsupportedControlRoomStyles')!;
 const forceUnsupportedControlRoomRow = document.querySelector<HTMLElement>(
@@ -1668,6 +1694,9 @@ async function loadState(): Promise<void> {
 		waves,
 		styleFeatures,
 		styleValues,
+		recorderEnabled,
+		recorderPort,
+		recorderToken,
 	] = await Promise.all([
 		getStylesEnabled(),
 		getSoundsEnabled(),
@@ -1685,6 +1714,9 @@ async function loadState(): Promise<void> {
 		getRunButtonWavesEnabled(),
 		getStyleFeatureValues(),
 		getStyleValues(),
+		getRecorderBridgeEnabled(),
+		getRecorderBridgePort(),
+		getRecorderBridgeToken(),
 	]);
 
 	stylesInput.checked = styles;
@@ -1724,6 +1756,9 @@ async function loadState(): Promise<void> {
 	renderSupportedBuilds();
 	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
 	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
+	recorderBridgeEnabledInput.checked = recorderEnabled;
+	recorderBridgePortInput.value = String(recorderPort);
+	recorderBridgeTokenInput.value = recorderToken;
 	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
 	previousDoctorResults = savedDoctorResults[currentDoctorView] ?? null;
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
@@ -1845,6 +1880,21 @@ forceEnglishLocaleInput.addEventListener('change', () => {
 		'info',
 		'settings'
 	);
+});
+
+recorderBridgeEnabledInput.addEventListener('change', () => {
+	void recorderBridgeEnabled.setValue(recorderBridgeEnabledInput.checked);
+});
+recorderBridgePortInput.addEventListener('change', () => {
+	const port = Number(recorderBridgePortInput.value);
+	const value = Number.isInteger(port) && port > 0 && port < 65536
+		? port
+		: DEFAULT_RECORDER_BRIDGE_PORT;
+	recorderBridgePortInput.value = String(value);
+	void recorderBridgePort.setValue(value);
+});
+recorderBridgeTokenInput.addEventListener('change', () => {
+	void recorderBridgeToken.setValue(recorderBridgeTokenInput.value);
 });
 
 forceUnsupportedControlRoomStylesInput.addEventListener('change', () => {
@@ -2406,6 +2456,15 @@ blockTaskbotNodeLabelClicks.watch((value) => {
 });
 forceEnglishLocale.watch((value) => {
 	forceEnglishLocaleInput.checked = value ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+});
+recorderBridgeEnabled.watch((value) => {
+	recorderBridgeEnabledInput.checked = value ?? DEFAULT_RECORDER_BRIDGE_ENABLED;
+});
+recorderBridgePort.watch((value) => {
+	recorderBridgePortInput.value = String(value ?? DEFAULT_RECORDER_BRIDGE_PORT);
+});
+recorderBridgeToken.watch((value) => {
+	recorderBridgeTokenInput.value = value ?? '';
 });
 forceUnsupportedControlRoomStyles.watch((value) => {
 	forceUnsupportedControlRoomStylesInput.checked =

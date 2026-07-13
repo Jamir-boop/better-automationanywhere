@@ -72,6 +72,9 @@ export const styleDoctorLastResults = storage.defineItem<Record<string, import('
 export const apiHealthLastResults = storage.defineItem<
 	import('./api-health').ApiHealthResult[]
 >('local:apiHealthLastResults');
+export const recorderBridgeEnabled = storage.defineItem<boolean>('local:recorderBridgeEnabled');
+export const recorderBridgePort = storage.defineItem<number>('local:recorderBridgePort');
+export const recorderBridgeToken = storage.defineItem<string>('local:recorderBridgeToken');
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;
@@ -91,6 +94,8 @@ export const DEFAULT_COMMAND_PALETTE_SHORTCUT = COMMAND_PALETTE_SHORTCUTS.ALT_P;
 export const DEFAULT_OPEN_SIDEBAR_SHORTCUT = OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L;
 export const DEFAULT_BOT_EXECUTION_MODAL_POSITION =
 	BOT_EXECUTION_MODAL_POSITIONS.TOP_RIGHT;
+export const DEFAULT_RECORDER_BRIDGE_ENABLED = false;
+export const DEFAULT_RECORDER_BRIDGE_PORT = 8765;
 
 export const OPEN_SIDEBAR_SHORTCUT_LABELS: Record<OpenSidebarShortcut, string> = {
 	[OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L]: 'Alt + Shift + L',
@@ -369,6 +374,19 @@ export async function getBotExecutionModalPosition(): Promise<BotExecutionModalP
 	return normalizeBotExecutionModalPosition(
 		await botExecutionModalPosition.getValue()
 	);
+}
+
+export async function getRecorderBridgeEnabled(): Promise<boolean> {
+	return (await recorderBridgeEnabled.getValue()) ?? DEFAULT_RECORDER_BRIDGE_ENABLED;
+}
+
+export async function getRecorderBridgePort(): Promise<number> {
+	const value = Number(await recorderBridgePort.getValue());
+	return Number.isInteger(value) && value > 0 && value < 65536 ? value : DEFAULT_RECORDER_BRIDGE_PORT;
+}
+
+export async function getRecorderBridgeToken(): Promise<string> {
+	return (await recorderBridgeToken.getValue()) ?? '';
 }
 
 export function getCommandPaletteShortcutLabel(
