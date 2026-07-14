@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.30.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.32.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -42,6 +42,7 @@ Copy and paste bot actions between different Control Rooms in the same browser.
 Notes:
 
 - Clipboard slots use extension storage with its normal quota removed.
+- Enable **Browser context menu** in Settings to show the extension's right-click commands. TaskBot editors add **Universal Clipboard** submenus for Slots 1–3; each slot always offers Copy and shows Paste only while that slot contains data.
 - Available non-secure capture screenshots and thumbnails are embedded in portable Action JSON. Cross-bot paste uploads them into the target bot metadata and rewrites the action paths; same-bot paste reuses the existing paths.
 - Selector blobs, variables, and package references remain in Automation Anywhere's native action JSON. The portable resource envelope and image bytes are removed before native paste.
 - If Automation Anywhere's page clipboard is full, TaskBot paste automatically sends the largest fitting top-level action groups in order. Loops, conditions, branches, and their children are never split internally. This fallback can be disabled in Settings.
@@ -216,7 +217,7 @@ Examples:
 
 Open the extension sidebar from the toolbar or configured shortcut.
 
-- **Config:** shortcuts, sounds, suggestions, keep-alive, package and MessageBox notifications, chunked clipboard paste, language, and debug controls.
+- **Config:** shortcuts, sounds, suggestions, keep-alive, browser context menu, package and MessageBox notifications, chunked clipboard paste, language, and debug controls.
 - **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.
 - **Tools:** context-aware Control Room tools; export format appears when Export Bots is selected.
 

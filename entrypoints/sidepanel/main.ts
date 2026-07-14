@@ -64,6 +64,7 @@ import {
 	BOT_EXECUTION_MODAL_POSITION_OPTIONS,
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
 	DEFAULT_BOT_EXECUTION_MODAL_POSITION,
+	DEFAULT_BROWSER_CONTEXT_MENU_ENABLED,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_DEBUG_ENABLED,
 	DEFAULT_EXTENSION_LANGUAGE,
@@ -82,6 +83,7 @@ import {
 	STYLE_VALUE_FIELDS,
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
+	browserContextMenuEnabled,
 	chunkedClipboardPasteEnabled,
 	commandPaletteEnabled,
 	commandPaletteShortcut,
@@ -91,6 +93,7 @@ import {
 	forceUnsupportedControlRoomStyles,
 	getBlockTaskbotNodeLabelClicks,
 	getBotExecutionModalPosition,
+	getBrowserContextMenuEnabled,
 	getCommandPaletteEnabled,
 	getChunkedClipboardPasteEnabled,
 	getCommandPaletteShortcut,
@@ -293,6 +296,13 @@ function renderToolsConfigSection(): string {
 					<small>${t('Checks saved TaskBots for message boxes without a definite positive timeout.')}</small>
 				</span>
 				<input id="nonClosingMessageBoxWarningEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Browser context menu')}</strong>
+					<small>${t('Shows Open Sidebar and Universal Clipboard commands in the browser right-click menu.')}</small>
+				</span>
+				<input id="browserContextMenuEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
@@ -691,6 +701,9 @@ const packageUpdateToastEnabledInput = document.querySelector<HTMLInputElement>(
 )!;
 const nonClosingMessageBoxWarningEnabledInput =
 	document.querySelector<HTMLInputElement>('#nonClosingMessageBoxWarningEnabled')!;
+const browserContextMenuEnabledInput = document.querySelector<HTMLInputElement>(
+	'#browserContextMenuEnabled'
+)!;
 const chunkedClipboardPasteEnabledInput = document.querySelector<HTMLInputElement>(
 	'#chunkedClipboardPasteEnabled'
 )!;
@@ -1790,6 +1803,7 @@ async function loadState(): Promise<void> {
 	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
 	nonClosingMessageBoxWarningEnabledInput.checked =
 		await getNonClosingMessageBoxWarningEnabled();
+	browserContextMenuEnabledInput.checked = await getBrowserContextMenuEnabled();
 	chunkedClipboardPasteEnabledInput.checked = await getChunkedClipboardPasteEnabled();
 	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
 	recorderBridgeEnabledInput.checked = recorderEnabled;
@@ -1923,6 +1937,10 @@ nonClosingMessageBoxWarningEnabledInput.addEventListener('change', () => {
 	void nonClosingMessageBoxWarningEnabled.setValue(
 		nonClosingMessageBoxWarningEnabledInput.checked
 	);
+});
+
+browserContextMenuEnabledInput.addEventListener('change', () => {
+	void browserContextMenuEnabled.setValue(browserContextMenuEnabledInput.checked);
 });
 
 chunkedClipboardPasteEnabledInput.addEventListener('change', () => {
@@ -2510,6 +2528,9 @@ forceEnglishLocale.watch((value) => {
 nonClosingMessageBoxWarningEnabled.watch((value) => {
 	nonClosingMessageBoxWarningEnabledInput.checked =
 		value ?? DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
+});
+browserContextMenuEnabled.watch((value) => {
+	browserContextMenuEnabledInput.checked = value ?? DEFAULT_BROWSER_CONTEXT_MENU_ENABLED;
 });
 chunkedClipboardPasteEnabled.watch((value) => {
 	chunkedClipboardPasteEnabledInput.checked =

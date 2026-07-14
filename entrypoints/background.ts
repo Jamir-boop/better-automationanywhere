@@ -1,6 +1,7 @@
 import type {
 	AutomationAnywhereApiRequestMessage,
 	AutomationAnywhereApiResponse,
+	ContentActionMessage,
 	ContentActionResponse,
 	ControlRoomCompatibilityMessage,
 	ControlRoomCompatibilityResponse,
@@ -16,6 +17,7 @@ import {
 	AUTOMATION_ANYWHERE_MATCHES,
 	isAutomationAnywhereApiUrl,
 	isAutomationAnywhereUrl,
+	parseAutomationAnywhereTaskEditorRoute,
 } from '../src/ts/automation-anywhere';
 import {
 	getAutomationAnywhereAuthToken,
@@ -30,6 +32,7 @@ import {
 import {
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
+	browserContextMenuEnabled,
 	commandPaletteEnabled,
 	commandPaletteShortcut,
 	debugEnabled,
@@ -38,6 +41,7 @@ import {
 	forceUnsupportedControlRoomStyles,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
+	getBrowserContextMenuEnabled,
 	getOpenSidebarShortcut,
 	getOpenSidebarShortcutLabel,
 	getStylesEnabled,
@@ -54,6 +58,7 @@ import {
 	styleValueItems,
 	stylesEnabled,
 } from '../src/ts/settings';
+import { universalClipboardSlot } from '../src/ts/universal-clipboard-storage';
 import { debugError, debugInfo, debugWarn } from '../src/ts/debug';
 import {
 	extractApiErrorMessage,
@@ -66,6 +71,22 @@ const FALLBACK_OPEN_SIDEBAR_SHORTCUT = 'Alt + Shift + L';
 const CONTROL_ROOM_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SLOW_API_REQUEST_MS = 2000;
 const OPEN_SIDEBAR_CONTEXT_MENU_ID = 'open-better-aa-sidebar';
+const UNIVERSAL_CLIPBOARD_CONTEXT_MENU_ID = 'better-aa-universal-clipboard';
+const CONTEXT_MENU_CLIPBOARD_SLOTS = [1, 2, 3] as const;
+
+type UniversalClipboardSlot = (typeof CONTEXT_MENU_CLIPBOARD_SLOTS)[number];
+
+function getClipboardSlotContextMenuId(slot: UniversalClipboardSlot): string {
+	return `better-aa-universal-slot-${slot}`;
+}
+
+function getClipboardCopyContextMenuId(slot: UniversalClipboardSlot): string {
+	return `better-aa-universal-copy-${slot}`;
+}
+
+function getClipboardPasteContextMenuId(slot: UniversalClipboardSlot): string {
+	return `better-aa-universal-paste-${slot}`;
+}
 
 const controlRoomVersionCache = new Map<
 	string,
@@ -364,21 +385,51 @@ function getContextMenusApi(): any {
 	);
 }
 
-function createOpenSidebarContextMenu(): void {
+function getContextMenuTitle(
+	key: Parameters<typeof browser.i18n.getMessage>[0],
+	fallback: string
+): string {
+	return browser.i18n.getMessage(key) || fallback;
+}
+
+function createBrowserContextMenus(): void {
 	const menus = getContextMenusApi();
 	if (!menus?.create) return;
 
-	try {
+	menus.create({
+		id: OPEN_SIDEBAR_CONTEXT_MENU_ID,
+		title: getContextMenuTitle('openSidebarCommandDescription', 'Open extension sidebar'),
+		contexts: ['all'],
+		documentUrlPatterns: [...AUTOMATION_ANYWHERE_MATCHES],
+		visible: false,
+	});
+	menus.create({
+		id: UNIVERSAL_CLIPBOARD_CONTEXT_MENU_ID,
+		title: getContextMenuTitle('universalClipboardContextMenu', 'Universal Clipboard'),
+		contexts: ['all'],
+		documentUrlPatterns: [...AUTOMATION_ANYWHERE_MATCHES],
+		visible: false,
+	});
+	for (const slot of CONTEXT_MENU_CLIPBOARD_SLOTS) {
 		menus.create({
-			id: OPEN_SIDEBAR_CONTEXT_MENU_ID,
-			title:
-				browser.i18n.getMessage('openSidebarCommandDescription') ||
-				'Open extension sidebar',
+			id: getClipboardSlotContextMenuId(slot),
+			parentId: UNIVERSAL_CLIPBOARD_CONTEXT_MENU_ID,
+			title: `${getContextMenuTitle('universalClipboardSlotContextMenu', 'Slot')} ${slot}`,
 			contexts: ['all'],
-			documentUrlPatterns: [...AUTOMATION_ANYWHERE_MATCHES],
 		});
-	} catch (error) {
-		void debugWarn('background', 'Context menu creation failed.', { error });
+		menus.create({
+			id: getClipboardCopyContextMenuId(slot),
+			parentId: getClipboardSlotContextMenuId(slot),
+			title: getContextMenuTitle('universalCopyContextMenu', 'Copy selected actions'),
+			contexts: ['all'],
+		});
+		menus.create({
+			id: getClipboardPasteContextMenuId(slot),
+			parentId: getClipboardSlotContextMenuId(slot),
+			title: getContextMenuTitle('universalPasteContextMenu', 'Paste copied actions'),
+			contexts: ['all'],
+			visible: false,
+		});
 	}
 }
 
@@ -404,20 +455,138 @@ function openSidebarFromContextMenu(tabId?: number): void {
 	openFirefoxSidebarFromUserAction(request);
 }
 
-function registerOpenSidebarContextMenu(): void {
+function isTaskEditorContextMenuUrl(url: unknown): url is string {
+	return isAutomationAnywhereUrl(url) && parseAutomationAnywhereTaskEditorRoute(url) !== null;
+}
+
+async function getActiveContextMenuTab(): Promise<
+	Awaited<ReturnType<typeof browser.tabs.query>>[number] | undefined
+> {
+	return (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+}
+
+async function refreshBrowserContextMenu(
+	tab?: { id?: number; url?: string; active?: boolean }
+): Promise<void> {
+	const menus = getContextMenusApi();
+	if (!menus?.update) return;
+
+	try {
+		const activeTab = tab ?? (await getActiveContextMenuTab());
+		const enabled = await getBrowserContextMenuEnabled();
+		const clipboardVisible = enabled && isTaskEditorContextMenuUrl(activeTab?.url);
+		const clipboardValues = clipboardVisible
+			? await Promise.all(
+					CONTEXT_MENU_CLIPBOARD_SLOTS.map((slot) =>
+						universalClipboardSlot(slot).getValue()
+					)
+				)
+			: CONTEXT_MENU_CLIPBOARD_SLOTS.map(() => null);
+		await Promise.all([
+			Promise.resolve(
+				menus.update(OPEN_SIDEBAR_CONTEXT_MENU_ID, {
+					visible: enabled,
+				})
+			),
+			Promise.resolve(
+				menus.update(UNIVERSAL_CLIPBOARD_CONTEXT_MENU_ID, {
+					visible: clipboardVisible,
+				})
+			),
+			...CONTEXT_MENU_CLIPBOARD_SLOTS.map((slot, index) =>
+				Promise.resolve(
+					menus.update(getClipboardPasteContextMenuId(slot), {
+						visible: clipboardVisible && Boolean(clipboardValues[index]?.trim()),
+					})
+				)
+			),
+		]);
+	} catch (error) {
+		void debugWarn('background', 'Context menu visibility update failed.', { error });
+	}
+}
+
+async function resetBrowserContextMenus(): Promise<void> {
+	const menus = getContextMenusApi();
+	if (!menus?.removeAll) return;
+
+	try {
+		await Promise.resolve(menus.removeAll());
+		createBrowserContextMenus();
+		await refreshBrowserContextMenu();
+	} catch (error) {
+		void debugWarn('background', 'Context menu synchronization failed.', { error });
+	}
+}
+
+async function runClipboardContextMenuAction(
+	action: 'copy' | 'paste',
+	slot: UniversalClipboardSlot,
+	tab?: { id?: number; url?: string }
+): Promise<void> {
+	if (tab?.id === undefined || !isTaskEditorContextMenuUrl(tab.url)) {
+		return;
+	}
+	if (action === 'paste' && !(await universalClipboardSlot(slot).getValue())?.trim()) return;
+	const message: ContentActionMessage = {
+		type: action === 'copy' ? 'COPY_TO_SLOT' : 'PASTE_FROM_SLOT',
+		slot,
+	};
+
+	try {
+		await browser.tabs.sendMessage(tab.id, message);
+	} catch (error) {
+		void debugWarn('background', 'Universal Clipboard context menu action failed.', {
+			action,
+			slot,
+			tabId: tab.id,
+			error,
+		});
+	}
+}
+
+function registerBrowserContextMenus(): void {
 	const menus = getContextMenusApi();
 	if (!menus?.onClicked?.addListener) return;
-
 	if (import.meta.env.FIREFOX) {
-		createOpenSidebarContextMenu();
+		void resetBrowserContextMenus();
 	} else {
-		browser.runtime.onInstalled.addListener(createOpenSidebarContextMenu);
+		browser.runtime.onInstalled.addListener(() => void resetBrowserContextMenus());
 	}
 
-	menus.onClicked.addListener((info: any, tab?: { id?: number }) => {
-		if (info?.menuItemId !== OPEN_SIDEBAR_CONTEXT_MENU_ID) return;
-		openSidebarFromContextMenu(tab?.id);
+	menus.onClicked.addListener((info: any, tab?: { id?: number; url?: string }) => {
+		void (async () => {
+			if (!(await getBrowserContextMenuEnabled())) return;
+			if (info?.menuItemId === OPEN_SIDEBAR_CONTEXT_MENU_ID) {
+				openSidebarFromContextMenu(tab?.id);
+				return;
+			}
+			for (const slot of CONTEXT_MENU_CLIPBOARD_SLOTS) {
+				if (info?.menuItemId === getClipboardCopyContextMenuId(slot)) {
+					await runClipboardContextMenuAction('copy', slot, tab);
+					return;
+				}
+				if (info?.menuItemId === getClipboardPasteContextMenuId(slot)) {
+					await runClipboardContextMenuAction('paste', slot, tab);
+					return;
+				}
+			}
+		})();
 	});
+
+	browserContextMenuEnabled.watch(() => void refreshBrowserContextMenu());
+	CONTEXT_MENU_CLIPBOARD_SLOTS.forEach((slot) => {
+		universalClipboardSlot(slot).watch(() => void refreshBrowserContextMenu());
+	});
+	browser.tabs.onActivated.addListener(({ tabId }) => {
+		void browser.tabs.get(tabId).then(refreshBrowserContextMenu);
+	});
+	browser.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+		if (!tab.active || (!changeInfo.url && changeInfo.status !== 'complete')) return;
+		void refreshBrowserContextMenu(tab);
+	});
+	browser.windows.onFocusChanged.addListener(() => void refreshBrowserContextMenu());
+	void refreshBrowserContextMenu();
 }
 
 async function handleSettingsMessage(message: SettingsBackgroundMessage): Promise<void> {
@@ -801,7 +970,12 @@ export default defineBackground(() => {
 
 	browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 		if (!message || typeof message.type !== 'string') return;
-		if (message.type === 'AA_ROUTE_CHANGED') return;
+		if (message.type === 'AA_ROUTE_CHANGED') {
+			if (sender.tab?.active !== false) {
+				void refreshBrowserContextMenu({ ...sender.tab, url: message.url });
+			}
+			return;
+		}
 		if (
 			message.type === 'OPEN_SIDEBAR' &&
 			import.meta.env.CHROME &&
@@ -834,6 +1008,6 @@ export default defineBackground(() => {
 	});
 
 	void setPanelActionBehavior();
-	registerOpenSidebarContextMenu();
+	registerBrowserContextMenus();
 	startRecorderBridge();
 });

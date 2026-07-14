@@ -15,6 +15,22 @@
     "message": "Open extension sidebar",
     "description": "Command description for opening the sidebar"
   },
+  "universalClipboardContextMenu": {
+    "message": "Universal Clipboard",
+    "description": "Browser context menu for Universal Clipboard actions"
+  },
+  "universalClipboardSlotContextMenu": {
+    "message": "Slot",
+    "description": "Named Universal Clipboard slot browser context menu prefix"
+  },
+  "universalCopyContextMenu": {
+    "message": "Copy selected actions",
+    "description": "Browser context menu action that copies selected TaskBot actions"
+  },
+  "universalPasteContextMenu": {
+    "message": "Paste copied actions",
+    "description": "Browser context menu action that pastes TaskBot actions from the Auto slot"
+  },
   "toggleStylesCommandDescription": {
     "message": "Toggle all custom styles",
     "description": "Command description for toggling injected styles"

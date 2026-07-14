@@ -51,6 +51,9 @@ export const packageUpdateToastEnabled = storage.defineItem<boolean>(
 export const nonClosingMessageBoxWarningEnabled = storage.defineItem<boolean>(
 	'local:nonClosingMessageBoxWarningEnabled'
 );
+export const browserContextMenuEnabled = storage.defineItem<boolean>(
+	'local:browserContextMenuEnabled'
+);
 export const variableMetadataEnabled = storage.defineItem<boolean>(
 	'local:variableMetadataEnabled'
 );
@@ -93,6 +96,7 @@ export const DEFAULT_KEEP_ALIVE_ENABLED = false;
 export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = false;
 export const DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = false;
 export const DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED = false;
+export const DEFAULT_BROWSER_CONTEXT_MENU_ENABLED = false;
 export const DEFAULT_VARIABLE_METADATA_ENABLED = true;
 export const DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED = true;
 export const DEFAULT_FORCE_ENGLISH_LOCALE = false;
@@ -321,6 +325,12 @@ export async function getNonClosingMessageBoxWarningEnabled(): Promise<boolean> 
 	return (
 		(await nonClosingMessageBoxWarningEnabled.getValue()) ??
 		DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED
+	);
+}
+
+export async function getBrowserContextMenuEnabled(): Promise<boolean> {
+	return (
+		(await browserContextMenuEnabled.getValue()) ?? DEFAULT_BROWSER_CONTEXT_MENU_ENABLED
 	);
 }
 

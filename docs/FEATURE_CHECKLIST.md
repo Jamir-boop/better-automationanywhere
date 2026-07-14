@@ -342,6 +342,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: AA shared clipboard mechanism removed.
 
+- [ ] Browser context menu
+  - Source: `entrypoints/background.ts`, `entrypoints/sidepanel/main.ts`, `src/ts/settings.ts`
+  - Setting/id: `local:browserContextMenuEnabled` (default off)
+  - Selectors: reuses `shared-copy-button` and `shared-paste-button` through the existing Universal Clipboard messages; no new external selectors
+  - Validate: with the setting disabled and enabled, right-click Automation Anywhere folders and private/public TaskBot editors in Chrome and Firefox; copy capture actions through Slots 1–3, clear and repopulate each slot, navigate between SPA routes, and switch tabs/windows.
+  - Expected: disabled hides every extension context-menu entry; enabled shows Open Sidebar on Automation Anywhere pages and Universal Clipboard only on TaskBot editors; Slots 1–3 each expose Copy, while their Paste item is hidden whenever that slot is empty; every slot retains the existing portable metadata, capture-resource, chunking, and notification behavior.
+  - Status: active
+  - Delete condition: browser context-menu shortcuts are removed or replaced.
+
 - [ ] Clipboard slots 0 to 3
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
   - Setting/id: `local:universalClipboardSlot1..3`

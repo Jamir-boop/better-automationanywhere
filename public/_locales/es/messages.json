@@ -15,6 +15,22 @@
     "message": "Abrir panel de la extension",
     "description": "Command description for opening the sidebar"
   },
+  "universalClipboardContextMenu": {
+    "message": "Portapapeles universal",
+    "description": "Browser context menu for Universal Clipboard actions"
+  },
+  "universalClipboardSlotContextMenu": {
+    "message": "Ranura",
+    "description": "Named Universal Clipboard slot browser context menu prefix"
+  },
+  "universalCopyContextMenu": {
+    "message": "Copiar acciones seleccionadas",
+    "description": "Browser context menu action that copies selected TaskBot actions"
+  },
+  "universalPasteContextMenu": {
+    "message": "Pegar acciones copiadas",
+    "description": "Browser context menu action that pastes TaskBot actions from the Auto slot"
+  },
   "toggleStylesCommandDescription": {
     "message": "Alternar todos los estilos personalizados",
     "description": "Command description for toggling injected styles"

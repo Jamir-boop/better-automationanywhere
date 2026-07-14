@@ -28,6 +28,9 @@ const ES: Record<string, string> = {
 	'Notify outdated packages': 'Notificar paquetes desactualizados',
 	'Warn about non-closing message boxes':
 		'Advertir sobre cuadros de mensaje que no se cierran',
+	'Browser context menu': 'Menu contextual del navegador',
+	'Shows Open Sidebar and Universal Clipboard commands in the browser right-click menu.':
+		'Muestra los comandos Abrir panel y Portapapeles universal en el menu contextual del navegador.',
 	'Chunk oversized clipboard pastes':
 		'Dividir pegados grandes del portapapeles',
 	'Automatically split large TaskBot pastes when Automation Anywhere storage is full.':
