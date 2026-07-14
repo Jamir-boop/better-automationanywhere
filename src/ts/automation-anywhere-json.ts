@@ -26,6 +26,13 @@ export interface AutomationAnywhereJsonStats {
 	variableCount: number;
 }
 
+export interface NonClosingMessageBoxFinding {
+	uid?: string;
+	packageName: string;
+	commandName: string;
+	reason: 'auto-close-disabled' | 'timeout-missing' | 'timeout-not-positive';
+}
+
 export interface AutomationAnywhereRepositoryReference {
 	value: string;
 	count: number;
@@ -84,6 +91,83 @@ export function flattenNodes(nodes: unknown): JsonRecord[] {
 	}
 
 	return result;
+}
+
+const MESSAGE_BOX_PLUS_COMMANDS = new Set([
+	'showboolean',
+	'showdictionary',
+	'showlist',
+	'shownumber',
+	'showrecord',
+	'showstring',
+	'showtable',
+]);
+
+function findAttribute(node: JsonRecord, name: string): JsonRecord | undefined {
+	if (!Array.isArray(node.attributes)) return undefined;
+	return node.attributes.find(
+		(attribute): attribute is JsonRecord =>
+			isRecord(attribute) && String(attribute.name).toLowerCase() === name.toLowerCase()
+	);
+}
+
+function readAttributeValue(attribute: JsonRecord | undefined): JsonRecord | undefined {
+	return attribute && isRecord(attribute.value) ? attribute.value : undefined;
+}
+
+export function findNonClosingMessageBoxes(content: unknown): NonClosingMessageBoxFinding[] {
+	if (!isRecord(content) || !Array.isArray(content.nodes)) return [];
+	const findings: NonClosingMessageBoxFinding[] = [];
+
+	function visit(value: unknown): void {
+		if (Array.isArray(value)) {
+			value.forEach(visit);
+			return;
+		}
+		if (!isRecord(value)) return;
+
+		const packageName = typeof value.packageName === 'string' ? value.packageName : '';
+		const commandName = typeof value.commandName === 'string' ? value.commandName : '';
+		const normalizedPackage = packageName.toLowerCase();
+		const normalizedCommand = commandName.toLowerCase();
+		const autoCloseName =
+			normalizedPackage === 'messagebox' && normalizedCommand === 'messagebox'
+				? 'closeMsgBox'
+				: normalizedPackage === 'messageboxplus' &&
+					  MESSAGE_BOX_PLUS_COMMANDS.has(normalizedCommand)
+					? 'isChecked'
+					: null;
+
+		if (autoCloseName) {
+			const autoClose = readAttributeValue(findAttribute(value, autoCloseName));
+			const timeout = readAttributeValue(findAttribute(value, 'timeOut'));
+			let reason: NonClosingMessageBoxFinding['reason'] | null = null;
+			if (autoClose?.boolean !== true) {
+				reason = 'auto-close-disabled';
+			} else if (!timeout) {
+				reason = 'timeout-missing';
+			} else if (
+				String(timeout.type).toUpperCase() === 'NUMBER' &&
+				!(Number(timeout.number) > 0)
+			) {
+				reason = 'timeout-not-positive';
+			}
+
+			if (reason) {
+				findings.push({
+					...(typeof value.uid === 'string' ? { uid: value.uid } : {}),
+					packageName,
+					commandName,
+					reason,
+				});
+			}
+		}
+
+		for (const nested of Object.values(value)) visit(nested);
+	}
+
+	visit(content.nodes);
+	return findings;
 }
 
 export function getAutomationAnywhereJsonStats(value: unknown): AutomationAnywhereJsonStats {

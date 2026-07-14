@@ -18,13 +18,16 @@ import {
 	ACTIVE_EDITOR_PALETTE_VARIABLES_SELECTOR,
 	EDITOR_PALETTE_SECTION_SELECTOR,
 	FOLDER_REFRESH_SELECTOR,
+	NATIVE_TOAST_SELECTOR,
 	SHARED_COPY_BUTTON_SELECTOR,
 	SHARED_PASTE_BUTTON_SELECTOR,
 	TASK_EDITOR_CAPABILITY_SELECTOR,
+	TASKBOT_SAVE_BUTTON_SELECTOR,
 	VARIABLE_LABEL_SELECTOR,
 	VARIABLE_LABEL_TEXT_SELECTOR,
 	VARIABLE_ROW_SELECTOR,
 } from '../src/ts/automation-anywhere-selectors';
+import { findNonClosingMessageBoxes } from '../src/ts/automation-anywhere-json';
 import {
 	clampBackgroundColorValue,
 	getBackgroundColorRgbChannels,
@@ -71,11 +74,14 @@ import {
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_KEEP_ALIVE_ENABLED,
+	DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED,
 	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
 	DEFAULT_VARIABLE_METADATA_ENABLED,
 	getPackageUpdateToastEnabled,
+	getNonClosingMessageBoxWarningEnabled,
 	getVariableMetadataEnabled,
 	packageUpdateToastEnabled,
+	nonClosingMessageBoxWarningEnabled,
 	variableMetadataEnabled,
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
@@ -579,8 +585,13 @@ function installVariableMetadataObserver(): void {
 
 const packageUpdateToastFileIds = new Set<string>();
 let packageUpdateToastActive = DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
+let nonClosingMessageBoxWarningActive =
+	DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
 // Defaults change rarely; one fetch per page load is enough.
 let defaultPackageVersionsPromise: Promise<Map<string, string>> | null = null;
+let nativeSaveObserver: MutationObserver | null = null;
+let nativeSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+const NATIVE_SAVE_TIMEOUT_MS = 30_000;
 
 async function checkPackageUpdateToast(): Promise<void> {
 	if (!packageUpdateToastActive) return;
@@ -611,12 +622,13 @@ async function checkPackageUpdateToast(): Promise<void> {
 
 		const shown = updates
 			.slice(0, 3)
-			.map((update) => `${update.name} ${update.currentVersion} → ${update.targetVersion}`)
-			.join(', ');
-		const extra = updates.length > 3 ? ` +${updates.length - 3}` : '';
+			.map((update) => `${update.name} ${update.currentVersion} → ${update.targetVersion}`);
+		if (updates.length > 3) {
+			shown.push(t('+{count} more', { count: updates.length - 3 }));
+		}
 		showNotification(
-			t('Package updates available'),
-			`${t('{count} outdated:', { count: updates.length })} ${shown}${extra}`
+			t('Package updates available ({count})', { count: updates.length }),
+			shown
 		);
 	} catch (error) {
 		void debugWarn(
@@ -626,6 +638,84 @@ async function checkPackageUpdateToast(): Promise<void> {
 			{ feedback: true, keepDetails: true }
 		);
 	}
+}
+
+function clearNativeSaveWait(): void {
+	nativeSaveObserver?.disconnect();
+	nativeSaveObserver = null;
+	if (nativeSaveTimeout !== null) clearTimeout(nativeSaveTimeout);
+	nativeSaveTimeout = null;
+}
+
+function addedNodeContainsNativeToast(node: Node): boolean {
+	if (!(node instanceof Element)) return false;
+	const toast = node.matches(NATIVE_TOAST_SELECTOR)
+		? node
+		: node.querySelector(NATIVE_TOAST_SELECTOR);
+	return Boolean(toast && !toast.closest('#better-aa-toast-host'));
+}
+
+async function checkSavedTaskbotForNonClosingMessageBoxes(
+	fileId: string,
+	baseUrl: string
+): Promise<void> {
+	const context = parseAutomationAnywherePageContext(location.href);
+	if (context.fileId !== fileId || context.baseUrl !== baseUrl) return;
+	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
+	if (!authToken) return;
+
+	try {
+		const content = await new AutomationAnywhereApi(baseUrl, authToken).getBotContent(fileId);
+		const findings = findNonClosingMessageBoxes(content);
+		if (!findings.length) return;
+		const shown = findings
+			.slice(0, 3)
+			.map((finding) => `${finding.packageName}.${finding.commandName}`);
+		if (findings.length > 3) {
+			shown.push(t('+{count} more', { count: findings.length - 3 }));
+		}
+		showNotification(
+			t('Message boxes may never close ({count})', { count: findings.length }),
+			shown
+		);
+	} catch (error) {
+		void debugWarn(
+			'message-box-warning',
+			'Message-box save check failed.',
+			{ fileId, error },
+			{ feedback: true, keepDetails: true }
+		);
+	}
+}
+
+function installNativeSaveWarning(): void {
+	document.addEventListener(
+		'click',
+		(event) => {
+			if (!nonClosingMessageBoxWarningActive || !document.body) return;
+			const button =
+				event.target instanceof Element
+					? event.target.closest<HTMLButtonElement>(TASKBOT_SAVE_BUTTON_SELECTOR)
+					: null;
+			if (!button || button.disabled) return;
+			const context = parseAutomationAnywherePageContext(location.href);
+			if (!context.fileId || !context.baseUrl || !isTaskEditorUrl(location.href)) return;
+
+			clearNativeSaveWait();
+			const { fileId, baseUrl } = context;
+			nativeSaveObserver = new MutationObserver((records) => {
+				const saved = records.some((record) =>
+					[...record.addedNodes].some(addedNodeContainsNativeToast)
+				);
+				if (!saved) return;
+				clearNativeSaveWait();
+				void checkSavedTaskbotForNonClosingMessageBoxes(fileId, baseUrl);
+			});
+			nativeSaveObserver.observe(document.body, { childList: true, subtree: true });
+			nativeSaveTimeout = setTimeout(clearNativeSaveWait, NATIVE_SAVE_TIMEOUT_MS);
+		},
+		true
+	);
 }
 
 function setStyleValue(key: string, value: string): void {
@@ -670,6 +760,8 @@ async function applyInitialSettings(): Promise<void> {
 		setActiveBlockTaskbotNodeLabelClicks(await getBlockTaskbotNodeLabelClicks());
 	packageUpdateToastActive = await getPackageUpdateToastEnabled();
 	void checkPackageUpdateToast();
+	nonClosingMessageBoxWarningActive =
+		await getNonClosingMessageBoxWarningEnabled();
 	variableMetadataActive = await getVariableMetadataEnabled();
 	scheduleVariableMetadataSync();
 		setForceEnglishLocaleEnabled(await getForceEnglishLocale());
@@ -975,7 +1067,10 @@ export default defineContentScript({
 			return handleRuntimeMessage(message);
 		});
 		await applyInitialSettings();
-		if (isTopFrame()) startGlobalClipboardWatcher();
+		if (isTopFrame()) {
+			startGlobalClipboardWatcher();
+			installNativeSaveWarning();
+		}
 
 		stylesEnabled.watch(() => {
 			void applyStyleClasses();
@@ -995,6 +1090,11 @@ export default defineContentScript({
 		packageUpdateToastEnabled.watch((value) => {
 			packageUpdateToastActive = value ?? DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
 			if (packageUpdateToastActive) void checkPackageUpdateToast();
+		});
+		nonClosingMessageBoxWarningEnabled.watch((value) => {
+			nonClosingMessageBoxWarningActive =
+				value ?? DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
+			if (!nonClosingMessageBoxWarningActive) clearNativeSaveWait();
 		});
 		variableMetadataEnabled.watch((value) => {
 			variableMetadataActive = value ?? DEFAULT_VARIABLE_METADATA_ENABLED;

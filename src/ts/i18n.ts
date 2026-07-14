@@ -26,6 +26,8 @@ const ES: Record<string, string> = {
 	'Sidebar shortcut': 'Atajo del panel',
 	'Sounds': 'Sonidos',
 	'Notify outdated packages': 'Notificar paquetes desactualizados',
+	'Warn about non-closing message boxes':
+		'Advertir sobre cuadros de mensaje que no se cierran',
 	'Chunk oversized clipboard pastes':
 		'Dividir pegados grandes del portapapeles',
 	'Automatically split large TaskBot pastes when Automation Anywhere storage is full.':
@@ -35,10 +37,19 @@ const ES: Record<string, string> = {
 		'Muestra flechas de entrada/salida, valores por defecto e indicadores de sin uso en la paleta de Variables.',
 	'Shows a toast when an open taskbot has package updates available.':
 		'Muestra un aviso cuando un taskbot abierto tiene actualizaciones de paquetes disponibles.',
+	'Checks saved TaskBots for message boxes without a definite positive timeout.':
+		'Revisa los TaskBots guardados en busca de cuadros de mensaje sin un tiempo de espera positivo definido.',
 	'Package updates available': 'Actualizaciones de paquetes disponibles',
+	'Package updates available ({count})':
+		'Actualizaciones de paquetes disponibles ({count})',
 	'Package updates available.': 'Actualizaciones de paquetes disponibles.',
 	'Package update check failed.': 'Fallo la verificacion de actualizaciones de paquetes.',
 	'{count} outdated:': '{count} desactualizados:',
+	'+{count} more': '+{count} mas',
+	'Message boxes may never close ({count})':
+		'Cuadros de mensaje que pueden no cerrarse ({count})',
+	'{count} message box action(s) may never close.':
+		'{count} acciones de cuadro de mensaje pueden no cerrarse.',
 	'Run, error, and done tones': 'Tonos de ejecutar, error y terminado',
 	'Show suggestions': 'Mostrar sugerencias',
 	'Short mouse-click tips for common shortcuts':

@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.29.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.30.0           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -70,6 +70,10 @@ The sidepanel Tools tab adapts to the active Control Room page.
 - Package detail page: download versions for the opened package and view usage across all used versions.
 
 Package lists load in small pages with progress feedback. Package Usage loads all results, groups them by package version, and makes each version group collapsible. Versions with no usage are not shown. The tool requires Control Room package-management API permission.
+
+### Save-time MessageBox warning
+
+An optional Settings toggle checks successfully saved TaskBots for MessageBox and supported MessageBoxPlus actions that definitely lack automatic closing. It covers the native TaskBot Save button and the extension's TaskBot JSON Save, reports affected actions without blocking the save, and accepts dynamic timeout values when automatic closing is enabled.
 
 ------
 
@@ -212,7 +216,7 @@ Examples:
 
 Open the extension sidebar from the toolbar or configured shortcut.
 
-- **Config:** shortcuts, sounds, suggestions, keep-alive, chunked clipboard paste, language, and debug controls.
+- **Config:** shortcuts, sounds, suggestions, keep-alive, package and MessageBox notifications, chunked clipboard paste, language, and debug controls.
 - **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.
 - **Tools:** context-aware Control Room tools; export format appears when Export Bots is selected.
 

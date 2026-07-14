@@ -281,7 +281,7 @@ function getNotificationTray(): Element {
 
 export function showNotification(
 	title: string,
-	message = '',
+	message: string | readonly string[] = '',
 	duration = NOTIFICATION_MIN_DURATION_MS
 ): void {
 	const tray = getNotificationTray();
@@ -300,10 +300,21 @@ export function showNotification(
 		content.appendChild(titleEl);
 	}
 
-	if (message) {
-		const messageEl = document.createElement('div');
-		messageEl.className = 'toast-message';
-		messageEl.textContent = message;
+	const messageItems = typeof message === 'string' ? null : message;
+	if (messageItems ? messageItems.length : message) {
+		const messageEl = document.createElement(messageItems ? 'ul' : 'div');
+		messageEl.className = messageItems
+			? 'toast-message toast-message-list'
+			: 'toast-message';
+		if (messageItems) {
+			for (const item of messageItems) {
+				const row = document.createElement('li');
+				row.textContent = item;
+				messageEl.appendChild(row);
+			}
+		} else {
+			messageEl.textContent = typeof message === 'string' ? message : '';
+		}
 		content.appendChild(messageEl);
 	}
 

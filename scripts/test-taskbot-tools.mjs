@@ -11,6 +11,9 @@ const response = await importTsModule(
 	join(root, 'src', 'ts', 'automation-anywhere-response.ts')
 );
 const clipboard = await importTsModule(join(root, 'src', 'ts', 'clipboard-json.ts'));
+const automationJson = await importTsModule(
+	join(root, 'src', 'ts', 'automation-anywhere-json.ts')
+);
 
 assert.deepEqual(
 	tools.getAutomationAnywherePackageUpdates(
@@ -599,6 +602,82 @@ assert.equal(
 		pageType: 'public-folder',
 	}, { universalClipboard: false }),
 	null
+);
+
+const attribute = (name, value) => ({ name, value });
+const messageBoxNode = (packageName, commandName, autoCloseName, autoClose, timeout) => ({
+	uid: `${packageName}-${commandName}`,
+	packageName,
+	commandName,
+	attributes: [
+		...(autoClose === undefined
+			? []
+			: [attribute(autoCloseName, { type: 'BOOLEAN', boolean: autoClose })]),
+		...(timeout === undefined
+			? []
+			: [attribute('timeOut', timeout)]),
+	],
+});
+const messageBoxPlusCommands = [
+	'ShowDictionary',
+	'ShowBoolean',
+	'ShowList',
+	'ShowNumber',
+	'ShowRecord',
+	'ShowString',
+	'ShowTable',
+];
+
+const unsafeMessageBoxes = {
+	nodes: [
+		messageBoxNode('MessageBox', 'messageBox', 'closeMsgBox', false),
+		...messageBoxPlusCommands.map((command) =>
+			messageBoxNode('MessageBoxPlus', command, 'isChecked', false)
+		),
+	],
+};
+assert.equal(automationJson.findNonClosingMessageBoxes(unsafeMessageBoxes).length, 8);
+
+const positiveTimeout = { type: 'NUMBER', number: '5' };
+const safeMessageBoxes = {
+	nodes: [
+		messageBoxNode('MessageBox', 'messageBox', 'closeMsgBox', true, positiveTimeout),
+		...messageBoxPlusCommands.map((command) =>
+			messageBoxNode('MessageBoxPlus', command, 'isChecked', true, positiveTimeout)
+		),
+	],
+};
+assert.deepEqual(automationJson.findNonClosingMessageBoxes(safeMessageBoxes), []);
+
+const nestedAndDynamicMessageBoxes = {
+	nodes: [
+		{
+			packageName: 'If',
+			commandName: 'if',
+			branches: [
+				{
+					children: [
+						messageBoxNode('MessageBoxPlus', 'ShowList', 'isChecked', true),
+						messageBoxNode('MessageBoxPlus', 'ShowString', 'isChecked', true, {
+							type: 'NUMBER',
+							number: '0',
+						}),
+						messageBoxNode('MessageBoxPlus', 'ShowTable', 'isChecked', true, {
+							type: 'VARIABLE',
+							variableName: 'timeout',
+						}),
+						messageBoxNode('MessageBoxPlus', 'Unsupported', 'isChecked', false),
+					],
+				},
+			],
+		},
+	],
+};
+assert.deepEqual(
+	automationJson
+		.findNonClosingMessageBoxes(nestedAndDynamicMessageBoxes)
+		.map((finding) => finding.reason),
+	['timeout-missing', 'timeout-not-positive']
 );
 
 console.log('Taskbot tools tests passed.');

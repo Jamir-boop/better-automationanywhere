@@ -124,6 +124,9 @@ import {
 	packageUpdateToastEnabled,
 	getPackageUpdateToastEnabled,
 	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
+	nonClosingMessageBoxWarningEnabled,
+	getNonClosingMessageBoxWarningEnabled,
+	DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED,
 	variableMetadataEnabled,
 	getVariableMetadataEnabled,
 	DEFAULT_VARIABLE_METADATA_ENABLED,
@@ -283,6 +286,13 @@ function renderToolsConfigSection(): string {
 					<small>${t('Shows a toast when an open taskbot has package updates available.')}</small>
 				</span>
 				<input id="packageUpdateToastEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Warn about non-closing message boxes')}</strong>
+					<small>${t('Checks saved TaskBots for message boxes without a definite positive timeout.')}</small>
+				</span>
+				<input id="nonClosingMessageBoxWarningEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
@@ -679,6 +689,8 @@ const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const packageUpdateToastEnabledInput = document.querySelector<HTMLInputElement>(
 	'#packageUpdateToastEnabled'
 )!;
+const nonClosingMessageBoxWarningEnabledInput =
+	document.querySelector<HTMLInputElement>('#nonClosingMessageBoxWarningEnabled')!;
 const chunkedClipboardPasteEnabledInput = document.querySelector<HTMLInputElement>(
 	'#chunkedClipboardPasteEnabled'
 )!;
@@ -1776,6 +1788,8 @@ async function loadState(): Promise<void> {
 	await refreshFeedbackHistory();
 	renderSupportedBuilds();
 	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
+	nonClosingMessageBoxWarningEnabledInput.checked =
+		await getNonClosingMessageBoxWarningEnabled();
 	chunkedClipboardPasteEnabledInput.checked = await getChunkedClipboardPasteEnabled();
 	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
 	recorderBridgeEnabledInput.checked = recorderEnabled;
@@ -1902,6 +1916,12 @@ forceEnglishLocaleInput.addEventListener('change', () => {
 			: t('English locale enforcement disabled.'),
 		'info',
 		'settings'
+	);
+});
+
+nonClosingMessageBoxWarningEnabledInput.addEventListener('change', () => {
+	void nonClosingMessageBoxWarningEnabled.setValue(
+		nonClosingMessageBoxWarningEnabledInput.checked
 	);
 });
 
@@ -2486,6 +2506,10 @@ blockTaskbotNodeLabelClicks.watch((value) => {
 });
 forceEnglishLocale.watch((value) => {
 	forceEnglishLocaleInput.checked = value ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+});
+nonClosingMessageBoxWarningEnabled.watch((value) => {
+	nonClosingMessageBoxWarningEnabledInput.checked =
+		value ?? DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
 });
 chunkedClipboardPasteEnabled.watch((value) => {
 	chunkedClipboardPasteEnabledInput.checked =

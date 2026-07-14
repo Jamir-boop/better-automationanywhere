@@ -107,6 +107,8 @@ export const RUN_BUTTON_SELECTOR =
 	'button[aria-label="Run"][name="run"], button[name="run"]';
 export const RUN_BUTTON_HOST_SELECTOR = '.icon-button, [data-path="IconButton"]';
 export const RUN_BUTTON_PLAY_ICON_SELECTOR = '.rio-icon--icon_play-triangle';
+export const TASKBOT_SAVE_BUTTON_SELECTOR = 'button[name="save"]';
+export const NATIVE_TOAST_SELECTOR = '[data-path="Toast"]';
 export const CODE_INPUT_SELECTOR = '[data-path="CodeInput"]';
 export const SHARED_COPY_BUTTON_SELECTOR = '.aa-icon-action-clipboard-copy--shared';
 export const SHARED_PASTE_BUTTON_SELECTOR = '.aa-icon-action-clipboard-paste--shared';
@@ -258,6 +260,30 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		source: 'src/ts/clipboard.ts',
 		severity: 'optional',
 		status: 'active',
+	},
+	{
+		id: 'taskbot-save-button',
+		view: 'taskbot-editor',
+		group: 'taskbot-editor',
+		label: 'Taskbot Save button',
+		feature: 'Non-closing message-box warning',
+		selector: TASKBOT_SAVE_BUTTON_SELECTOR,
+		source: 'entrypoints/content.ts',
+		severity: 'optional',
+		status: 'watch',
+		notes: 'Observed in capture phase so the native save handler remains unchanged.',
+	},
+	{
+		id: 'native-success-toast',
+		view: 'taskbot-editor',
+		group: 'taskbot-transient',
+		label: 'Native success toast',
+		feature: 'Non-closing message-box warning',
+		selector: NATIVE_TOAST_SELECTOR,
+		source: 'entrypoints/content.ts',
+		severity: 'transient',
+		status: 'watch',
+		triggerHint: 'Save an edited Taskbot to render the native success toast.',
 	},
 	{
 		id: 'taskbot-line-number',

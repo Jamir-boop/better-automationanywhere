@@ -469,9 +469,18 @@ Selector source of truth:
   - Setting/id: `local:packageUpdateToastEnabled` (default off)
   - Selectors: none; API/content based
   - Validate: enable in Settings; open taskbot with outdated packages on `/edit` and `/view`; re-open same bot in session; reload; open up-to-date bot; disable toggle.
-  - Expected: one toast per bot per page load listing up to 3 `name current → target` plus `+N`; up-to-date bot silent; toggle off silent.
+  - Expected: one toast per bot per page load with the total in its title and a vertical list of up to 3 `name current → target` rows plus `+N more`; up-to-date bot silent; toggle off silent.
   - Status: active
   - Delete condition: toast setting removed or AA surfaces native update notice.
+
+- [ ] Non-closing message-box save warning
+  - Source: `entrypoints/content.ts`, `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-json.ts`, `src/ts/settings.ts`
+  - Setting/id: `local:nonClosingMessageBoxWarningEnabled` (default off)
+  - Selectors: `TASKBOT_SAVE_BUTTON_SELECTOR`, `NATIVE_TOAST_SELECTOR`
+  - Validate: enable the setting; save the supplied unsafe and corrected TaskBots through native Save and TaskBot JSON Save; test nested actions, a dynamic timeout, save failure, and setting off.
+  - Expected: a successful unsafe save warns with the affected action count and up to 3 action names; missing/false auto-close and missing/non-positive literal timeouts warn; enabled auto-close with a dynamic timeout does not; safe, failed, and disabled checks stay silent. Native Save is never delayed or blocked.
+  - Status: watch
+  - Delete condition: MessageBox schemas change or Automation Anywhere adds an equivalent native validator.
 
 - [ ] Update Packages
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`

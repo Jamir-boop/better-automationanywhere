@@ -21,6 +21,8 @@ import {
 	type AutomationAnywherePackageUsageStatus,
 } from '@/src/ts/automation-anywhere-api';
 import { isAutomationAnywhereUrl } from '@/src/ts/automation-anywhere';
+import { findNonClosingMessageBoxes } from '@/src/ts/automation-anywhere-json';
+import { getNonClosingMessageBoxWarningEnabled } from '@/src/ts/settings';
 import {
 	initializeJsonWorkbench,
 	renderJsonWorkbenchActionButtons,
@@ -2931,8 +2933,18 @@ async function saveTaskbotJson(): Promise<void> {
 
 		await activeRuntime.api.updateBotContent(fileId, parsed);
 		taskbotJsonBaseline = normalizeTaskbotJsonContent(parsed);
+		const findings = (await getNonClosingMessageBoxWarningEnabled().catch(() => false))
+			? findNonClosingMessageBoxes(parsed)
+			: [];
 		await browser.tabs.reload(activeRuntime.tabId);
-		setToolStatus(t('Taskbot JSON imported to Control Room.'));
+		setToolStatus(
+			findings.length
+				? t('{count} message box action(s) may never close.', {
+						count: findings.length,
+					})
+				: t('Taskbot JSON imported to Control Room.'),
+			findings.length ? 'warn' : 'info'
+		);
 		void options.addFeedback(
 			'info',
 			'tools',
@@ -2945,6 +2957,17 @@ async function saveTaskbotJson(): Promise<void> {
 			},
 			{ keepDetails: true, debugOnly: true }
 		);
+		if (findings.length) {
+			void options.addFeedback(
+				'warn',
+				'tools',
+				t('{count} message box action(s) may never close.', {
+					count: findings.length,
+				}),
+				{ fileId, findings },
+				{ keepDetails: true }
+			);
+		}
 	} catch (error) {
 		setToolStatus(error instanceof Error ? error.message : t('Taskbot JSON import failed.'), 'error');
 	}
