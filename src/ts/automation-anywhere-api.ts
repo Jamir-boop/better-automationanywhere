@@ -454,6 +454,7 @@ export class AutomationAnywhereApi {
 			method?: string;
 			headers?: Record<string, string>;
 			body?: unknown;
+			bodyBase64?: string;
 			responseType?: 'json' | 'text' | 'blob' | 'bot-content';
 		} = {}
 	): Promise<T> {
@@ -471,9 +472,10 @@ export class AutomationAnywhereApi {
 			type: 'AA_API_REQUEST',
 			config: {
 				url: `${this.baseUrl}${path}`,
-				method: options.method ?? (body ? 'POST' : 'GET'),
+				method: options.method ?? (body || options.bodyBase64 ? 'POST' : 'GET'),
 				headers,
 				body,
+				bodyBase64: options.bodyBase64,
 				responseType: options.responseType ?? 'json',
 			},
 		})) as AutomationAnywhereApiResponse;
@@ -761,6 +763,49 @@ export class AutomationAnywhereApi {
 				metadataPath
 			)}`,
 			{ responseType: 'blob' }
+		);
+	}
+
+	async createMetadataFile(
+		parentFileId: string,
+		contentType: string
+	): Promise<{ id: string; name: string }> {
+		const numericParentFileId = Number(parentFileId);
+		if (!Number.isSafeInteger(numericParentFileId) || numericParentFileId <= 0) {
+			throw new Error('Target taskbot file id is invalid.');
+		}
+		const extension = contentType.split('/')[1]?.split(';')[0] || 'bin';
+		const response = await this.request<{ id?: number | string; name?: string }>(
+			'/v2/repository/files',
+			{
+				method: 'POST',
+				body: {
+					name: `${crypto.randomUUID()}.${extension}`,
+					metadata: true,
+					parentFileId: numericParentFileId,
+					contentType,
+					isExpirable: false,
+				},
+			}
+		);
+		if (response.id === undefined || !response.name) {
+			throw new Error('Create metadata response is incomplete.');
+		}
+		return { id: String(response.id), name: response.name };
+	}
+
+	uploadMetadataContent(
+		metadataFileId: string,
+		contentType: string,
+		base64: string
+	): Promise<unknown> {
+		return this.request<unknown>(
+			`/v2/repository/files/${metadataFileId}/content`,
+			{
+				method: 'PUT',
+				headers: { 'Content-Type': contentType },
+				bodyBase64: base64,
+			}
 		);
 	}
 }

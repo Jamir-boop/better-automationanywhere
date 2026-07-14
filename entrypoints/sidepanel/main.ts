@@ -329,7 +329,7 @@ function renderUniversalClipboardSection(): string {
 		</div>
 
 		<h2>${t('Action JSON')}</h2>
-		<p class="inline-hint">${t('Advanced: imports raw Automation Anywhere clipboard JSON.')}</p>
+		<p class="inline-hint">${t('Portable Action JSON can contain capture screenshots and selector data.')}</p>
 		${renderJsonWorkbenchSearchTools('actionJson')}
 		<div class="json-field">
 			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="${t('Universal copy loads selected action JSON here. Paste JSON here to import.')}"></textarea>

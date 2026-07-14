@@ -15,6 +15,7 @@ export interface AutomationAnywhereApiRequestConfig {
 	method?: string;
 	headers?: Record<string, string>;
 	body?: string;
+	bodyBase64?: string;
 	responseType?: 'json' | 'text' | 'blob' | 'bot-content';
 }
 

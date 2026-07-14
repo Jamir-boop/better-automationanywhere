@@ -13,9 +13,21 @@ import {
 import * as utils from './utils';
 import {
 	AUTOMATION_ANYWHERE_UID_PLACEHOLDER as UID_PLACEHOLDER,
+	addPortableClipboardEnvelope,
+	collectPortableMetadataPaths,
 	cleanAutomationAnywhereJson as cleanClipboardJson,
+	getNativeClipboardSourceFileId,
+	getPortableClipboardEnvelope,
+	preparePortableClipboardForPaste,
 	serializeClipboardJsonWithPlaceholder,
+	type PortableClipboardEnvelope,
+	type PortableClipboardResource,
 } from './clipboard-json';
+import {
+	AutomationAnywhereApi,
+	parseAutomationAnywherePageContext,
+	readAutomationAnywhereAuthTokenFromLocalStorage,
+} from './automation-anywhere-api';
 
 const GLOBAL_CLIPBOARD_KEY = 'globalClipboard';
 const GLOBAL_CLIPBOARD_UID_KEY = 'globalClipboardUid';
@@ -31,6 +43,7 @@ let globalClipboardWatcherOnEditorPage = false;
 let lastSeenGlobalClipboard: string | null = null;
 let ignoredGlobalClipboardWrite: string | null = null;
 let pasteInFlight = false;
+let watcherSaveGeneration = 0;
 
 function generateUid(): string {
 	if (crypto.randomUUID) return crypto.randomUUID();
@@ -113,6 +126,7 @@ async function readFreshSharedCopy(context: string): Promise<string | null> {
 		markGlobalClipboardWrite(previousClipboardJSON);
 		localStorage.setItem(GLOBAL_CLIPBOARD_KEY, previousClipboardJSON);
 	}
+	if (globalClipboardJSON) markGlobalClipboardWrite(globalClipboardJSON);
 	return globalClipboardJSON;
 }
 
@@ -120,6 +134,82 @@ function isTaskEditorPage(): boolean {
 	const hash = location.hash.toLowerCase();
 	if (hash.includes('taskbot') || hash.includes('editor')) return true;
 	return Boolean(document.querySelector(TASK_EDITOR_CAPABILITY_SELECTOR));
+}
+
+function getBase64Resource(
+	dataUrl: string,
+	contentType: string
+): PortableClipboardResource | null {
+	const match = dataUrl.match(/^data:([^;,]*)(?:;[^,]*)*;base64,(.*)$/s);
+	if (!match) return null;
+	const resolvedContentType = contentType || match[1] || 'image/png';
+	if (!resolvedContentType.startsWith('image/')) return null;
+	return { contentType: resolvedContentType, base64: match[2] };
+}
+
+async function serializePortableClipboardJson(
+	globalClipboardJSON: string
+): Promise<{ json: string; missing: number }> {
+	const serialized = serializeClipboardJsonWithPlaceholder(globalClipboardJSON);
+	const value = JSON.parse(serialized) as unknown;
+	const paths = collectPortableMetadataPaths(value);
+	if (!paths.length) return { json: serialized, missing: 0 };
+
+	const context = parseAutomationAnywherePageContext(location.href);
+	const sourceFileId = getNativeClipboardSourceFileId(value) || context.fileId || '';
+	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
+	const resources: Record<string, PortableClipboardResource> = {};
+	const missing: string[] = [];
+
+	if (!sourceFileId || !authToken) {
+		missing.push(...paths);
+	} else {
+		const api = new AutomationAnywhereApi(location.origin, authToken);
+		const results = await Promise.allSettled(
+			paths.map(async (path) => {
+				const response = await api.downloadMetadataContent(sourceFileId, path);
+				const resource = getBase64Resource(response.blob, response.type);
+				if (!resource) throw new Error('Capture metadata is not an image.');
+				return { path, resource };
+			})
+		);
+		for (let index = 0; index < results.length; index += 1) {
+			const result = results[index];
+			if (result.status === 'fulfilled') {
+				resources[result.value.path] = result.value.resource;
+			} else {
+				missing.push(paths[index]);
+			}
+		}
+	}
+
+	return {
+		json: addPortableClipboardEnvelope(serialized, {
+			sourceOrigin: location.origin,
+			sourceFileId,
+			resources,
+			missing,
+		}),
+		missing: missing.length,
+	};
+}
+
+function showCopyResult(source: string, missing: number, slot?: number): void {
+	if (missing) {
+		ui.showNotification(
+			t('Copied with missing captures'),
+			t('{count} capture image(s) could not be included.', { count: missing })
+		);
+		return;
+	}
+	ui.showNotification(
+		source === 'watcher' ? t('Universal clipboard updated') : t('Copied'),
+		source === 'watcher'
+			? t('Auto slot saved from Automation Anywhere copy.')
+			: slot === undefined
+				? t('Saved current Automation Anywhere clipboard to auto slot.')
+				: t('Saved current selection to slot {slot}.', { slot })
+	);
 }
 
 async function saveGlobalClipboardValueToDefaultSlot(
@@ -137,18 +227,16 @@ async function saveGlobalClipboardValueToDefaultSlot(
 	}
 
 	try {
-		const serialized = serializeClipboardJsonWithPlaceholder(globalClipboardJSON);
-		await universalClipboard.setValue(serialized);
+		const generation = source === 'watcher' ? ++watcherSaveGeneration : 0;
+		const portable = await serializePortableClipboardJson(globalClipboardJSON);
+		if (source === 'watcher' && generation !== watcherSaveGeneration) return null;
+		await universalClipboard.setValue(portable.json);
 		void debugInfo('clipboard', 'Default universal clipboard slot saved.', {
+			missingResources: portable.missing,
 			source,
 		}, { feedback: true });
-		ui.showNotification(
-			source === 'watcher' ? t('Universal clipboard updated') : t('Copied'),
-			source === 'watcher'
-				? t('Auto slot saved from Automation Anywhere copy.')
-				: t('Saved current Automation Anywhere clipboard to auto slot.')
-		);
-		return serialized;
+		showCopyResult(source, portable.missing);
+		return portable.json;
 	} catch (error) {
 		void debugWarn('clipboard', 'globalClipboard JSON is invalid.', {
 			error,
@@ -205,11 +293,14 @@ export async function copyToSlot(slot: number): Promise<string | null> {
 	}
 
 	try {
-		const serialized = serializeClipboardJsonWithPlaceholder(globalClipboardJSON);
-		await universalClipboardSlot(slot).setValue(serialized);
-		void debugInfo('clipboard', 'Clipboard slot saved.', { slot }, { feedback: true });
-		ui.showNotification(t('Copied'), t('Saved current selection to slot {slot}.', { slot }));
-		return serialized;
+		const portable = await serializePortableClipboardJson(globalClipboardJSON);
+		await universalClipboardSlot(slot).setValue(portable.json);
+		void debugInfo('clipboard', 'Clipboard slot saved.', {
+			missingResources: portable.missing,
+			slot,
+		}, { feedback: true });
+		showCopyResult('copyToSlot', portable.missing, slot);
+		return portable.json;
 	} catch (error) {
 		void debugError('clipboard', 'Failed to copy data to slot.', {
 			error,
@@ -230,6 +321,84 @@ async function withPasteLock<T>(fn: () => Promise<T>): Promise<T> {
 	}
 }
 
+async function uploadPortableResources(
+	envelope: PortableClipboardEnvelope,
+	targetFileId: string
+): Promise<{ replacements: Map<string, string>; missing: number }> {
+	const replacements = new Map<string, string>();
+	const entries = Object.entries(envelope.resources);
+	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
+	if (!authToken) {
+		return { replacements, missing: envelope.missing.length + entries.length };
+	}
+
+	const api = new AutomationAnywhereApi(location.origin, authToken);
+	const results = await Promise.allSettled(
+		entries.map(async ([path, resource]) => {
+			const created = await api.createMetadataFile(targetFileId, resource.contentType);
+			await api.uploadMetadataContent(created.id, resource.contentType, resource.base64);
+			return { path, name: created.name };
+		})
+	);
+	let missing = envelope.missing.length;
+	for (const result of results) {
+		if (result.status === 'fulfilled') {
+			replacements.set(result.value.path, result.value.name);
+		} else {
+			missing += 1;
+		}
+	}
+	return { replacements, missing };
+}
+
+async function prepareSharedPasteData(
+	clipboardData: string,
+	uid: string
+): Promise<{ json: string; missing: number }> {
+	const withUid = replaceStoredUid(clipboardData, uid);
+	let value: unknown;
+	try {
+		value = JSON.parse(withUid);
+	} catch {
+		return { json: cleanAutomationAnywhereJson(withUid), missing: 0 };
+	}
+
+	const envelope = getPortableClipboardEnvelope(value);
+	if (!envelope) {
+		return { json: cleanAutomationAnywhereJson(withUid), missing: 0 };
+	}
+	const targetFileId = parseAutomationAnywherePageContext(location.href).fileId;
+	const reuseSourceMetadata = Boolean(
+		targetFileId &&
+		envelope.sourceOrigin === location.origin &&
+		envelope.sourceFileId === targetFileId
+	);
+	if (reuseSourceMetadata) {
+		return {
+			json: preparePortableClipboardForPaste(withUid, {
+				targetFileId,
+				reuseSourceMetadata: true,
+			}),
+			missing: 0,
+		};
+	}
+
+	const uploaded = targetFileId
+		? await uploadPortableResources(envelope, targetFileId)
+		: {
+				replacements: new Map<string, string>(),
+				missing:
+					envelope.missing.length + Object.keys(envelope.resources).length,
+			};
+	return {
+		json: preparePortableClipboardForPaste(withUid, {
+			targetFileId,
+			replacements: uploaded.replacements,
+		}),
+		missing: uploaded.missing,
+	};
+}
+
 async function requestSharedPaste(
 	clipboardData: string,
 	context: string,
@@ -237,7 +406,8 @@ async function requestSharedPaste(
 	notify = true
 ): Promise<void> {
 	const uid = generateUid();
-	const cleanedData = cleanAutomationAnywhereJson(replaceStoredUid(clipboardData, uid));
+	const prepared = await prepareSharedPasteData(clipboardData, uid);
+	const cleanedData = prepared.json;
 	markGlobalClipboardWrite(cleanedData);
 
 	localStorage.removeItem(GLOBAL_CLIPBOARD_KEY);
@@ -268,12 +438,19 @@ async function requestSharedPaste(
 	pasteButton.click();
 	void debugInfo('clipboard', 'Clipboard paste requested.', { slot }, { feedback: true });
 	if (notify) {
-		ui.showNotification(
-			t('Paste sent'),
-			slot === undefined
-				? t('Sent content from universal clipboard to Automation Anywhere.')
-				: t('Sent content from slot {slot} to Automation Anywhere.', { slot })
-		);
+		if (prepared.missing) {
+			ui.showNotification(
+				t('Pasted with missing captures'),
+				t('{count} capture image(s) were omitted.', { count: prepared.missing })
+			);
+		} else {
+			ui.showNotification(
+				t('Paste sent'),
+				slot === undefined
+					? t('Sent content from universal clipboard to Automation Anywhere.')
+					: t('Sent content from slot {slot} to Automation Anywhere.', { slot })
+			);
+		}
 	}
 
 	await utils.sleep(CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS);
@@ -342,8 +519,7 @@ export async function importActionJson(json: string): Promise<void> {
 		feedback: true,
 	});
 	await utils.sleep(200);
-	await universalPaste(false);
-	ui.showNotification(t('Import queued'), t('JSON accepted. Pasting action now.'));
+	await universalPaste();
 }
 
 function cleanAutomationAnywhereJson(jsonString: string): string {

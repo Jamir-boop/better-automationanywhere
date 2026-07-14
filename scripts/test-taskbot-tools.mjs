@@ -166,15 +166,6 @@ assert.throws(
 	() => clipboard.serializeClipboardJsonWithPlaceholder('[]'),
 	/globalClipboard JSON is not an object/
 );
-const sensitive = {
-	blob: 'secret',
-	nested: { thumbnailMetadataPath: 'thumb', keep: 'value' },
-};
-clipboard.clearSensitiveFields(sensitive);
-assert.deepEqual(sensitive, {
-	blob: '',
-	nested: { thumbnailMetadataPath: '', keep: 'value' },
-});
 assert.deepEqual(
 	JSON.parse(
 		clipboard.cleanAutomationAnywhereJson(
@@ -185,11 +176,11 @@ assert.deepEqual(
 		nodes: [
 			{
 				attributes: [
-					{
-						value: {
-							blob: '',
-							nested: { screenshotMetadataPath: '', keep: 1 },
-						},
+				{
+					value: {
+						blob: 'secret',
+						nested: { screenshotMetadataPath: '', keep: 1 },
+					},
 					},
 				],
 			},
@@ -197,6 +188,97 @@ assert.deepEqual(
 	}
 );
 assert.equal(clipboard.cleanAutomationAnywhereJson('{invalid'), '{invalid');
+
+const resourceClipboard = {
+	uid: 'old',
+	sourceFileId: 123,
+	nodes: [
+		{
+			attributes: [
+				{
+					value: {
+						blob: 'selector',
+						screenshotMetadataPath: 'shot.png',
+						nested: { thumbnailMetadataPath: 'shot.png' },
+					},
+				},
+			],
+		},
+		{
+			attributes: [
+				{
+					value: {
+						secure: {
+							secureRecordingEnabled: true,
+							thumbnailMetadataPath: 'secure.png',
+						},
+					},
+				},
+			],
+		},
+	],
+};
+assert.deepEqual(clipboard.collectPortableMetadataPaths(resourceClipboard), [
+	'shot.png',
+]);
+assert.equal(clipboard.getNativeClipboardSourceFileId(resourceClipboard), '123');
+const portableJson = clipboard.addPortableClipboardEnvelope(
+	JSON.stringify(resourceClipboard),
+	{
+		sourceOrigin: 'https://source.my.automationanywhere.digital',
+		sourceFileId: '123',
+		resources: {
+			'shot.png': { contentType: 'image/png', base64: 'cG5n' },
+		},
+		missing: [],
+	}
+);
+assert.deepEqual(
+	clipboard.getPortableClipboardEnvelope(JSON.parse(portableJson)),
+	{
+		version: 1,
+		sourceOrigin: 'https://source.my.automationanywhere.digital',
+		sourceFileId: '123',
+		resources: {
+			'shot.png': { contentType: 'image/png', base64: 'cG5n' },
+		},
+		missing: [],
+	}
+);
+const preparedResourceClipboard = JSON.parse(
+	clipboard.preparePortableClipboardForPaste(portableJson, {
+		targetFileId: '456',
+		replacements: new Map([['shot.png', 'target.png']]),
+	})
+);
+assert.equal(preparedResourceClipboard.sourceFileId, '456');
+assert.equal(
+	preparedResourceClipboard.nodes[0].attributes[0].value.screenshotMetadataPath,
+	'target.png'
+);
+assert.equal(
+	preparedResourceClipboard.nodes[0].attributes[0].value.nested.thumbnailMetadataPath,
+	'target.png'
+);
+assert.equal(
+	preparedResourceClipboard.nodes[1].attributes[0].value.secure.thumbnailMetadataPath,
+	''
+);
+assert.equal(preparedResourceClipboard.nodes[0].attributes[0].value.blob, 'selector');
+assert.equal(
+	Object.hasOwn(preparedResourceClipboard, clipboard.PORTABLE_CLIPBOARD_KEY),
+	false
+);
+const reusedResourceClipboard = JSON.parse(
+	clipboard.preparePortableClipboardForPaste(portableJson, {
+		targetFileId: '123',
+		reuseSourceMetadata: true,
+	})
+);
+assert.equal(
+	reusedResourceClipboard.nodes[1].attributes[0].value.secure.thumbnailMetadataPath,
+	'secure.png'
+);
 
 const privateRoute = mod.parseAutomationAnywhereTaskEditorRoute(
 	'https://tenant.my.automationanywhere.digital/bots/repository/private/folders/abc%20123/files/taskbot/bot%20456/edit'

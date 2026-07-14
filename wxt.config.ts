@@ -35,6 +35,7 @@ export default defineConfig({
 		author: 'jamir-boop',
 		permissions: [
 			'storage',
+			'unlimitedStorage',
 			'tabs',
 			'webNavigation',
 			...(browser === 'chrome'

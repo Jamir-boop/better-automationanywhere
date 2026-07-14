@@ -61,6 +61,8 @@ const ES: Record<string, string> = {
 	'Collapse action summary': 'Contraer resumen de accion',
 	'Advanced: imports raw Automation Anywhere clipboard JSON.':
 		'Avanzado: importa JSON sin procesar del portapapeles de Automation Anywhere.',
+	'Portable Action JSON can contain capture screenshots and selector data.':
+		'El JSON de accion portatil puede contener capturas de pantalla y datos de selectores.',
 	'Universal copy loads selected action JSON here. Paste JSON here to import.':
 		'La copia universal carga aqui el JSON de la accion seleccionada. Pega JSON aqui para importar.',
 	'Clear JSON': 'Limpiar JSON',
@@ -343,6 +345,9 @@ const ES: Record<string, string> = {
 		'El portapapeles de Automation Anywhere esta vacio.',
 	'Universal clipboard updated': 'Portapapeles universal actualizado',
 	Copied: 'Copiado',
+	'Copied with missing captures': 'Copiado con capturas faltantes',
+	'{count} capture image(s) could not be included.':
+		'No se pudieron incluir {count} imagen(es) de captura.',
 	'Auto slot saved from Automation Anywhere copy.':
 		'Espacio predeterminado guardado desde la copia de Automation Anywhere.',
 	'Saved current Automation Anywhere clipboard to auto slot.':
@@ -366,6 +371,9 @@ const ES: Record<string, string> = {
 	'Preparing {label} paste... {seconds}s':
 		'Preparando pegado de {label}... {seconds}s',
 	'Paste sent': 'Pegado enviado',
+	'Pasted with missing captures': 'Pegado con capturas faltantes',
+	'{count} capture image(s) were omitted.':
+		'Se omitieron {count} imagen(es) de captura.',
 	'Sent content from slot {slot} to Automation Anywhere.':
 		'Contenido del espacio {slot} enviado a Automation Anywhere.',
 	'Sent content from universal clipboard to Automation Anywhere.':

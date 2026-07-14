@@ -337,8 +337,8 @@ Selector source of truth:
   - Source: `entrypoints/content.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`, `src/ts/universal-clipboard-storage.ts`
   - Setting/id: `local:universalClipboard`, slot `0`
   - Selectors: `shared-copy-button`, `shared-paste-button`, task editor capability selector
-  - Validate: use native AA shared copy on a task editor containing an iframe.
-  - Expected: only the top frame polls `globalClipboard` and updates the auto slot.
+  - Validate: use native AA shared copy on a task editor containing an iframe and a capture action.
+  - Expected: only the top frame polls `globalClipboard`; the newest copy updates the auto slot with portable capture resources.
   - Status: active
   - Delete condition: AA shared clipboard mechanism removed.
 
@@ -346,8 +346,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
   - Setting/id: `local:universalClipboardSlot1..3`
   - Selectors: shared copy/paste
-  - Validate: copy selection to each slot, paste each slot, and reject malformed non-object clipboard JSON.
-  - Expected: correct slot content is pasted with fresh uid; malformed values do not overwrite slots.
+  - Validate: copy capture actions to each slot, paste within the same bot and into another Control Room, and reject malformed non-object clipboard JSON.
+  - Expected: correct slot content is pasted with fresh uid, selector blobs, screenshots, thumbnails, variables, and package references; unavailable images are omitted with a warning.
   - Status: active
   - Delete condition: slot UI removed.
 
@@ -356,7 +356,7 @@ Selector source of truth:
   - Setting/id: command `exportActionToClipboard`
   - Selectors: shared copy button
   - Validate: copy an action and run export command.
-  - Expected: sanitized action JSON lands in system clipboard.
+  - Expected: versioned portable action JSON, including available capture images and selector data, lands in the system clipboard.
   - Status: active
   - Delete condition: import/export workflow replaced by tools.
 
@@ -365,18 +365,19 @@ Selector source of truth:
   - Setting/id: command `importActionFromJson`, `IMPORT_ACTION_JSON`
   - Selectors: shared paste button
   - Validate: paste valid and invalid JSON into Action JSON field.
-  - Expected: valid JSON queues paste; invalid JSON shows error.
+  - Expected: valid portable or legacy JSON queues paste; cross-Control-Room metadata is created and uploaded before native paste; invalid JSON shows error.
   - Status: active
   - Delete condition: workflow replaced by Taskbot JSON tool.
 
-- [ ] Sensitive field cleanup
-  - Source: `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`
-  - Setting/id: `clearSensitiveFields`
-  - Selectors: none
-  - Validate: export copied action with blobs/screenshots.
-  - Expected: blob/screenshot fields are cleared.
+- [ ] Portable action resources
+  - Source: `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`, `src/ts/automation-anywhere-api.ts`, `entrypoints/background.ts`
+  - Setting/id: none; always on by explicit user approval; stored inline in `local:universalClipboard*`
+  - Selectors: none; reuses the existing shared copy/paste selectors above
+  - API: `GET /v2/repository/files/{sourceFileId}/metadata/content`, `POST /v2/repository/files`, `PUT /v2/repository/files/{metadataFileId}/content`
+  - Validate: copy Capture, coordinate/region capture, anchored UIObject, secure-recording, and image-bearing actions between two Control Rooms; interrupt one resource request.
+  - Expected: non-secure screenshots/thumbnails are embedded once per path and restored under the target bot; `blob` is preserved; secure or failed resources are blanked for cross-bot paste and reported without blocking the action.
   - Status: active
-  - Delete condition: no sensitive payloads are present in AA clipboard JSON.
+  - Delete condition: Automation Anywhere provides a portable cross-Control-Room action clipboard or removes these metadata fields/endpoints.
 
 ## Variable Metadata
 

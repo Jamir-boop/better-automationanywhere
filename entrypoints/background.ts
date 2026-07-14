@@ -631,7 +631,9 @@ function getApiRequestTarget(url: string, includeFullUrl = false): Record<string
 	}
 }
 
-function getApiRequestBodyKind(body: string | undefined): string {
+function getApiRequestBodyKind(message: AutomationAnywhereApiRequestMessage): string {
+	if (message.config.bodyBase64 !== undefined) return 'base64';
+	const body = message.config.body;
 	if (body === undefined) return 'none';
 	const trimmed = body.trim();
 	if (!trimmed) return 'empty';
@@ -652,8 +654,11 @@ function getApiRequestLogDetails(
 		requestId,
 		method,
 		responseType: message.config.responseType ?? 'json',
-		bodyKind: getApiRequestBodyKind(message.config.body),
-		bodyBytes: message.config.body?.length ?? 0,
+		bodyKind: getApiRequestBodyKind(message),
+		bodyBytes:
+			message.config.bodyBase64 === undefined
+				? (message.config.body?.length ?? 0)
+				: Math.floor((message.config.bodyBase64.length * 3) / 4),
 		durationMs,
 		...getApiRequestTarget(message.config.url, includeFullUrl),
 		...extra,
@@ -680,10 +685,21 @@ async function handleApiRequest(
 	const startedAt = Date.now();
 	const method = message.config.method ?? 'GET';
 	try {
+		if (
+			message.config.body !== undefined &&
+			message.config.bodyBase64 !== undefined
+		) {
+			throw new Error('API request cannot contain text and binary bodies.');
+		}
+		const binaryBody = message.config.bodyBase64;
+		const body =
+			binaryBody === undefined
+				? message.config.body
+				: Uint8Array.from(atob(binaryBody), (character) => character.charCodeAt(0));
 		const response = await fetch(message.config.url, {
 			method,
 			headers: message.config.headers,
-			body: message.config.body,
+			body,
 		});
 
 		if (!response.ok) {
