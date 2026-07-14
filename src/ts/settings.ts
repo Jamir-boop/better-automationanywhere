@@ -51,6 +51,9 @@ export const packageUpdateToastEnabled = storage.defineItem<boolean>(
 export const variableMetadataEnabled = storage.defineItem<boolean>(
 	'local:variableMetadataEnabled'
 );
+export const chunkedClipboardPasteEnabled = storage.defineItem<boolean>(
+	'local:chunkedClipboardPasteEnabled'
+);
 export const forceEnglishLocale = storage.defineItem<boolean>('local:forceEnglishLocale');
 export const forceUnsupportedControlRoomStyles = storage.defineItem<boolean>(
 	'local:forceUnsupportedControlRoomStyles'
@@ -87,6 +90,7 @@ export const DEFAULT_KEEP_ALIVE_ENABLED = false;
 export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = false;
 export const DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = false;
 export const DEFAULT_VARIABLE_METADATA_ENABLED = true;
+export const DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED = true;
 export const DEFAULT_FORCE_ENGLISH_LOCALE = false;
 export const DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES = false;
 export const DEFAULT_EXTENSION_LANGUAGE: LanguagePreference = 'auto';
@@ -312,6 +316,13 @@ export async function getPackageUpdateToastEnabled(): Promise<boolean> {
 export async function getVariableMetadataEnabled(): Promise<boolean> {
 	return (
 		(await variableMetadataEnabled.getValue()) ?? DEFAULT_VARIABLE_METADATA_ENABLED
+	);
+}
+
+export async function getChunkedClipboardPasteEnabled(): Promise<boolean> {
+	return (
+		(await chunkedClipboardPasteEnabled.getValue()) ??
+		DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED
 	);
 }
 

@@ -26,6 +26,10 @@ const ES: Record<string, string> = {
 	'Sidebar shortcut': 'Atajo del panel',
 	'Sounds': 'Sonidos',
 	'Notify outdated packages': 'Notificar paquetes desactualizados',
+	'Chunk oversized clipboard pastes':
+		'Dividir pegados grandes del portapapeles',
+	'Automatically split large TaskBot pastes when Automation Anywhere storage is full.':
+		'Divide automaticamente pegados grandes de TaskBot cuando el almacenamiento de Automation Anywhere esta lleno.',
 	'Variable metadata labels': 'Etiquetas de metadatos de variables',
 	'Shows IO arrows, defaults, and unused badges in the Variables palette.':
 		'Muestra flechas de entrada/salida, valores por defecto e indicadores de sin uso en la paleta de Variables.',
@@ -368,6 +372,28 @@ const ES: Record<string, string> = {
 	'Paste failed': 'Pegado fallido',
 	'Shared paste button not found.': 'Boton de pegado compartido no encontrado.',
 	'Paste already in progress.': 'Pegado ya en progreso.',
+	'Automation Anywhere clipboard storage limit exceeded.':
+		'Se excedio el limite de almacenamiento del portapapeles de Automation Anywhere.',
+	'Chunked paste is supported only in TaskBot editors.':
+		'El pegado dividido solo es compatible con editores TaskBot.',
+	'Clipboard JSON has no actions to split.':
+		'El JSON del portapapeles no tiene acciones que dividir.',
+	'A single action block exceeds the Automation Anywhere clipboard limit.':
+		'Un solo bloque de acciones excede el limite del portapapeles de Automation Anywhere.',
+	'Clipboard content cannot be split safely.':
+		'El contenido del portapapeles no se puede dividir de forma segura.',
+	'Large paste': 'Pegado grande',
+	'Sending {count} chunks. Keep the TaskBot cursor unchanged.':
+		'Enviando {count} fragmentos. No cambies el cursor del TaskBot.',
+	'Paste incomplete': 'Pegado incompleto',
+	'TaskBot cursor changed after {count} chunk(s).':
+		'El cursor del TaskBot cambio despues de {count} fragmento(s).',
+	'TaskBot cursor changed during chunked paste.':
+		'El cursor del TaskBot cambio durante el pegado dividido.',
+	'Automation Anywhere did not finish chunk {current} of {total}.':
+		'Automation Anywhere no termino el fragmento {current} de {total}.',
+	'Chunked paste timed out or the editor changed.':
+		'El pegado dividido agoto el tiempo o el editor cambio.',
 	'Preparing {label} paste... {seconds}s':
 		'Preparando pegado de {label}... {seconds}s',
 	'Paste sent': 'Pegado enviado',

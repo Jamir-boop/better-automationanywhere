@@ -56,6 +56,10 @@ export const LOADING_INDICATOR_SELECTOR =
 	'.devicechannelmodal .icon-image-container, .rio-spinner--variant_LOADING, .rio-spinner--variant_WORKING';
 export const TASKBOT_EDITOR_LAYOUT_SELECTOR = '.editor-layout__palette';
 export const TASKBOT_CANVAS_NODE_SELECTOR = '.taskbot-canvas-list-node';
+export const TASKBOT_RENDERED_NODE_SELECTOR =
+	'[data-path="TaskbotCanvasListNode"][data-node-uid], [data-path="TaskbotCanvasFlowPoint"][data-node-uid]';
+export const TASKBOT_ACTIVE_CURSOR_SELECTOR =
+	'[data-path="TaskbotCanvasListNode"][aria-selected="true"], .taskbot-canvas-flow-point__node--cursor, .taskbot-canvas-flow-point__container--cursor';
 export const TASKBOT_LINE_NUMBER_SELECTOR =
 	'.taskbot-canvas-list-node > .taskbot-canvas-list-node__number';
 export const TASKBOT_CLICKABLE_LINE_NUMBER_SELECTOR =
@@ -231,6 +235,28 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		selector: TASKBOT_CANVAS_NODE_SELECTOR,
 		source: 'src/styl/editorMain.styl',
 		severity: 'required',
+		status: 'active',
+	},
+	{
+		id: 'taskbot-rendered-node',
+		view: 'taskbot-editor',
+		group: 'taskbot-editor',
+		label: 'Rendered Taskbot node',
+		feature: 'Chunked clipboard paste',
+		selector: TASKBOT_RENDERED_NODE_SELECTOR,
+		source: 'src/ts/clipboard.ts',
+		severity: 'optional',
+		status: 'active',
+	},
+	{
+		id: 'taskbot-active-cursor',
+		view: 'taskbot-editor',
+		group: 'taskbot-editor',
+		label: 'Active Taskbot cursor',
+		feature: 'Chunked clipboard paste',
+		selector: TASKBOT_ACTIVE_CURSOR_SELECTOR,
+		source: 'src/ts/clipboard.ts',
+		severity: 'optional',
 		status: 'active',
 	},
 	{

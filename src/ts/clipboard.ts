@@ -4,7 +4,9 @@ import { t } from './i18n';
 import {
 	SHARED_COPY_BUTTON_SELECTOR,
 	SHARED_PASTE_BUTTON_SELECTOR,
+	TASKBOT_ACTIVE_CURSOR_SELECTOR,
 	TASK_EDITOR_CAPABILITY_SELECTOR,
+	TASKBOT_RENDERED_NODE_SELECTOR,
 } from './automation-anywhere-selectors';
 import {
 	universalClipboard,
@@ -18,11 +20,14 @@ import {
 	cleanAutomationAnywhereJson as cleanClipboardJson,
 	getNativeClipboardSourceFileId,
 	getPortableClipboardEnvelope,
+	isStorageQuotaExceededError,
+	partitionClipboardJson,
 	preparePortableClipboardForPaste,
 	serializeClipboardJsonWithPlaceholder,
 	type PortableClipboardEnvelope,
 	type PortableClipboardResource,
 } from './clipboard-json';
+import { getChunkedClipboardPasteEnabled } from './settings';
 import {
 	AutomationAnywhereApi,
 	parseAutomationAnywherePageContext,
@@ -38,6 +43,7 @@ const CLIPBOARD_POLL_MS = 50;
 const CLIPBOARD_PASTE_READY_WAIT_MS = 1500;
 const CLIPBOARD_PASTE_BEFORE_CLICK_MS = 2500;
 const CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS = 1500;
+const CLIPBOARD_CHUNK_COMPLETION_WAIT_MS = 120_000;
 let globalClipboardWatcherStarted = false;
 let globalClipboardWatcherOnEditorPage = false;
 let lastSeenGlobalClipboard: string | null = null;
@@ -261,6 +267,11 @@ export function startGlobalClipboardWatcher(): void {
 		}
 
 		const currentClipboard = getGlobalClipboardValue();
+		if (pasteInFlight) {
+			lastSeenGlobalClipboard = currentClipboard;
+			ignoredGlobalClipboardWrite = null;
+			return;
+		}
 		if (!globalClipboardWatcherOnEditorPage) {
 			lastSeenGlobalClipboard = currentClipboard;
 			globalClipboardWatcherOnEditorPage = true;
@@ -277,6 +288,95 @@ export function startGlobalClipboardWatcher(): void {
 
 		void saveGlobalClipboardValueToDefaultSlot(currentClipboard, 'watcher');
 	}, GLOBAL_CLIPBOARD_WATCH_INTERVAL_MS);
+}
+
+function getNodeUids(selector: string): Set<string> {
+	return new Set(
+		[...document.querySelectorAll<HTMLElement>(selector)]
+			.map((element) => element.dataset.nodeUid)
+			.filter((uid): uid is string => Boolean(uid))
+	);
+}
+
+function setsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+	return left.size === right.size && [...left].every((value) => right.has(value));
+}
+
+async function waitForNewRenderedNode(
+	previousUids: ReadonlySet<string>,
+	startUrl: string
+): Promise<boolean> {
+	const start = Date.now();
+	while (Date.now() - start < CLIPBOARD_CHUNK_COMPLETION_WAIT_MS) {
+		if (location.href !== startUrl) return false;
+		const currentUids = getNodeUids(TASKBOT_RENDERED_NODE_SELECTOR);
+		if ([...currentUids].some((uid) => !previousUids.has(uid))) return true;
+		await utils.sleep(100);
+	}
+	return false;
+}
+
+async function stageSharedClipboard(json: string, uid: string): Promise<void> {
+	markGlobalClipboardWrite(json);
+	localStorage.removeItem(GLOBAL_CLIPBOARD_KEY);
+	localStorage.removeItem(GLOBAL_CLIPBOARD_UID_KEY);
+	await utils.sleep(0);
+	localStorage.setItem(GLOBAL_CLIPBOARD_KEY, json);
+	localStorage.setItem(GLOBAL_CLIPBOARD_UID_KEY, `"${uid}"`);
+	if (!(await waitForPasteClipboardValue(json, uid))) {
+		throw new Error('Automation Anywhere clipboard write failed.');
+	}
+}
+
+function clipboardUid(json: string): string {
+	const value = JSON.parse(json) as { uid?: unknown };
+	if (typeof value.uid !== 'string' || !value.uid) {
+		throw new Error('Automation Anywhere clipboard uid is missing.');
+	}
+	return value.uid;
+}
+
+function canStageClipboardChunk(json: string): boolean {
+	try {
+		// Reserve room for globalClipboardUid without waking AA during capacity probes.
+		localStorage.setItem(GLOBAL_CLIPBOARD_KEY, `${json}${' '.repeat(256)}`);
+		return true;
+	} catch (error) {
+		if (isStorageQuotaExceededError(error)) return false;
+		throw error;
+	}
+}
+
+async function clickSharedPaste(context: string): Promise<void> {
+	await utils.sleep(CLIPBOARD_PASTE_BEFORE_CLICK_MS);
+	const pasteButton = await waitForSharedClipboardButton(
+		SHARED_PASTE_BUTTON_SELECTOR,
+		context,
+		'Shared paste button not found.'
+	);
+	if (!pasteButton) {
+		ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
+		throw new Error('Shared paste button not found.');
+	}
+	window.focus();
+	pasteButton.focus({ preventScroll: true });
+	pasteButton.click();
+}
+
+function showPasteResult(missing: number, slot?: number): void {
+	if (missing) {
+		ui.showNotification(
+			t('Pasted with missing captures'),
+			t('{count} capture image(s) were omitted.', { count: missing })
+		);
+		return;
+	}
+	ui.showNotification(
+		t('Paste sent'),
+		slot === undefined
+			? t('Sent content from universal clipboard to Automation Anywhere.')
+			: t('Sent content from slot {slot} to Automation Anywhere.', { slot })
+	);
 }
 
 export async function copyToSlot(slot: number): Promise<string | null> {
@@ -408,52 +508,88 @@ async function requestSharedPaste(
 	const uid = generateUid();
 	const prepared = await prepareSharedPasteData(clipboardData, uid);
 	const cleanedData = prepared.json;
-	markGlobalClipboardWrite(cleanedData);
+	try {
+		await stageSharedClipboard(cleanedData, uid);
+		await clickSharedPaste(context);
+		void debugInfo('clipboard', 'Clipboard paste requested.', { slot }, {
+			feedback: true,
+		});
+		if (notify) showPasteResult(prepared.missing, slot);
+		await utils.sleep(CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS);
+		return;
+	} catch (error) {
+		if (!isStorageQuotaExceededError(error)) throw error;
+	}
 
+	if (!(await getChunkedClipboardPasteEnabled())) {
+		const message = t('Automation Anywhere clipboard storage limit exceeded.');
+		ui.showNotification(t('Paste failed'), message);
+		throw new Error(message);
+	}
+	const pageType = parseAutomationAnywherePageContext(location.href).pageType;
+	if (pageType !== 'private-taskbot' && pageType !== 'public-taskbot') {
+		const message = t('Chunked paste is supported only in TaskBot editors.');
+		ui.showNotification(t('Paste failed'), message);
+		throw new Error(message);
+	}
+
+	const cursorUids = getNodeUids(TASKBOT_ACTIVE_CURSOR_SELECTOR);
 	localStorage.removeItem(GLOBAL_CLIPBOARD_KEY);
 	localStorage.removeItem(GLOBAL_CLIPBOARD_UID_KEY);
-	await utils.sleep(0);
-
-	localStorage.setItem(GLOBAL_CLIPBOARD_KEY, cleanedData);
-	localStorage.setItem(GLOBAL_CLIPBOARD_UID_KEY, `"${uid}"`);
-
-	const stable = await waitForPasteClipboardValue(cleanedData, uid);
-	if (!stable) {
-		throw new Error('Automation Anywhere clipboard write failed.');
+	let chunks: string[];
+	try {
+		chunks = partitionClipboardJson(
+			cleanedData,
+			cursorUids.size ? 'reverse' : 'forward',
+			canStageClipboardChunk,
+			generateUid
+		);
+	} catch (error) {
+		const message =
+			error instanceof Error ? t(error.message) : t('Clipboard content cannot be split safely.');
+		ui.showNotification(t('Paste failed'), message);
+		throw new Error(message);
+	} finally {
+		localStorage.removeItem(GLOBAL_CLIPBOARD_KEY);
+		localStorage.removeItem(GLOBAL_CLIPBOARD_UID_KEY);
 	}
-	await utils.sleep(CLIPBOARD_PASTE_BEFORE_CLICK_MS);
 
-	const pasteButton = await waitForSharedClipboardButton(
-		SHARED_PASTE_BUTTON_SELECTOR,
-		context,
-		'Shared paste button not found.'
+	ui.showNotification(
+		t('Large paste'),
+		t('Sending {count} chunks. Keep the TaskBot cursor unchanged.', {
+			count: chunks.length,
+		})
 	);
-	if (!pasteButton) {
-		ui.showNotification(t('Paste failed'), t('Shared paste button not found.'));
-		throw new Error('Shared paste button not found.');
-	}
-
-	window.focus();
-	pasteButton.focus({ preventScroll: true });
-	pasteButton.click();
-	void debugInfo('clipboard', 'Clipboard paste requested.', { slot }, { feedback: true });
-	if (notify) {
-		if (prepared.missing) {
+	const startUrl = location.href;
+	for (let index = 0; index < chunks.length; index += 1) {
+		if (!setsEqual(cursorUids, getNodeUids(TASKBOT_ACTIVE_CURSOR_SELECTOR))) {
 			ui.showNotification(
-				t('Pasted with missing captures'),
-				t('{count} capture image(s) were omitted.', { count: prepared.missing })
+				t('Paste incomplete'),
+				t('TaskBot cursor changed after {count} chunk(s).', { count: index })
 			);
-		} else {
-			ui.showNotification(
-				t('Paste sent'),
-				slot === undefined
-					? t('Sent content from universal clipboard to Automation Anywhere.')
-					: t('Sent content from slot {slot} to Automation Anywhere.', { slot })
-			);
+			throw new Error(t('TaskBot cursor changed during chunked paste.'));
 		}
+		const chunk = chunks[index];
+		const renderedUids = getNodeUids(TASKBOT_RENDERED_NODE_SELECTOR);
+		await stageSharedClipboard(chunk, clipboardUid(chunk));
+		await clickSharedPaste(`${context}:chunk-${index + 1}`);
+		if (!(await waitForNewRenderedNode(renderedUids, startUrl))) {
+			ui.showNotification(
+				t('Paste incomplete'),
+				t('Automation Anywhere did not finish chunk {current} of {total}.', {
+					current: index + 1,
+					total: chunks.length,
+				})
+			);
+			throw new Error(t('Chunked paste timed out or the editor changed.'));
+		}
+		await utils.sleep(CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS);
 	}
-
-	await utils.sleep(CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS);
+	void debugInfo('clipboard', 'Chunked clipboard paste completed.', {
+		chunks: chunks.length,
+		slot,
+	}, { feedback: true });
+	if (notify) showPasteResult(prepared.missing, slot);
 }
 
 export async function pasteFromSlot(slot: number): Promise<string | null> {

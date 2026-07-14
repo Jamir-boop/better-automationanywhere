@@ -25,6 +25,69 @@ export interface PortableClipboardEnvelope {
 	missing: string[];
 }
 
+export type ClipboardChunkDirection = 'forward' | 'reverse';
+
+export function isStorageQuotaExceededError(error: unknown): boolean {
+	if (!error || typeof error !== 'object') return false;
+	const candidate = error as { code?: unknown; name?: unknown };
+	return (
+		candidate.name === 'QuotaExceededError' ||
+		candidate.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+		candidate.code === 22 ||
+		candidate.code === 1014
+	);
+}
+
+export function partitionClipboardJson(
+	json: string,
+	direction: ClipboardChunkDirection,
+	fits: (candidate: string) => boolean,
+	generateUid: () => string
+): string[] {
+	const value = JSON.parse(json) as unknown;
+	if (!isRecord(value) || !Array.isArray(value.nodes) || !value.nodes.length) {
+		throw new Error('Clipboard JSON has no actions to split.');
+	}
+
+	const remaining = [...value.nodes];
+	const chunks: string[] = [];
+	while (remaining.length) {
+		let low = 1;
+		let high = remaining.length;
+		let bestCount = 0;
+		let bestJson = '';
+		while (low <= high) {
+			const count = Math.floor((low + high) / 2);
+			const nodes =
+				direction === 'forward'
+					? remaining.slice(0, count)
+					: remaining.slice(remaining.length - count);
+			const candidate = JSON.stringify({
+				...value,
+				uid: generateUid(),
+				nodes,
+				variables: chunks.length ? [] : value.variables,
+				packages: chunks.length ? [] : value.packages,
+			});
+			if (fits(candidate)) {
+				bestCount = count;
+				bestJson = candidate;
+				low = count + 1;
+			} else {
+				high = count - 1;
+			}
+		}
+
+		if (!bestCount) {
+			throw new Error('A single action block exceeds the Automation Anywhere clipboard limit.');
+		}
+		chunks.push(bestJson);
+		if (direction === 'forward') remaining.splice(0, bestCount);
+		else remaining.splice(remaining.length - bestCount, bestCount);
+	}
+	return chunks;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

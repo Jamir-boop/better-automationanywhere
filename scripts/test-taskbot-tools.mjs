@@ -166,6 +166,78 @@ assert.throws(
 	() => clipboard.serializeClipboardJsonWithPlaceholder('[]'),
 	/globalClipboard JSON is not an object/
 );
+assert.equal(
+	clipboard.isStorageQuotaExceededError({ name: 'QuotaExceededError' }),
+	true
+);
+assert.equal(
+	clipboard.isStorageQuotaExceededError({ name: 'NS_ERROR_DOM_QUOTA_REACHED' }),
+	true
+);
+assert.equal(clipboard.isStorageQuotaExceededError(new Error('write failed')), false);
+
+const chunkSource = {
+	uid: 'source',
+	sourceFileId: '123',
+	nodes: [
+		{ uid: 'a', value: 'a'.repeat(20) },
+		{ uid: 'b', children: [{ uid: 'nested' }], value: 'b'.repeat(20) },
+		{ uid: 'c', value: 'c'.repeat(20) },
+	],
+	variables: [{ name: 'input' }],
+	packages: [{ name: 'Recorder', version: '1' }],
+};
+const twoNodeLimit = JSON.stringify({
+	...chunkSource,
+	uid: 'chunk-id',
+	nodes: chunkSource.nodes.slice(0, 2),
+}).length;
+const forwardChunks = clipboard
+	.partitionClipboardJson(
+		JSON.stringify(chunkSource),
+		'forward',
+		(candidate) => candidate.length <= twoNodeLimit,
+		() => 'chunk-id'
+	)
+	.map(JSON.parse);
+assert.deepEqual(
+	forwardChunks.map((chunk) => chunk.nodes.map((node) => node.uid)),
+	[
+		['a', 'b'],
+		['c'],
+	]
+);
+assert.deepEqual(forwardChunks[0].variables, chunkSource.variables);
+assert.deepEqual(forwardChunks[1].variables, []);
+assert.deepEqual(forwardChunks[1].packages, []);
+assert.equal(forwardChunks[0].nodes[1].children[0].uid, 'nested');
+
+const reverseChunks = clipboard
+	.partitionClipboardJson(
+		JSON.stringify(chunkSource),
+		'reverse',
+		(candidate) => candidate.length <= twoNodeLimit,
+		() => 'chunk-id'
+	)
+	.map(JSON.parse);
+assert.deepEqual(
+	reverseChunks.map((chunk) => chunk.nodes.map((node) => node.uid)),
+	[
+		['b', 'c'],
+		['a'],
+	]
+);
+assert.deepEqual(reverseChunks[0].variables, chunkSource.variables);
+assert.throws(
+	() =>
+		clipboard.partitionClipboardJson(
+			JSON.stringify({ ...chunkSource, nodes: [chunkSource.nodes[0]] }),
+			'forward',
+			() => false,
+			() => 'chunk-id'
+		),
+	/single action block/
+);
 assert.deepEqual(
 	JSON.parse(
 		clipboard.cleanAutomationAnywhereJson(

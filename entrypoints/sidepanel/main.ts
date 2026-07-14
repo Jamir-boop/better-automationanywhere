@@ -69,6 +69,7 @@ import {
 	DEFAULT_EXTENSION_LANGUAGE,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES,
+	DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED,
 	DEFAULT_KEEP_ALIVE_ENABLED,
 	DEFAULT_OPEN_SIDEBAR_SHORTCUT,
 	DEFAULT_RUN_BUTTON_WAVES,
@@ -81,6 +82,7 @@ import {
 	STYLE_VALUE_FIELDS,
 	botExecutionModalPosition,
 	blockTaskbotNodeLabelClicks,
+	chunkedClipboardPasteEnabled,
 	commandPaletteEnabled,
 	commandPaletteShortcut,
 	debugEnabled,
@@ -90,6 +92,7 @@ import {
 	getBlockTaskbotNodeLabelClicks,
 	getBotExecutionModalPosition,
 	getCommandPaletteEnabled,
+	getChunkedClipboardPasteEnabled,
 	getCommandPaletteShortcut,
 	getCommandPaletteShortcutLabel,
 	getDebugEnabled,
@@ -280,6 +283,13 @@ function renderToolsConfigSection(): string {
 					<small>${t('Shows a toast when an open taskbot has package updates available.')}</small>
 				</span>
 				<input id="packageUpdateToastEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span>
+					<strong>${t('Chunk oversized clipboard pastes')}</strong>
+					<small>${t('Automatically split large TaskBot pastes when Automation Anywhere storage is full.')}</small>
+				</span>
+				<input id="chunkedClipboardPasteEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
@@ -668,6 +678,9 @@ const runButtonWavesRow =
 const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const packageUpdateToastEnabledInput = document.querySelector<HTMLInputElement>(
 	'#packageUpdateToastEnabled'
+)!;
+const chunkedClipboardPasteEnabledInput = document.querySelector<HTMLInputElement>(
+	'#chunkedClipboardPasteEnabled'
 )!;
 const variableMetadataEnabledInput = document.querySelector<HTMLInputElement>(
 	'#variableMetadataEnabled'
@@ -1763,6 +1776,7 @@ async function loadState(): Promise<void> {
 	await refreshFeedbackHistory();
 	renderSupportedBuilds();
 	packageUpdateToastEnabledInput.checked = await getPackageUpdateToastEnabled();
+	chunkedClipboardPasteEnabledInput.checked = await getChunkedClipboardPasteEnabled();
 	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
 	recorderBridgeEnabledInput.checked = recorderEnabled;
 	updateRecorderBridgeDependentState();
@@ -1888,6 +1902,12 @@ forceEnglishLocaleInput.addEventListener('change', () => {
 			: t('English locale enforcement disabled.'),
 		'info',
 		'settings'
+	);
+});
+
+chunkedClipboardPasteEnabledInput.addEventListener('change', () => {
+	void chunkedClipboardPasteEnabled.setValue(
+		chunkedClipboardPasteEnabledInput.checked
 	);
 });
 
@@ -2466,6 +2486,10 @@ blockTaskbotNodeLabelClicks.watch((value) => {
 });
 forceEnglishLocale.watch((value) => {
 	forceEnglishLocaleInput.checked = value ?? DEFAULT_FORCE_ENGLISH_LOCALE;
+});
+chunkedClipboardPasteEnabled.watch((value) => {
+	chunkedClipboardPasteEnabledInput.checked =
+		value ?? DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED;
 });
 recorderBridgeEnabled.watch((value) => {
 	recorderBridgeEnabledInput.checked = value ?? DEFAULT_RECORDER_BRIDGE_ENABLED;

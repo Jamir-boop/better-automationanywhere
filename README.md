@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.28.0           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.29.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -41,11 +41,12 @@ Copy and paste bot actions between different Control Rooms in the same browser.
 
 Notes:
 
-- Data is stored in browser storage.
-- Large action blocks may hit browser storage limits.
-- Copy smaller sections for better reliability.
-- Uploaded Control Room dependencies are not transferred.
-- Capture screenshots and other uploaded assets must exist in target Control Room.
+- Clipboard slots use extension storage with its normal quota removed.
+- Available non-secure capture screenshots and thumbnails are embedded in portable Action JSON. Cross-bot paste uploads them into the target bot metadata and rewrites the action paths; same-bot paste reuses the existing paths.
+- Selector blobs, variables, and package references remain in Automation Anywhere's native action JSON. The portable resource envelope and image bytes are removed before native paste.
+- If Automation Anywhere's page clipboard is full, TaskBot paste automatically sends the largest fitting top-level action groups in order. Loops, conditions, branches, and their children are never split internally. This fallback can be disabled in Settings.
+- Automation Anywhere's native shared copy and a single oversized action block still use its page clipboard and can exceed that limit.
+- Secure, unavailable, or failed capture resources are omitted during cross-bot paste with a warning. Other uploaded Control Room dependencies are not transferred.
 
 ------
 
@@ -211,7 +212,7 @@ Examples:
 
 Open the extension sidebar from the toolbar or configured shortcut.
 
-- **Config:** shortcuts, sounds, suggestions, keep-alive, language, and debug controls.
+- **Config:** shortcuts, sounds, suggestions, keep-alive, chunked clipboard paste, language, and debug controls.
 - **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.
 - **Tools:** context-aware Control Room tools; export format appears when Export Bots is selected.
 
@@ -220,10 +221,9 @@ Open the extension sidebar from the toolbar or configured shortcut.
 ## Known limitations
 
 - Control Room language must be English.
-- Universal copy/paste depends on browser storage limits.
-- Large copied action blocks may fail or paste inconsistently.
-- Uploaded dependencies are not transferred between Control Rooms.
-- Capture screenshots and other Control Room assets must be manually available in target environment.
+- Automation Anywhere's native shared copy can fail before the extension receives the selection, and a single oversized action block cannot be split safely.
+- Chunked paste is limited to TaskBot editors; Process Automation keeps native paste behavior.
+- Available non-secure capture screenshots and thumbnails transfer automatically. Secure, missing, or failed resources are omitted with a warning; other uploaded dependencies are not transferred between Control Rooms.
 - Automation Anywhere UI updates may break selectors.
 - Some commands only appear when related Control Room sidebar views are available to current user.
 - Extension behavior may differ between Automation Anywhere Cloud and On-Prem versions.
