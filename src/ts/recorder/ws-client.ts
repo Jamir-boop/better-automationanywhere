@@ -4,9 +4,10 @@ import {
 	getRecorderBridgePort,
 	getRecorderBridgeToken,
 } from '../settings';
-import { chooseRecorderTab, isMissingRecorderReceiver, unwrapContentResponse } from './protocol';
+import { chooseRecorderTab, classifyRecorderError, isMissingRecorderReceiver, unwrapContentResponse } from './protocol';
 
 type Envelope = { id: string; type: string; payload?: Record<string, unknown> };
+const CAPTURE_INTERVAL_MS = 550;
 
 function error(code: string, message: string) {
 	return { ok: false, error: { code, message } };
@@ -28,6 +29,7 @@ export function startRecorderBridge(): void {
 	let socket: WebSocket | undefined;
 	let reconnectTimer: number | undefined;
 	let tabId: number | undefined;
+	let lastCaptureAt = 0;
 
 	const send = (value: unknown) => {
 		if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(value));
@@ -60,6 +62,9 @@ export function startRecorderBridge(): void {
 	};
 	const capture = async () => {
 		if (tabId === undefined) throw new Error('No controlled tab.');
+		const wait = CAPTURE_INTERVAL_MS - (Date.now() - lastCaptureAt);
+		if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+		lastCaptureAt = Date.now();
 		const tab = await browser.tabs.get(tabId);
 		if (!tab.active) {
 			throw Object.assign(new Error('Controlled tab is no longer active.'), { code: 'NO_TAB' });
@@ -79,42 +84,71 @@ export function startRecorderBridge(): void {
 			})
 		);
 	};
+	const waitForTabComplete = async (controlledTabId: number, start: () => Promise<unknown>) => {
+		await new Promise<void>((resolve, reject) => {
+			let settled = false;
+			const finish = (cause?: unknown) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timeout);
+				browser.tabs.onUpdated.removeListener(listener);
+				if (cause) reject(cause); else resolve();
+			};
+			const timeout = setTimeout(() => finish(new Error('Navigation timed out.')), 15_000);
+			const listener = (updatedId: number, info: { status?: string }) => {
+				if (updatedId === controlledTabId && info.status === 'complete') finish();
+			};
+			browser.tabs.onUpdated.addListener(listener);
+			void start()
+				.then(() => browser.tabs.get(controlledTabId))
+				.then((tab) => { if (tab.status !== 'loading') finish(); })
+				.catch(finish);
+		});
+	};
 	const navigate = async (url: string) => {
 		if (tabId === undefined) throw new Error('No controlled tab.');
 		const controlledTabId = tabId;
-		await new Promise<void>((resolve, reject) => {
-			const cleanup = () => {
-				clearTimeout(timeout);
-				browser.tabs.onUpdated.removeListener(listener);
-			};
-			const timeout = setTimeout(() => {
-				cleanup();
-				reject(new Error('Navigation timed out.'));
-			}, 15_000);
-			const listener = (updatedId: number, info: { status?: string }) => {
-				if (updatedId !== controlledTabId || info.status !== 'complete') return;
-				cleanup();
-				resolve();
-			};
-			browser.tabs.onUpdated.addListener(listener);
-			void browser.tabs.update(controlledTabId, { url }).catch((error) => {
-				cleanup();
-				reject(error);
-			});
-		});
+		await waitForTabComplete(controlledTabId, () => browser.tabs.update(controlledTabId, { url }));
 		await ensureContentScript();
 		return { url };
 	};
-	const selectTab = async (url: string) => {
-		const tab = chooseRecorderTab(await browser.tabs.query({}), url);
+	const settleAfterClick = async () => {
+		if (tabId === undefined) return;
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		const controlledTabId = tabId;
+		await waitForTabComplete(controlledTabId, () => browser.tabs.get(controlledTabId));
+		await ensureContentScript();
+	};
+	const selectTab = async (payload: Record<string, unknown>) => {
+		const tabs = await browser.tabs.query({});
+		const requestedId = Number(payload.tabId);
+		const url = String(payload.url ?? '');
+		const tab = Number.isInteger(requestedId)
+			? tabs.find((candidate) => candidate.id === requestedId)
+			: chooseRecorderTab(tabs, url);
 		if (tab?.id === undefined) {
-			throw Object.assign(new Error(`No open browser tab matches captured URL: ${url}`), { code: 'NO_TAB' });
+			throw Object.assign(new Error(Number.isInteger(requestedId)
+				? `No open browser tab has id ${requestedId}`
+				: `No open browser tab matches captured URL: ${url}`), { code: 'NO_TAB' });
 		}
 		tabId = tab.id;
 		await browser.tabs.update(tabId, { active: true });
+		if (tab.windowId !== undefined) await browser.windows.update(tab.windowId, { focused: true });
 		await ensureContentScript();
 		return { tabId, url: tab.url };
 	};
+	const listTabs = async () => ({
+		currentTabId: tabId,
+		tabs: (await browser.tabs.query({}))
+			.filter((tab) => tab.id !== undefined && /^(https?|file):/i.test(tab.url ?? ''))
+			.map((tab) => ({
+				tabId: tab.id,
+				title: tab.title ?? '',
+				url: tab.url ?? '',
+				active: Boolean(tab.active),
+				lastAccessed: tab.lastAccessed ?? 0,
+			})),
+	});
 	const debuggerClick = async (message: Envelope) => {
 		if (!import.meta.env.CHROME) {
 			throw Object.assign(new Error('debugger click unsupported on this browser'), { code: 'INTERNAL' });
@@ -124,6 +158,7 @@ export function startRecorderBridge(): void {
 			rect: { x: number; y: number; width: number; height: number };
 			selector: string;
 			xpath: string;
+			targetDescriptor: Record<string, unknown>;
 		}>(await browser.tabs.sendMessage(tabId, { type: 'RECORDER_PREPARE_DEBUGGER_CLICK', request: message }));
 		const chromeApi = (globalThis as any).chrome;
 		const target = { tabId };
@@ -136,7 +171,9 @@ export function startRecorderBridge(): void {
 			await chromeApi.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
 			await chromeApi.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
 			await chromeApi.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
-			return message.type === 'executeVerb' ? { selector: prepared.selector, xpath: prepared.xpath } : {};
+			return message.type === 'executeVerb'
+				? { selector: prepared.selector, xpath: prepared.xpath, targetDescriptor: prepared.targetDescriptor, changed: true }
+				: {};
 		} finally {
 			if (attached) await chromeApi.debugger.detach(target).catch(() => {});
 		}
@@ -144,19 +181,24 @@ export function startRecorderBridge(): void {
 	const handle = async (message: Envelope) => {
 		if (message.type === 'ping') return response(message.id, { pong: true });
 		try {
-			if (message.type === 'selectTab') return response(message.id, await selectTab(String(message.payload?.url ?? '')));
+			if (message.type === 'listTabs') return response(message.id, await listTabs());
+			if (message.type === 'selectTab') return response(message.id, await selectTab(message.payload ?? {}));
 			if (message.type === 'screenshot') return response(message.id, await capture());
 			if (message.type === 'navigate') return response(message.id, await navigate(String(message.payload?.url ?? '')));
 			if (message.type === 'debuggerClick' || (message.type === 'executeVerb' && message.payload?.verb === 'debuggerClick')) {
-				return response(message.id, await debuggerClick(message));
+				const result = await debuggerClick(message);
+				await settleAfterClick();
+				return response(message.id, result);
+			}
+			if (message.type === 'executeVerb') {
+				const result = await forward(message);
+				if (message.payload?.verb === 'click') await settleAfterClick();
+				return response(message.id, result);
 			}
 			return response(message.id, await forward(message));
 		} catch (cause) {
-			const bridgeError = cause as { code?: string; message?: string };
-			const messageText = cause instanceof Error ? cause.message : bridgeError?.message || 'Request failed.';
-			const noTab = ['No controlled', 'Receiving end does not exist', 'Invalid tab', 'Cannot access'].some((text) => messageText.includes(text));
-			const code = bridgeError?.code || (noTab ? 'NO_TAB' : messageText.includes('timed out') ? 'TIMEOUT' : 'INTERNAL');
-			return { id: message.id, ...error(code, messageText) };
+			const failure = classifyRecorderError(cause);
+			return { id: message.id, ...error(failure.code, failure.message) };
 		}
 	};
 	const connect = async () => {
@@ -168,7 +210,11 @@ export function startRecorderBridge(): void {
 		const next = new WebSocket(`ws://127.0.0.1:${port || DEFAULT_RECORDER_BRIDGE_PORT}`);
 		socket = next;
 		next.onopen = () => {
-			if (socket === next) send({ type: 'hello', token, tabId, extVersion: browser.runtime.getManifest().version });
+			if (socket === next) send({
+				type: 'hello', token, tabId,
+				extVersion: browser.runtime.getManifest().version,
+				capabilities: import.meta.env.CHROME ? ['aiSteps'] : [],
+			});
 		};
 		next.onmessage = (event) => {
 			if (socket !== next) return;

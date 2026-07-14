@@ -3,7 +3,23 @@ export type ElementDescription = {
 	xpath: string;
 	text: string;
 	role: string;
+	tag: string;
+	accessibleName: string;
+	label: string;
+	placeholder: string;
+	name: string;
+	testId: string;
+	radioGroup: string;
+	optionValue: string;
 };
+
+export function summarizeSelectOptions(options: string[], selectedIndex: number) {
+	const texts = options.slice(0, 25).map((text) => text.replace(/\s+/g, ' ').trim().slice(0, 120));
+	if (selectedIndex >= 25 && selectedIndex < options.length) {
+		texts.push(options[selectedIndex].replace(/\s+/g, ' ').trim().slice(0, 120));
+	}
+	return { texts, optionCount: options.length, optionsTruncated: options.length > texts.length };
+}
 
 function cssEscape(value: string): string {
 	return CSS.escape(value);
@@ -60,15 +76,19 @@ export function buildXPath(element: Element): string {
 	return `/${parts.join('/')}`;
 }
 
+function labelText(element: Element): string {
+	const html = element as HTMLElement;
+	return ((html.id
+		? document.querySelector(`label[for="${cssEscape(html.id)}"]`)?.textContent
+		: html.closest('label')?.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+}
+
 export function accessibleText(element: Element): string {
 	const html = element as HTMLElement;
-	const label = html.id
-		? document.querySelector(`label[for="${cssEscape(html.id)}"]`)?.textContent
-		: html.closest('label')?.textContent;
 	return (
 		html.getAttribute('aria-label') ||
 		html.getAttribute('title') ||
-		label ||
+		labelText(element) ||
 		(html instanceof HTMLInputElement ? html.placeholder || html.name : '') ||
 		html.innerText ||
 		html.textContent ||
@@ -81,10 +101,19 @@ export function accessibleText(element: Element): string {
 
 export function describeElement(element: Element): ElementDescription {
 	const html = element as HTMLElement;
+	const accessibleName = accessibleText(element);
 	return {
 		selector: buildSelector(element),
 		xpath: buildXPath(element),
-		text: accessibleText(element),
+		text: accessibleName,
 		role: html.getAttribute('role') || html.tagName.toLowerCase(),
+		tag: html.tagName.toLowerCase(),
+		accessibleName,
+		label: labelText(element),
+		placeholder: html.getAttribute('placeholder') || '',
+		name: html.getAttribute('name') || '',
+		testId: html.getAttribute('data-testid') || '',
+		radioGroup: html instanceof HTMLInputElement && html.type === 'radio' ? html.name : '',
+		optionValue: html instanceof HTMLInputElement && html.type === 'radio' ? html.value : '',
 	};
 }

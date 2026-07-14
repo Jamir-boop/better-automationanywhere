@@ -20,8 +20,6 @@ export const RECORDER_VERBS = [
 	'selectItemByIndex',
 	'getStatus',
 	'setFocus',
-	'hover',
-	'exists',
 ] as const;
 
 export type RecorderVerb = (typeof RECORDER_VERBS)[number];
@@ -44,11 +42,23 @@ export function isMissingRecorderReceiver(cause: unknown): boolean {
 		|| message.includes('Could not establish connection');
 }
 
+export function classifyRecorderError(cause: unknown): { code: string; message: string } {
+	const bridgeError = cause as { code?: string; message?: string };
+	const message = cause instanceof Error ? cause.message : bridgeError?.message || 'Request failed.';
+	if (bridgeError?.code) return { code: bridgeError.code, message };
+	const lower = message.toLowerCase();
+	const noTab = ['no controlled tab', 'receiving end does not exist', 'could not establish connection',
+		'invalid tab', 'no tab with id', 'cannot access'].some((text) => lower.includes(text));
+	return { code: noTab ? 'NO_TAB' : lower.includes('timed out') ? 'TIMEOUT' : 'INTERNAL', message };
+}
+
 export type RecorderTabCandidate = {
 	id?: number;
 	url?: string;
+	title?: string;
 	active?: boolean;
 	lastAccessed?: number;
+	windowId?: number;
 };
 
 export function normalizeRecorderTabUrl(value: string): string {
