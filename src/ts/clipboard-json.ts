@@ -257,13 +257,10 @@ export function cleanAutomationAnywhereJson(
 	jsonString: string,
 	onParseError?: (error: unknown) => void
 ): string {
-	let data: unknown;
 	try {
-		data = JSON.parse(jsonString);
+		return preparePortableClipboardForPaste(jsonString, {});
 	} catch (error) {
 		onParseError?.(error);
 		return jsonString;
 	}
-
-	return preparePortableClipboardForPaste(JSON.stringify(data), {});
 }

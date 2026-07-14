@@ -909,6 +909,7 @@ async function refreshToolsContext(): Promise<void> {
 		);
 		updateAvailabilityDot(tools.length > 0);
 		setToolsHelpMatrixVisible(tools.length === 0);
+		updatePackagesDot = false;
 
 		if (isFolderContext(active.context)) {
 			const shouldSuggestPaste = canPasteCopiedFilesInContext(active.context);
@@ -1129,9 +1130,7 @@ function getToolInlineHint(tool: ToolId | null): string {
 	return '';
 }
 
-const updatePackagesDotByFileId = new Map<string, boolean>();
-// Defaults change rarely; one fetch per sidepanel lifetime.
-let sidepanelDefaultVersionsPromise: Promise<Map<string, string>> | null = null;
+let updatePackagesDot = false;
 
 function applyUpdatePackagesDot(hasUpdates: boolean): void {
 	const button = actionsContainer.querySelector<HTMLButtonElement>(
@@ -1148,22 +1147,18 @@ async function refreshUpdatePackagesDot(activeRuntime: ToolsRuntime): Promise<vo
 	const fileId = activeRuntime.context.fileId;
 	if (!fileId) return;
 
-	const cached = updatePackagesDotByFileId.get(fileId);
-	if (cached !== undefined) {
-		applyUpdatePackagesDot(cached);
-		return;
-	}
-
 	try {
-		const content = await activeRuntime.api.getBotContent(fileId);
-		sidepanelDefaultVersionsPromise ??= activeRuntime.api.getDefaultPackageVersions();
+		const [content, defaultVersions] = await Promise.all([
+			activeRuntime.api.getBotContent(fileId),
+			activeRuntime.api.getDefaultPackageVersions(),
+		]);
 		const updates = getAutomationAnywherePackageUpdates(
 			extractAutomationAnywherePackages(content),
-			await sidepanelDefaultVersionsPromise
+			defaultVersions
 		);
-		updatePackagesDotByFileId.set(fileId, updates.length > 0);
 		if (runtime !== activeRuntime) return;
-		applyUpdatePackagesDot(updates.length > 0);
+		updatePackagesDot = updates.length > 0;
+		applyUpdatePackagesDot(updatePackagesDot);
 	} catch (error) {
 		void options.addFeedback(
 			'info',
@@ -1193,10 +1188,7 @@ function renderActionButtons(): void {
 		actionsContainer.appendChild(button);
 	}
 
-	const dotState = context.fileId
-		? updatePackagesDotByFileId.get(context.fileId)
-		: undefined;
-	if (dotState !== undefined) applyUpdatePackagesDot(dotState);
+	applyUpdatePackagesDot(updatePackagesDot);
 }
 
 async function selectTool(tool: ToolId): Promise<void> {
@@ -2482,6 +2474,7 @@ async function updateCurrentTaskbotPackages(activeRuntime: ToolsRuntime): Promis
 		const result = applyPackageVersionsToContent(content, versions);
 		if (!updates.length || !result.changed) {
 			removeUpdatedRows();
+			await refreshUpdatePackagesDot(activeRuntime);
 			const message = t('Selected packages are already current.');
 			setToolProgress(1, 1, message);
 			setToolStatus(message);
@@ -2491,6 +2484,7 @@ async function updateCurrentTaskbotPackages(activeRuntime: ToolsRuntime): Promis
 
 		await activeRuntime.api.updateBotContent(fileId, result.content);
 		removeUpdatedRows();
+		await refreshUpdatePackagesDot(activeRuntime);
 		const message = t('Updated {count} package(s) in current bot.', {
 			count: updates.length,
 		});

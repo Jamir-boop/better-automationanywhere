@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { importTsModule, root } from './lib/ts-module-loader.mjs';
 
@@ -14,6 +15,10 @@ const clipboard = await importTsModule(join(root, 'src', 'ts', 'clipboard-json.t
 const automationJson = await importTsModule(
 	join(root, 'src', 'ts', 'automation-anywhere-json.ts')
 );
+const clipboardSource = await readFile(join(root, 'src', 'ts', 'clipboard.ts'), 'utf8');
+const apiSource = await readFile(join(root, 'src', 'ts', 'automation-anywhere-api.ts'), 'utf8');
+assert.ok(clipboardSource.includes('await api.deleteRepositoryFile(created.id)'));
+assert.ok(apiSource.includes("method: 'DELETE'"));
 
 assert.deepEqual(
 	tools.getAutomationAnywherePackageUpdates(

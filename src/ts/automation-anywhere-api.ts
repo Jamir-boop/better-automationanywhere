@@ -808,4 +808,12 @@ export class AutomationAnywhereApi {
 			}
 		);
 	}
+
+	deleteRepositoryFile(fileId: string): Promise<void> {
+		const numericFileId = Number(fileId);
+		if (!Number.isSafeInteger(numericFileId) || numericFileId <= 0) {
+			throw new Error('Repository file id is invalid.');
+		}
+		return this.request<void>(`/v2/repository/files/${numericFileId}`, { method: 'DELETE' });
+	}
 }

@@ -1,5 +1,4 @@
 import {
-	DEFAULT_RECORDER_BRIDGE_ENABLED,
 	DEFAULT_RECORDER_BRIDGE_PORT,
 	getRecorderBridgeEnabled,
 	getRecorderBridgePort,
@@ -28,7 +27,6 @@ async function activeTab(): Promise<Awaited<ReturnType<typeof browser.tabs.query
 export function startRecorderBridge(): void {
 	let socket: WebSocket | undefined;
 	let reconnectTimer: number | undefined;
-	let stopped = false;
 	let tabId: number | undefined;
 
 	const send = (value: unknown) => {
@@ -41,7 +39,7 @@ export function startRecorderBridge(): void {
 		socket = undefined;
 	};
 	const schedule = () => {
-		if (stopped || reconnectTimer) return;
+		if (reconnectTimer) return;
 		reconnectTimer = setTimeout(() => {
 			reconnectTimer = undefined;
 			void connect();
@@ -63,6 +61,9 @@ export function startRecorderBridge(): void {
 	const capture = async () => {
 		if (tabId === undefined) throw new Error('No controlled tab.');
 		const tab = await browser.tabs.get(tabId);
+		if (!tab.active) {
+			throw Object.assign(new Error('Controlled tab is no longer active.'), { code: 'NO_TAB' });
+		}
 		const [png, viewport] = await Promise.all([
 			browser.tabs.captureVisibleTab(tab.windowId, { format: 'png' }),
 			browser.tabs.sendMessage(tabId, { type: 'RECORDER_VIEWPORT' }),
@@ -80,20 +81,28 @@ export function startRecorderBridge(): void {
 	};
 	const navigate = async (url: string) => {
 		if (tabId === undefined) throw new Error('No controlled tab.');
-		await browser.tabs.update(tabId, { url });
+		const controlledTabId = tabId;
 		await new Promise<void>((resolve, reject) => {
-			const timeout = setTimeout(() => {
+			const cleanup = () => {
+				clearTimeout(timeout);
 				browser.tabs.onUpdated.removeListener(listener);
+			};
+			const timeout = setTimeout(() => {
+				cleanup();
 				reject(new Error('Navigation timed out.'));
 			}, 15_000);
 			const listener = (updatedId: number, info: { status?: string }) => {
-				if (updatedId !== tabId || info.status !== 'complete') return;
-				clearTimeout(timeout);
-				browser.tabs.onUpdated.removeListener(listener);
+				if (updatedId !== controlledTabId || info.status !== 'complete') return;
+				cleanup();
 				resolve();
 			};
 			browser.tabs.onUpdated.addListener(listener);
+			void browser.tabs.update(controlledTabId, { url }).catch((error) => {
+				cleanup();
+				reject(error);
+			});
 		});
+		await ensureContentScript();
 		return { url };
 	};
 	const selectTab = async (url: string) => {
@@ -112,7 +121,6 @@ export function startRecorderBridge(): void {
 		}
 		if (tabId === undefined) throw Object.assign(new Error('No controlled tab.'), { code: 'NO_TAB' });
 		const prepared = unwrapContentResponse<{
-			token: string;
 			rect: { x: number; y: number; width: number; height: number };
 			selector: string;
 			xpath: string;
@@ -131,7 +139,6 @@ export function startRecorderBridge(): void {
 			return message.type === 'executeVerb' ? { selector: prepared.selector, xpath: prepared.xpath } : {};
 		} finally {
 			if (attached) await chromeApi.debugger.detach(target).catch(() => {});
-			await browser.tabs.sendMessage(tabId, { type: 'RECORDER_CLEANUP_DEBUGGER_CLICK', token: prepared.token }).catch(() => {});
 		}
 	};
 	const handle = async (message: Envelope) => {
@@ -178,6 +185,5 @@ export function startRecorderBridge(): void {
 		close();
 		void connect();
 	});
-	if (DEFAULT_RECORDER_BRIDGE_ENABLED) void connect();
-	else void getRecorderBridgeEnabled().then((enabled) => { if (enabled) void connect(); });
+	void connect();
 }

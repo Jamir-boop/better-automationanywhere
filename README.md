@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.30.0           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.30.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -31,7 +31,7 @@ This project replaces the older Tampermonkey userscript and Stylus theme. Everyt
 
 ### Better Recorder bridge
 
-The optional Better Recorder bridge connects the extension to a local `BetterRecorder` Automation Anywhere package. Enable it from the sidepanel Settings tab, enter the local port/token, and start the package session. It uses `<all_urls>` and `webNavigation` so capture actions can operate on user-selected web pages; it does not run unless enabled. Chrome's optional trusted-click verb also requires the `debugger` permission; Firefox reports that verb as unsupported.
+The Better Recorder bridge connects the extension to a local `BetterRecorder` Automation Anywhere package. It is enabled by default for zero-config pairing on `127.0.0.1:8765` and can be disabled or assigned a port/token from Settings. The recorder page script is injected only after BetterRecorder selects a tab. The bridge trusts the local process that owns the configured port; the optional token gates clients at the BetterRecorder server but is not mutual server authentication. It uses `<all_urls>` and `webNavigation` so capture actions can operate on user-selected web pages. Chrome's optional trusted-click verb also requires the `debugger` permission; Firefox reports that verb as unsupported.
 
 ### Universal action copy/paste
 
@@ -46,7 +46,7 @@ Notes:
 - Selector blobs, variables, and package references remain in Automation Anywhere's native action JSON. The portable resource envelope and image bytes are removed before native paste.
 - If Automation Anywhere's page clipboard is full, TaskBot paste automatically sends the largest fitting top-level action groups in order. Loops, conditions, branches, and their children are never split internally. This fallback can be disabled in Settings.
 - Automation Anywhere's native shared copy and a single oversized action block still use its page clipboard and can exceed that limit.
-- Secure, unavailable, or failed capture resources are omitted during cross-bot paste with a warning. Other uploaded Control Room dependencies are not transferred.
+- Secure, unavailable, or failed capture resources are omitted during cross-bot paste with a warning. A metadata file created for a failed upload is deleted on a best-effort basis. Other uploaded Control Room dependencies are not transferred.
 
 ------
 
@@ -73,7 +73,7 @@ Package lists load in small pages with progress feedback. Package Usage loads al
 
 ### Save-time MessageBox warning
 
-An optional Settings toggle checks successfully saved TaskBots for MessageBox and supported MessageBoxPlus actions that definitely lack automatic closing. It covers the native TaskBot Save button and the extension's TaskBot JSON Save, reports affected actions without blocking the save, and accepts dynamic timeout values when automatic closing is enabled.
+An optional Settings toggle checks successfully saved TaskBots for MessageBox and supported MessageBoxPlus actions that definitely lack automatic closing. Native Save waits for the Save button's busy-to-idle lifecycle plus a new native success toast; ambiguous saves stay silent. TaskBot JSON Save is checked after its API write succeeds. The warning reports affected actions without blocking the save and accepts dynamic timeout values when automatic closing is enabled.
 
 ------
 

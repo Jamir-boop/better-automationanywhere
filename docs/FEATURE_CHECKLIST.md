@@ -20,8 +20,8 @@ Selector source of truth:
   - Source: `src/ts/recorder/ws-client.ts`, `entrypoints/recorder.content.ts`, `entrypoints/background.ts`
   - Setting/id: `local:recorderBridgeEnabled` (default `true`), `local:recorderBridgePort` (default `8765`), `local:recorderBridgeToken`; port/token rows are hidden while disabled.
   - Selectors: web-page selectors are generated at runtime by `src/ts/recorder/selector.ts`; no Automation Anywhere external selector.
-  - Validate: enable the bridge, start BetterRecorder on `127.0.0.1:8765`, and confirm `hello` then `ping`; run `executeVerb` against text, checkbox, radio, select, and password controls; verify Chrome debugger click and Firefox's unsupported error.
-  - Expected: only the enabled local bridge receives the token; DOM requests return protocol results or `NO_MATCH`/`NOT_VISIBLE`/`NO_TAB`/`TIMEOUT`/`NOT_ALLOWED`/`INTERNAL`; password reads are rejected and debugger clicks detach after use.
+  - Validate: start BetterRecorder on `127.0.0.1:8765` and confirm `hello` then `ping`; verify the recorder content script is runtime-only and injected after `selectTab`; switch tabs before a screenshot; run `executeVerb` against text, checkbox, radio, select, and password controls; verify Chrome debugger click and Firefox's unsupported error.
+  - Expected: zero-config mode trusts the process owning the configured loopback port; the optional token authenticates the extension to BetterRecorder but is not mutual server authentication. Runtime injection occurs only for the selected tab; leaving that tab before a screenshot returns `NO_TAB`; DOM requests return protocol results or `NO_MATCH`/`NOT_VISIBLE`/`NO_TAB`/`TIMEOUT`/`NOT_ALLOWED`/`INTERNAL`; password reads are rejected and debugger clicks detach after use.
   - Validated: pending — v2 live Java/browser checkpoints required.
   - Status: active
   - Delete condition: BetterRecorder package support is removed or replaced by a native bridge.
@@ -382,9 +382,9 @@ Selector source of truth:
   - Source: `src/ts/clipboard.ts`, `src/ts/clipboard-json.ts`, `src/ts/automation-anywhere-api.ts`, `entrypoints/background.ts`
   - Setting/id: none; always on by explicit user approval; stored inline in `local:universalClipboard*`
   - Selectors: none; reuses the existing shared copy/paste selectors above
-  - API: `GET /v2/repository/files/{sourceFileId}/metadata/content`, `POST /v2/repository/files`, `PUT /v2/repository/files/{metadataFileId}/content`
-  - Validate: copy Capture, coordinate/region capture, anchored UIObject, secure-recording, and image-bearing actions within one bot and between two Control Rooms; inspect the page `globalClipboard`; interrupt one resource request.
-  - Expected: each available non-secure screenshot/thumbnail is embedded once per source path in `__betterAutomationAnywhere`; same-origin/same-bot paste reuses metadata paths; cross-bot paste creates and uploads target metadata, rewrites paths and `sourceFileId`, then strips the envelope before writing native JSON to `globalClipboard`. Selector `blob`, variables, and packages remain native; secure or failed resources are blanked cross-bot and reported without blocking the action.
+  - API: `GET /v2/repository/files/{sourceFileId}/metadata/content`, `POST /v2/repository/files`, `PUT /v2/repository/files/{metadataFileId}/content`, rollback `DELETE /v2/repository/files/{metadataFileId}`
+  - Validate: copy Capture, coordinate/region capture, anchored UIObject, secure-recording, and image-bearing actions within one bot and between two Control Rooms; inspect the page `globalClipboard`; force one upload failure and verify rollback.
+  - Expected: each available non-secure screenshot/thumbnail is embedded once per source path in `__betterAutomationAnywhere`; same-origin/same-bot paste reuses metadata paths; cross-bot paste creates and uploads target metadata, rewrites paths and `sourceFileId`, then strips the envelope before writing native JSON to `globalClipboard`. A failed upload best-effort deletes its newly created metadata file while preserving the original error. Selector `blob`, variables, and packages remain native; secure or failed resources are blanked cross-bot and reported without blocking the action.
   - Status: active
   - Delete condition: Automation Anywhere provides a portable cross-Control-Room action clipboard or removes these metadata fields/endpoints.
 
@@ -468,8 +468,8 @@ Selector source of truth:
   - Source: `entrypoints/content.ts`, `src/ts/ui.ts`, `src/ts/settings.ts`
   - Setting/id: `local:packageUpdateToastEnabled` (default off)
   - Selectors: none; API/content based
-  - Validate: enable in Settings; open taskbot with outdated packages on `/edit` and `/view`; re-open same bot in session; reload; open up-to-date bot; disable toggle.
-  - Expected: one toast per bot per page load with the total in its title and a vertical list of up to 3 `name current → target` rows plus `+N more`; up-to-date bot silent; toggle off silent.
+  - Validate: enable in Settings; open taskbot with outdated packages on `/edit` and `/view`; re-open same bot in session; force an auth/API failure and retry; reload; open up-to-date bot; disable toggle.
+  - Expected: one toast per successfully checked bot per page load with the total in its title and a vertical list of up to 3 `name current → target` rows plus `+N more`; failed checks remain retryable; up-to-date bot silent; toggle off silent.
   - Status: active
   - Delete condition: toast setting removed or AA surfaces native update notice.
 
@@ -477,8 +477,8 @@ Selector source of truth:
   - Source: `entrypoints/content.ts`, `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-json.ts`, `src/ts/settings.ts`
   - Setting/id: `local:nonClosingMessageBoxWarningEnabled` (default off)
   - Selectors: `TASKBOT_SAVE_BUTTON_SELECTOR`, `NATIVE_TOAST_SELECTOR`
-  - Validate: enable the setting; save the supplied unsafe and corrected TaskBots through native Save and TaskBot JSON Save; test nested actions, a dynamic timeout, save failure, and setting off.
-  - Expected: a successful unsafe save warns with the affected action count and up to 3 action names; missing/false auto-close and missing/non-positive literal timeouts warn; enabled auto-close with a dynamic timeout does not; safe, failed, and disabled checks stay silent. Native Save is never delayed or blocked.
+  - Validate: enable the setting; save the supplied unsafe and corrected TaskBots through native Save and TaskBot JSON Save; test nested actions, a dynamic timeout, an unrelated toast, save failure, a build without a visible Save-button busy transition, and setting off.
+  - Expected: native Save requires the same button to enter and leave `disabled`/`aria-busy` state plus a new native toast; ambiguous, unrelated, safe, failed, and disabled checks stay silent. A successful unsafe save warns with the affected action count and up to 3 action names; missing/false auto-close and missing/non-positive literal timeouts warn; enabled auto-close with a dynamic timeout does not. Native Save is never delayed or blocked.
   - Status: watch
   - Delete condition: MessageBox schemas change or Automation Anywhere adds an equivalent native validator.
 
@@ -486,8 +486,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-tools.ts`, `src/ts/automation-anywhere-api.ts`
   - Setting/id: tool `update-packages`
   - Selectors: none; API/content based
-  - Validate: on private taskbot `/edit`, deselect one of multiple outdated packages and update; also test private `/view` and folder mode; open outdated and up-to-date taskbots and hover the tool button.
-  - Expected: `/edit` lists outdated packages with current/default versions and updates only selected packages; `/view` and folder mode retain update-all behavior; outdated taskbot shows a dot on the Update Packages button with tooltip suffix 'Package updates available.' (always-on by design, user sign-off 2026-07-10; sidepanel-internal, no toggle), up-to-date taskbot shows neither.
+  - Validate: on private taskbot `/edit`, deselect one of multiple outdated packages and update; also test private `/view` and folder mode; switch between two Control Rooms containing the same numeric file id; force a failed check and retry; open outdated and up-to-date taskbots and hover the tool button.
+  - Expected: `/edit` lists outdated packages with current/default versions and updates only selected packages; `/view` and folder mode retain update-all behavior; the dot uses a fresh check for the active runtime, refreshes after updates, and never carries state/defaults across Control Rooms. An outdated taskbot shows a dot with tooltip suffix 'Package updates available.' (always-on by design, user sign-off 2026-07-10; sidepanel-internal, no toggle); an up-to-date taskbot shows neither.
   - Status: active
   - Delete condition: AA package schema changes beyond repair.
 

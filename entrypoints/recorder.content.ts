@@ -9,7 +9,6 @@ type Target = {
 type Request = { type: string; payload?: Record<string, any> };
 
 const INTERACTIVE = 'a,button,input,select,textarea,[role="button"],[role="link"],[role="textbox"],[onclick],[contenteditable="true"],[tabindex]';
-const DEBUGGER_TARGET_ATTRIBUTE = 'automationanywhere-click-target';
 
 function fail(code: string, message: string): never {
 	throw Object.assign(new Error(message), { code });
@@ -349,28 +348,22 @@ async function handle(request: Request): Promise<unknown> {
 
 export default defineContentScript({
 	matches: ['<all_urls>'],
+	registration: 'runtime',
 	allFrames: false,
 	runAt: 'document_idle',
 	main() {
 		const page = globalThis as typeof globalThis & { __betterAaRecorderLoaded?: boolean };
 		if (page.__betterAaRecorderLoaded) return;
 		page.__betterAaRecorderLoaded = true;
-		browser.runtime.onMessage.addListener((message: { type?: string; request?: Request; token?: string }) => {
+		browser.runtime.onMessage.addListener((message: { type?: string; request?: Request }) => {
 			if (message.type === 'RECORDER_VIEWPORT') return { devicePixelRatio, viewportW: innerWidth, viewportH: innerHeight };
 			if (message.type === 'RECORDER_PREPARE_DEBUGGER_CLICK' && message.request) {
 				try {
 					const element = actionable(message.request.payload?.target ?? {});
-					const token = crypto.randomUUID();
-					element.setAttribute(DEBUGGER_TARGET_ATTRIBUTE, token);
-					return { token, rect: rect(element), ...resultFor(element) };
+					return { rect: rect(element), ...resultFor(element) };
 				} catch (cause) {
 					return { __error: { code: (cause as any)?.code ?? 'INTERNAL', message: (cause as any)?.message ?? 'Request failed.' } };
 				}
-			}
-			if (message.type === 'RECORDER_CLEANUP_DEBUGGER_CLICK' && message.token) {
-				const element = document.querySelector(`[${DEBUGGER_TARGET_ATTRIBUTE}="${CSS.escape(message.token)}"]`);
-				element?.removeAttribute(DEBUGGER_TARGET_ATTRIBUTE);
-				return {};
 			}
 			if (message.type !== 'RECORDER_REQUEST' || !message.request) return;
 			return handle(message.request).catch((cause) => ({

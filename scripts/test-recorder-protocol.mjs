@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { importTsModule, root } from './lib/ts-module-loader.mjs';
 
@@ -31,5 +32,24 @@ assert.deepEqual(
 	{ id: 3, url: 'https://example.com/form', active: true, lastAccessed: 5 }
 );
 assert.equal(chooseRecorderTab([{ id: 1, url: 'https://example.com/other' }], 'https://example.com/form'), undefined);
+
+const recorderClientSource = await readFile(
+	join(root, 'src', 'ts', 'recorder', 'ws-client.ts'),
+	'utf8'
+);
+const recorderContentSource = await readFile(
+	join(root, 'entrypoints', 'recorder.content.ts'),
+	'utf8'
+);
+assert.ok(recorderContentSource.includes("registration: 'runtime'"));
+assert.ok(!recorderContentSource.includes('RECORDER_CLEANUP_DEBUGGER_CLICK'));
+assert.ok(!recorderContentSource.includes('DEBUGGER_TARGET_ATTRIBUTE'));
+assert.ok(!recorderClientSource.includes('let stopped'));
+assert.ok(recorderClientSource.includes('Controlled tab is no longer active.'));
+assert.ok(
+	recorderClientSource.indexOf('browser.tabs.onUpdated.addListener(listener)') <
+		recorderClientSource.indexOf('browser.tabs.update(controlledTabId, { url })'),
+	'navigation listener is registered before navigation starts'
+);
 
 console.log('Recorder protocol tests passed.');

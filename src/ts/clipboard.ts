@@ -298,10 +298,6 @@ function getNodeUids(selector: string): Set<string> {
 	);
 }
 
-function setsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
-	return left.size === right.size && [...left].every((value) => right.has(value));
-}
-
 async function waitForNewRenderedNode(
 	previousUids: ReadonlySet<string>,
 	startUrl: string
@@ -436,7 +432,20 @@ async function uploadPortableResources(
 	const results = await Promise.allSettled(
 		entries.map(async ([path, resource]) => {
 			const created = await api.createMetadataFile(targetFileId, resource.contentType);
-			await api.uploadMetadataContent(created.id, resource.contentType, resource.base64);
+			try {
+				await api.uploadMetadataContent(created.id, resource.contentType, resource.base64);
+			} catch (error) {
+				try {
+					await api.deleteRepositoryFile(created.id);
+				} catch (cleanupError) {
+					void debugWarn('clipboard', 'Failed metadata upload could not be rolled back.', {
+						cleanupError,
+						metadataFileId: created.id,
+						targetFileId,
+					}, { feedback: true, keepDetails: true });
+				}
+				throw error;
+			}
 			return { path, name: created.name };
 		})
 	);
@@ -562,7 +571,8 @@ async function requestSharedPaste(
 	);
 	const startUrl = location.href;
 	for (let index = 0; index < chunks.length; index += 1) {
-		if (!setsEqual(cursorUids, getNodeUids(TASKBOT_ACTIVE_CURSOR_SELECTOR))) {
+		const currentCursorUids = getNodeUids(TASKBOT_ACTIVE_CURSOR_SELECTOR);
+		if (cursorUids.size !== currentCursorUids.size || [...cursorUids].some((value) => !currentCursorUids.has(value))) {
 			ui.showNotification(
 				t('Paste incomplete'),
 				t('TaskBot cursor changed after {count} chunk(s).', { count: index })

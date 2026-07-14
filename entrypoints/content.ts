@@ -584,11 +584,10 @@ function installVariableMetadataObserver(): void {
 }
 
 const packageUpdateToastFileIds = new Set<string>();
+const packageUpdateToastPendingFileIds = new Set<string>();
 let packageUpdateToastActive = DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED;
 let nonClosingMessageBoxWarningActive =
 	DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
-// Defaults change rarely; one fetch per page load is enough.
-let defaultPackageVersionsPromise: Promise<Map<string, string>> | null = null;
 let nativeSaveObserver: MutationObserver | null = null;
 let nativeSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 const NATIVE_SAVE_TIMEOUT_MS = 30_000;
@@ -604,20 +603,31 @@ async function checkPackageUpdateToast(): Promise<void> {
 	) {
 		return;
 	}
-	if (packageUpdateToastFileIds.has(context.fileId)) return;
-	packageUpdateToastFileIds.add(context.fileId);
+	if (
+		packageUpdateToastFileIds.has(context.fileId) ||
+		packageUpdateToastPendingFileIds.has(context.fileId)
+	) return;
 
 	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
 	if (!authToken) return;
+	packageUpdateToastPendingFileIds.add(context.fileId);
 
 	try {
 		const api = new AutomationAnywhereApi(context.baseUrl, authToken);
-		const content = await api.getBotContent(context.fileId);
-		defaultPackageVersionsPromise ??= api.getDefaultPackageVersions();
+		const [content, defaultVersions] = await Promise.all([
+			api.getBotContent(context.fileId),
+			api.getDefaultPackageVersions(),
+		]);
 		const updates = getAutomationAnywherePackageUpdates(
 			extractAutomationAnywherePackages(content),
-			await defaultPackageVersionsPromise
+			defaultVersions
 		);
+		const currentContext = parseAutomationAnywherePageContext(location.href);
+		if (
+			currentContext.fileId !== context.fileId ||
+			currentContext.baseUrl !== context.baseUrl
+		) return;
+		packageUpdateToastFileIds.add(context.fileId);
 		if (!updates.length) return;
 
 		const shown = updates
@@ -637,6 +647,8 @@ async function checkPackageUpdateToast(): Promise<void> {
 			{ fileId: context.fileId, error },
 			{ feedback: true, keepDetails: true }
 		);
+	} finally {
+		packageUpdateToastPendingFileIds.delete(context.fileId);
 	}
 }
 
@@ -653,6 +665,10 @@ function addedNodeContainsNativeToast(node: Node): boolean {
 		? node
 		: node.querySelector(NATIVE_TOAST_SELECTOR);
 	return Boolean(toast && !toast.closest('#better-aa-toast-host'));
+}
+
+function isNativeSaveBusy(button: HTMLButtonElement): boolean {
+	return button.disabled || button.getAttribute('aria-busy') === 'true';
 }
 
 async function checkSavedTaskbotForNonClosingMessageBoxes(
@@ -703,15 +719,34 @@ function installNativeSaveWarning(): void {
 
 			clearNativeSaveWait();
 			const { fileId, baseUrl } = context;
+			let sawBusy = false;
+			let sawToast = false;
 			nativeSaveObserver = new MutationObserver((records) => {
-				const saved = records.some((record) =>
+				if (
+					records.some(
+						(record) =>
+							record.type === 'attributes' &&
+							record.target === button &&
+							((record.attributeName === 'disabled' && record.oldValue === null) ||
+								(record.attributeName === 'aria-busy' && record.oldValue !== 'true'))
+					)
+				) {
+					sawBusy = true;
+				}
+				sawToast ||= records.some((record) =>
 					[...record.addedNodes].some(addedNodeContainsNativeToast)
 				);
-				if (!saved) return;
+				if (!sawBusy || !sawToast || isNativeSaveBusy(button)) return;
 				clearNativeSaveWait();
 				void checkSavedTaskbotForNonClosingMessageBoxes(fileId, baseUrl);
 			});
-			nativeSaveObserver.observe(document.body, { childList: true, subtree: true });
+			nativeSaveObserver.observe(document.body, {
+				attributes: true,
+				attributeFilter: ['disabled', 'aria-busy'],
+				attributeOldValue: true,
+				childList: true,
+				subtree: true,
+			});
 			nativeSaveTimeout = setTimeout(clearNativeSaveWait, NATIVE_SAVE_TIMEOUT_MS);
 		},
 		true

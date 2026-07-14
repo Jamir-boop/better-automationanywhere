@@ -271,7 +271,7 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		source: 'entrypoints/content.ts',
 		severity: 'optional',
 		status: 'watch',
-		notes: 'Observed in capture phase so the native save handler remains unchanged.',
+		notes: 'Observed in capture phase; warning requires this button to enter and leave disabled/aria-busy state.',
 	},
 	{
 		id: 'native-success-toast',
@@ -284,6 +284,7 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		severity: 'transient',
 		status: 'watch',
 		triggerHint: 'Save an edited Taskbot to render the native success toast.',
+		notes: 'A toast alone is insufficient; it is paired with the Save button busy-to-idle lifecycle.',
 	},
 	{
 		id: 'taskbot-line-number',
