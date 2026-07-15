@@ -332,18 +332,18 @@ function renderToolsConfigSection(): string {
 				</span>
 				<input id="forceEnglishLocale" type="checkbox">
 			</label>
-			<label class="setting-row">
+			<label class="setting-row"${import.meta.env.CHROME ? '' : ' hidden'}>
 				<span>
 					<strong>Better Recorder bridge</strong>
 					<small>Connects to the local BetterRecorder package. Enabled by default.</small>
 				</span>
 				<input id="recorderBridgeEnabled" type="checkbox">
 			</label>
-			<label id="recorderBridgePortRow" class="select-row">
+			<label id="recorderBridgePortRow" class="select-row"${import.meta.env.CHROME ? '' : ' hidden'}>
 				<span><strong>Recorder port</strong><small>Local WebSocket port.</small></span>
 				<input id="recorderBridgePort" type="number" min="1" max="65535" inputmode="numeric">
 			</label>
-			<label id="recorderBridgeTokenRow" class="select-row">
+			<label id="recorderBridgeTokenRow" class="select-row"${import.meta.env.CHROME ? '' : ' hidden'}>
 				<span><strong>Recorder token</strong><small>Shared only with localhost.</small></span>
 				<input id="recorderBridgeToken" type="password" autocomplete="off">
 			</label>
@@ -729,7 +729,7 @@ const recorderBridgePortInput = document.querySelector<HTMLInputElement>('#recor
 const recorderBridgeTokenInput = document.querySelector<HTMLInputElement>('#recorderBridgeToken')!;
 
 function updateRecorderBridgeDependentState(): void {
-	const hidden = !recorderBridgeEnabledInput.checked;
+	const hidden = !import.meta.env.CHROME || !recorderBridgeEnabledInput.checked;
 	recorderBridgePortRow.hidden = hidden;
 	recorderBridgeTokenRow.hidden = hidden;
 }

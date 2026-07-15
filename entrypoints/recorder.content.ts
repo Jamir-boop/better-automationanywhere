@@ -405,6 +405,7 @@ async function handle(request: Request): Promise<unknown> {
 }
 
 export default defineContentScript({
+	include: ['chrome'],
 	matches: ['<all_urls>'],
 	registration: 'runtime',
 	allFrames: false,

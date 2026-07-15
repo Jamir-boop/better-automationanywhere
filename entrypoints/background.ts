@@ -1009,5 +1009,5 @@ export default defineBackground(() => {
 
 	void setPanelActionBehavior();
 	registerBrowserContextMenus();
-	startRecorderBridge();
+	if (import.meta.env.CHROME) startRecorderBridge();
 });

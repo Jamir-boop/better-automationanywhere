@@ -37,12 +37,11 @@ export default defineConfig({
 			'storage',
 			'unlimitedStorage',
 			'tabs',
-			'webNavigation',
 			...(browser === 'chrome'
-				? ['sidePanel', 'scripting', 'activeTab', 'contextMenus', 'debugger']
+				? ['webNavigation', 'sidePanel', 'scripting', 'activeTab', 'contextMenus', 'debugger']
 				: ['menus']),
 		],
-		host_permissions: ['<all_urls>'],
+		host_permissions: browser === 'chrome' ? ['<all_urls>'] : automationAnywhereMatches,
 		web_accessible_resources:
 			browser === 'chrome'
 				? [

@@ -64,7 +64,15 @@ const recorderContentSource = await readFile(
 	join(root, 'entrypoints', 'recorder.content.ts'),
 	'utf8'
 );
+const backgroundSource = await readFile(join(root, 'entrypoints', 'background.ts'), 'utf8');
+const sidepanelSource = await readFile(join(root, 'entrypoints', 'sidepanel', 'main.ts'), 'utf8');
+const wxtConfigSource = await readFile(join(root, 'wxt.config.ts'), 'utf8');
 assert.ok(recorderContentSource.includes("registration: 'runtime'"));
+assert.ok(recorderContentSource.includes("include: ['chrome']"));
+assert.ok(backgroundSource.includes('if (import.meta.env.CHROME) startRecorderBridge();'));
+assert.equal(sidepanelSource.split("import.meta.env.CHROME ? '' : ' hidden'").length - 1, 3);
+assert.ok(sidepanelSource.includes("!import.meta.env.CHROME || !recorderBridgeEnabledInput.checked"));
+assert.ok(wxtConfigSource.includes("browser === 'chrome' ? ['<all_urls>'] : automationAnywhereMatches"));
 assert.ok(!recorderContentSource.includes('RECORDER_CLEANUP_DEBUGGER_CLICK'));
 assert.ok(!recorderContentSource.includes('DEBUGGER_TARGET_ATTRIBUTE'));
 assert.ok(!recorderClientSource.includes('let stopped'));
