@@ -1,4 +1,7 @@
-import type { AutomationAnywherePageContext } from './automation-anywhere-api';
+import type {
+	AutomationAnywherePackage,
+	AutomationAnywherePageContext,
+} from './automation-anywhere-api';
 import type { ToolCapabilities } from './messages';
 
 export type AutomationAnywhereToolId =
@@ -36,7 +39,6 @@ export interface AutomationAnywhereExportManifestEntry {
 
 export interface AutomationAnywherePaginationState {
 	isPackageTool: boolean;
-	packageFallbackScan: boolean;
 	loadedCount: number;
 	loadedTotal: number;
 	lastRawPageLength: number;
@@ -61,6 +63,52 @@ export function sanitizeDownloadFileName(value: string): string {
 		.replace(/[. ]+$/g, '');
 	if (!sanitized) return 'package';
 	return WINDOWS_RESERVED_FILE_NAME_RE.test(sanitized) ? `_${sanitized}` : sanitized;
+}
+
+export function resolveAutomationAnywhereDownloadUrl(url: string, baseUrl: string): string {
+	return new URL(url, baseUrl).href;
+}
+
+export function createAutomationAnywherePackageListRequest(params: {
+	offset?: number;
+	length?: number;
+	query?: string;
+}): Record<string, unknown> {
+	return {
+		filterRequest: {
+			fields: [],
+			filter: params.query
+				? { operator: 'substring', field: 'label', value: params.query }
+				: null,
+			sort: [{ field: 'label', direction: 'asc' }],
+			page: {
+				offset: params.offset ?? 0,
+				length: params.length ?? 200,
+			},
+		},
+		includeDownloadUrls: true,
+	};
+}
+
+export function createAutomationAnywherePackageVersionListRequest(
+	name: string
+): Record<string, unknown> {
+	return {
+		fields: [],
+		filter: { operator: 'eq', field: 'name', value: name },
+		page: { offset: 0, length: 1000 },
+		sort: [{ field: 'label', direction: 'asc' }],
+	};
+}
+
+export function mergeAutomationAnywherePackageVersionDetail(response: {
+	package?: AutomationAnywherePackage;
+	metaInfo?: AutomationAnywherePackage;
+}): AutomationAnywherePackage {
+	return {
+		...response.package,
+		...response.metaInfo,
+	};
 }
 
 export function getMetadataZipPath(reference: {
@@ -115,24 +163,11 @@ export function createMetadataManifestEntry(
 	};
 }
 
-export function packageMatchesFilter(
-	packageName: string,
-	query: string,
-	exactName: string | null
-): boolean {
-	return exactName
-		? packageName === exactName
-		: !query || packageName.toLowerCase().includes(query.toLowerCase());
-}
-
 export function hasMoreAutomationAnywhereItems(
 	state: AutomationAnywherePaginationState
 ): boolean {
 	if (state.isPackageTool && state.loadedTotal > 0) {
 		return state.loadedCount < state.loadedTotal;
-	}
-	if (state.isPackageTool && state.packageFallbackScan) {
-		return state.lastRawPageLength >= state.pageLength;
 	}
 	if (state.isPackageTool) {
 		return state.lastRawPageLength >= state.packagePageLength;
@@ -141,6 +176,11 @@ export function hasMoreAutomationAnywhereItems(
 		state.lastRawPageLength >= state.pageLength ||
 		state.loadedCount < state.loadedTotal
 	);
+}
+
+export function isAutomationAnywhereLoggedOutError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error ?? '');
+	return message.includes('401') && message.toLowerCase().includes('logged out');
 }
 
 export function getAutomationAnywherePackageUpdates(

@@ -158,7 +158,62 @@ Base server: `/v3`
 | POST | `/v3/activity/manage` | Manage execution activity. | Stop/pause/resume/manage activity if supported. Require confirmation. |
 | POST | `/v3/activity/metrics` | Return activity metrics. | Summarize operational health and execution KPIs. |
 
-### 4.5 Packages Usage
+### 4.5 Package Discovery and Version Artifacts (Undocumented)
+
+These endpoints are used by the Control Room Packages UI but are absent from the exported supported Swagger inventory. Treat the captured wire shapes as tenant-internal contracts and revalidate them after major Control Room upgrades.
+
+| Method | Path | Purpose | Important behavior |
+|---|---|---|---|
+| POST | `/v3/packages/package/list` | List/search the package defaults shown on the Packages page. | `filterRequest` is required. Top-level `filter` and `page` fields are ignored. Search the visible `label`, not internal `name`. |
+| POST | `/v2/packages/package/version/list` | List every installed version of one internal package name. | Version rows include IDs and status, but `pkgDownloadUrl` can be empty. |
+| GET | `/v2/packages/package/version/{id}` | Load one version's package definition and metadata. | Response contains `package` and `metaInfo`; `metaInfo.pkgDownloadUrl` is the artifact URL. |
+| GET | URL returned by `metaInfo.pkgDownloadUrl` | Download the exact package JAR. | URL can be absolute on the shared artifact host or relative to the Control Room origin. |
+
+Package page request:
+
+```json
+{
+  "filterRequest": {
+    "fields": [],
+    "filter": {
+      "operator": "substring",
+      "field": "label",
+      "value": "Browser"
+    },
+    "sort": [{ "field": "label", "direction": "asc" }],
+    "page": { "offset": 0, "length": 20 }
+  },
+  "includeDownloadUrls": true
+}
+```
+
+Use `"filter": null` for an unfiltered page. The response is `{ "page": { "offset", "total", "totalFilter" }, "list": [...] }`.
+
+Package-version request:
+
+```json
+{
+  "fields": [],
+  "filter": {
+    "operator": "eq",
+    "field": "name",
+    "value": "Browser"
+  },
+  "page": { "offset": 0, "length": 1000 },
+  "sort": [{ "field": "label", "direction": "asc" }]
+}
+```
+
+Fetch `/v2/packages/package/version/{id}` only for versions whose download metadata is needed. Merge `package` first and `metaInfo` second so the metadata ID, status, and download URL win.
+
+Validated: 2026-07-15
+
+- Firefox Control Room capture on `aa-se-latam-2`: package page request matched the nested `/v3` shape; `BetterRecorder` returned three versions; selecting `1.7.10` fetched version ID `100007931` and returned a relative JAR path.
+- Authenticated API validation on `protecta`: an unfiltered `/v3` request with length `5` returned exactly `5` of `151`; label search `Browser` returned exactly `1`; version search returned `19`; version detail returned an absolute artifact URL.
+- Artifact validation: historical Browser JAR returned HTTP `200`, content length `34352829`, and ZIP/JAR magic `504b0304`. The current Browser JAR also returned HTTP `200` without an authorization header.
+- Negative validation: the old top-level `/v3` `filter`/`page` request returned the entire list and ignored both filtering and pagination.
+
+### 4.6 Packages Usage
 
 Base server: `/v2`
 
@@ -179,6 +234,8 @@ Base server: `/v2`
 | Check run result | `POST /v3/activity/list` | `GET /v3/activity/execution/{id}` | Use activity list to discover execution ID. |
 | Stop/manage run | `POST /v3/activity/manage` | `GET /v3/activity/execution/{id}` | Confirm action before manage. |
 | Package impact scan | `POST /v2/packages/{name}/versions/usage` | `POST /v2/repository/files/packagesVersionUpdate` | Role may block package usage lookup. |
+| Find/download package defaults | `POST /v3/packages/package/list` | URL in `pkgDownloadUrl` | Use nested `filterRequest`; search by `label`. Undocumented. |
+| Find/download a package version | `POST /v2/packages/package/version/list` | `GET /v2/packages/package/version/{id}`, then its `pkgDownloadUrl` | Search versions by internal package `name`. Undocumented. |
 | Assign release label | `POST /v2/repository/files/version/assignLabel` | `POST /v2/repository/file/list` | Confirm version and target bot. |
 | Create new bot | `POST /v2/repository/files` | `PUT /v2/repository/files/{id}/content` | Two-step: create empty bot, then PUT content. Requires `{ contentType, name, parentFolderId }`. |
 | Update bot content | `PUT /v2/repository/files/{id}/content` | none | Overwrite existing bot JSON. Body is raw taskbot JSON. |
@@ -393,10 +450,13 @@ Highest value:
 6. `PUT /v2/repository/files/{fileid}/dependencies/{workspaceId}`
 7. `POST /v2/repository/files` (create bot — undocumented)
 8. `POST /v2/repository/files/{fileId}/copy` (copy file — undocumented)
-9. `POST /v3/automations/deploy`
-10. `POST /v3/activity/list`
-11. `GET /v3/activity/execution/{id}`
-12. `POST /v2/packages/{name}/versions/usage`
+9. `POST /v3/packages/package/list` (package defaults/search — undocumented)
+10. `POST /v2/packages/package/version/list` (version history — undocumented)
+11. `GET /v2/packages/package/version/{id}` (version metadata — undocumented)
+12. `POST /v3/automations/deploy`
+13. `POST /v3/activity/list`
+14. `GET /v3/activity/execution/{id}`
+15. `POST /v2/packages/{name}/versions/usage`
 
 ## 11. Gaps to Verify in Active Tenant
 
@@ -406,7 +466,7 @@ The exported inventory covers concrete operations for core bot-building surfaces
 - content write/update endpoint availability (`PUT /v2/repository/files/{fileid}/content` confirmed working — see §4.2)
 - bot creation endpoint availability (`POST /v2/repository/files` confirmed working — undocumented, see §4.2)
 - v4 deploy behavior compared with v3 deploy
-- package metadata/list endpoints if needed beyond package usage
+- undocumented package discovery/version endpoints after major tenant upgrades (validated 2026-07-15; see §4.5)
 - role permissions needed for package usage lookup
 - media types for bot/form/headlessbot content download
 

@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.34.5           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.35.1           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -67,8 +67,8 @@ The sidepanel Tools tab adapts to the active Control Room page.
 
 - Folder pages: copy files, update package versions, and export bots.
 - Taskbot pages: inspect/edit Taskbot JSON, update package versions, and export bots.
-- Packages page: download selected package JAR files and view bots using a selected package version.
-- Package detail page: download versions for the opened package and view usage across all used versions.
+- Packages page: download selected package JAR files, drill into a package to choose specific versions, and view bots using a selected package version.
+- Package detail page: search, paginate, and download versions for the opened package, and view usage across all used versions.
 
 Package lists load in small pages with progress feedback. Package Usage loads all results, groups them by package version, and makes each version group collapsible. Versions with no usage are not shown. The tool requires Control Room package-management API permission.
 

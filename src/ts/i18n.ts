@@ -499,6 +499,8 @@ const ES: Record<string, string> = {
 	'Update Packages': 'Actualizar paquetes',
 	'Export Bots/Files': 'Exportar bots/archivos',
 	'Download Packages': 'Descargar paquetes',
+	'Browse versions': 'Explorar versiones',
+	'Back to packages': 'Volver a paquetes',
 	'Package Usage': 'Uso de paquetes',
 	'Use saved AA clipboard slots.': 'Usa espacios guardados del portapapeles AA.',
 	'Copy file references inside this extension.':
@@ -539,6 +541,10 @@ const ES: Record<string, string> = {
 		'Descarga archivos seleccionados uno por uno.',
 	'Downloads selected packages from the Packages page.':
 		'Descarga paquetes seleccionados desde la pagina Paquetes.',
+	'Select one package to browse versions, or download the versions shown.':
+		'Selecciona un paquete para explorar versiones o descarga las versiones mostradas.',
+	'Select one or more package versions to download.':
+		'Selecciona una o mas versiones de paquete para descargar.',
 	'Only versions with usage are shown. Missing versions have no usage found.':
 		'Solo se muestran versiones con uso. Las versiones ausentes no tienen uso encontrado.',
 	'Shows bots using one selected package version.':
@@ -558,10 +564,13 @@ const ES: Record<string, string> = {
 		'{count} version(es) de paquete cargada(s).',
 	'Folder list failed.': 'Lista de carpeta fallo.',
 	'Package list failed.': 'Lista de paquetes fallo.',
+	'Control Room session expired. Log in, then click Refresh.':
+		'La sesion de Control Room expiro. Inicia sesion y luego haz clic en Actualizar.',
 	unknown: 'desconocido',
 	Enabled: 'Habilitado',
 	Disabled: 'Deshabilitado',
 	'Package {name}': 'Paquete {name}',
+	'Package {name} versions': 'Versiones del paquete {name}',
 	'Package {name} on {host}': 'Paquete {name} en {host}',
 	'Outdated packages': 'Paquetes desactualizados',
 	'All package versions are current.': 'Todas las versiones de paquetes estan actualizadas.',
@@ -571,6 +580,10 @@ const ES: Record<string, string> = {
 	'Version {version} | missing pkgDownloadUrl':
 		'Version {version} | falta pkgDownloadUrl',
 	'Search packages': 'Buscar paquetes',
+	'Search loaded versions': 'Buscar versiones cargadas',
+	'Browse all available versions of the selected package.':
+		'Explora todas las versiones disponibles del paquete seleccionado.',
+	'Return to the package list.': 'Volver a la lista de paquetes.',
 	'Type at least {count} characters to search packages.':
 		'Escribe al menos {count} caracteres para buscar paquetes.',
 	'{selected} selected / {loaded} loaded':
@@ -668,6 +681,9 @@ const ES: Record<string, string> = {
 		'Descargando {count} paquete(s)...',
 	'Skipped: {label} - missing pkgDownloadUrl':
 		'Omitido: {label} - falta pkgDownloadUrl',
+	'Skipped: {label} - {message}': 'Omitido: {label} - {message}',
+	'missing pkgDownloadUrl': 'falta pkgDownloadUrl',
+	'Package details failed.': 'Fallo la carga de detalles del paquete.',
 	'Download started: {fileName}': 'Descarga iniciada: {fileName}',
 	'Package downloads started. Started {started}, skipped {skipped}.':
 		'Descargas de paquetes iniciadas. Iniciadas {started}, omitidas {skipped}.',

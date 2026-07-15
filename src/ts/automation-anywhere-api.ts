@@ -9,6 +9,11 @@ import {
 	parseAutomationAnywhereTaskEditorRoute,
 } from './automation-anywhere';
 import { debugWarn } from './debug';
+import {
+	createAutomationAnywherePackageListRequest,
+	createAutomationAnywherePackageVersionListRequest,
+	mergeAutomationAnywherePackageVersionDetail,
+} from './automation-anywhere-tools';
 
 export const AUTOMATION_ANYWHERE_TASKBOT_TYPE = 'application/vnd.aa.taskbot';
 const AUTOMATION_ANYWHERE_DIRECTORY_TYPES = new Set([
@@ -630,25 +635,12 @@ export class AutomationAnywhereApi {
 		offset?: number;
 		length?: number;
 		query?: string;
-		exactName?: string;
 	}): Promise<AutomationAnywherePackageListResponse> {
-		const filter = params.exactName
-			? { operator: 'eq', field: 'name', value: params.exactName }
-			: params.query
-				? { operator: 'substring', field: 'name', value: params.query }
-				: undefined;
 		const response = await this.request<AutomationAnywherePackageListResponse>(
 			'/v3/packages/package/list',
 			{
 				method: 'POST',
-				body: {
-					includeDownloadUrls: true,
-					filter,
-					page: {
-						offset: params.offset ?? 0,
-						length: params.length ?? 200,
-					},
-				},
+				body: createAutomationAnywherePackageListRequest(params),
 			}
 		);
 		const list = response.list ?? response.items ?? [];
@@ -656,6 +648,28 @@ export class AutomationAnywhereApi {
 			...response,
 			list,
 		};
+	}
+
+	async listPackageVersions(name: string): Promise<AutomationAnywherePackageListResponse> {
+		const response = await this.request<AutomationAnywherePackageListResponse>(
+			'/v2/packages/package/version/list',
+			{
+				method: 'POST',
+				body: createAutomationAnywherePackageVersionListRequest(name),
+			}
+		);
+		return {
+			...response,
+			list: response.list ?? response.items ?? [],
+		};
+	}
+
+	async getPackageVersion(id: string): Promise<AutomationAnywherePackage> {
+		const response = await this.request<{
+			package?: AutomationAnywherePackage;
+			metaInfo?: AutomationAnywherePackage;
+		}>(`/v2/packages/package/version/${encodeURIComponent(id)}`);
+		return mergeAutomationAnywherePackageVersionDetail(response);
 	}
 
 	async getPackageUsage(params: {

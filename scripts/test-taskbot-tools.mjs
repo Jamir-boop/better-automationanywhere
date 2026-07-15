@@ -20,6 +20,48 @@ const apiSource = await readFile(join(root, 'src', 'ts', 'automation-anywhere-ap
 assert.ok(clipboardSource.includes('await api.deleteRepositoryFile(created.id)'));
 assert.ok(apiSource.includes("method: 'DELETE'"));
 
+assert.ok(apiSource.includes("'/v3/packages/package/list'"));
+assert.ok(apiSource.includes("'/v2/packages/package/version/list'"));
+assert.ok(apiSource.includes('`/v2/packages/package/version/${encodeURIComponent(id)}`'));
+assert.deepEqual(tools.createAutomationAnywherePackageListRequest({
+	offset: 20,
+	length: 20,
+	query: 'Brow',
+}), {
+	filterRequest: {
+		fields: [],
+		filter: { operator: 'substring', field: 'label', value: 'Brow' },
+		sort: [{ field: 'label', direction: 'asc' }],
+		page: { offset: 20, length: 20 },
+	},
+	includeDownloadUrls: true,
+});
+assert.deepEqual(tools.createAutomationAnywherePackageListRequest({}), {
+	filterRequest: {
+		fields: [],
+		filter: null,
+		sort: [{ field: 'label', direction: 'asc' }],
+		page: { offset: 0, length: 200 },
+	},
+	includeDownloadUrls: true,
+});
+assert.deepEqual(tools.createAutomationAnywherePackageVersionListRequest('Browser'), {
+	fields: [],
+	filter: { operator: 'eq', field: 'name', value: 'Browser' },
+	page: { offset: 0, length: 1000 },
+	sort: [{ field: 'label', direction: 'asc' }],
+});
+assert.deepEqual(tools.mergeAutomationAnywherePackageVersionDetail({
+	package: { name: 'Browser', packageVersion: '4.4.3' },
+	metaInfo: { id: '42', status: 'ENABLED', pkgDownloadUrl: '/Browser-4.4.3.jar' },
+}), {
+	name: 'Browser',
+	packageVersion: '4.4.3',
+	id: '42',
+	status: 'ENABLED',
+	pkgDownloadUrl: '/Browser-4.4.3.jar',
+});
+
 assert.deepEqual(
 	tools.getAutomationAnywherePackageUpdates(
 		[
@@ -50,6 +92,25 @@ assert.equal(tools.sanitizeDownloadFileName(' bot:name?.atmx. '), 'bot_name_.atm
 assert.equal(tools.sanitizeDownloadFileName('CON'), '_CON');
 assert.equal(tools.sanitizeDownloadFileName('nul.json'), '_nul.json');
 assert.equal(tools.sanitizeDownloadFileName('... '), 'package');
+assert.equal(
+	tools.resolveAutomationAnywhereDownloadUrl(
+		'/v2/packages/artifacts/package/Browser-4.4.3.jar',
+		'https://tenant.example'
+	),
+	'https://tenant.example/v2/packages/artifacts/package/Browser-4.4.3.jar'
+);
+assert.equal(
+	tools.resolveAutomationAnywhereDownloadUrl(
+		'https://artifacts.example/Browser-4.4.3.jar',
+		'https://tenant.example'
+	),
+	'https://artifacts.example/Browser-4.4.3.jar'
+);
+assert.equal(
+	tools.isAutomationAnywhereLoggedOutError(new Error('401 : User Logged Out')),
+	true
+);
+assert.equal(tools.isAutomationAnywhereLoggedOutError(new Error('403 : Forbidden')), false);
 assert.equal(
 	tools.getMetadataZipPath({
 		botPath: '\\Bots\\..\\Finance\\Invoice.atmx',
@@ -106,14 +167,8 @@ assert.deepEqual(
 	}
 );
 
-assert.equal(tools.packageMatchesFilter('Browser', 'brow', null), true);
-assert.equal(tools.packageMatchesFilter('Browser', 'excel', null), false);
-assert.equal(tools.packageMatchesFilter('Browser', '', 'Browser'), true);
-assert.equal(tools.packageMatchesFilter('browser', '', 'Browser'), false);
-
 const paginationState = {
 	isPackageTool: false,
-	packageFallbackScan: false,
 	loadedCount: 180,
 	loadedTotal: 220,
 	lastRawPageLength: 180,
@@ -139,14 +194,12 @@ assert.equal(
 	tools.hasMoreAutomationAnywhereItems({
 		...paginationState,
 		isPackageTool: true,
-		packageFallbackScan: true,
 		loadedCount: 20,
 		loadedTotal: 0,
-		lastRawPageLength: 199,
+		lastRawPageLength: 20,
 	}),
-	false
+	true
 );
-
 assert.equal(
 	response.parseContentDispositionFileName("attachment; filename*=UTF-8''Quarter%201.csv"),
 	'Quarter 1.csv'

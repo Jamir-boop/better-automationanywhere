@@ -519,11 +519,12 @@ Selector source of truth:
   - Delete condition: separate export removed.
 
 - [ ] Download Packages
-  - Source: `entrypoints/sidepanel/tools.ts`
-  - Setting/id: tool `download-packages`
+  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`; undocumented API contracts recorded in `docs/swagger architecture.md` §4.5
+  - Setting/id: tool `download-packages`; specific-version drilldown is always available by user approval (no separate toggle)
   - Selectors: none; API/package list based
-  - Validate: open Packages page, search packages, load more, select packages, download; open package detail page and download package versions.
-  - Expected: first load is capped, search fetches matching package rows, progress updates during fallback scans, package detail page scopes to opened package, missing download URL is reported, and valid URLs are reported as started rather than completed.
+  - Validate: open Packages page, search/select one package, browse versions, locally search versions, select multiple versions, download, and return to the package list; repeat from a package detail page; log out and verify requests stop until login plus Tools Refresh.
+  - Expected: `/v3/packages/package/list` uses nested `filterRequest`, label search, and real pagination; `/v2/packages/package/version/list` scopes to one internal package name; selected historical versions lazily fetch `/v2/packages/package/version/{id}` and resolve relative or absolute `pkgDownloadUrl`; one failed version is skipped without stopping the batch; a logged-out session does not fall back to a full scan.
+  - Validated: 2026-07-15 — Firefox `aa-se-latam-2` network capture confirmed package list/version list/version detail shapes and three `BetterRecorder` versions; authenticated `protecta` API checks confirmed `/v3` pagination/filtering, 19 Browser versions, and a historical JAR returning HTTP 200 with `504b0304` magic.
   - Status: active
   - Delete condition: packages API unavailable.
 
