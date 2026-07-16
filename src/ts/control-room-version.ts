@@ -102,9 +102,3 @@ export function evaluateControlRoomCompatibility(
 		message,
 	};
 }
-
-export function createUnknownControlRoomCompatibility(
-	message?: string
-): ControlRoomCompatibilityStatus {
-	return evaluateControlRoomCompatibility(undefined, message);
-}

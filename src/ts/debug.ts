@@ -21,11 +21,6 @@ interface DebugOptions extends FeedbackOptions {
 export const feedbackHistory =
 	storage.defineItem<DebugEvent[]>('local:debugFeedbackHistory');
 
-function eventId(): string {
-	if (crypto.randomUUID) return crypto.randomUUID();
-	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 async function isDebugEnabled(): Promise<boolean> {
 	try {
 		return await getDebugEnabled();
@@ -67,7 +62,7 @@ export async function addFeedback(
 	const debugEnabled = await isDebugEnabled();
 	if (!shouldStoreFeedback(debugEnabled, options)) return;
 	const event = createFeedbackEvent({
-		id: eventId(),
+		id: crypto.randomUUID(),
 		timestamp: new Date().toISOString(),
 		level,
 		source,

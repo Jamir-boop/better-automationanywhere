@@ -682,11 +682,6 @@ function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void 
 	activeToolRun?.lines.push({ message, severity });
 }
 
-function createToolRunId(): string {
-	if (crypto.randomUUID) return crypto.randomUUID();
-	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function appendToolLog(
 	message: string,
 	severity: FeedbackSeverity = 'info',
@@ -727,7 +722,7 @@ function setToolProgress(completed: number, total: number, message: string): voi
 
 function startToolRun(title: string, total: number, message: string): void {
 	activeToolRun = {
-		runId: createToolRunId(),
+		runId: crypto.randomUUID(),
 		title,
 		total,
 		completed: 0,

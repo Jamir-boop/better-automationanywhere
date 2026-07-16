@@ -46,10 +46,6 @@ function pickRandom<T>(items: T[]): T | undefined {
 	return items[Math.floor(Math.random() * items.length)];
 }
 
-function getBundledSoundUrls(action: SoundAction): string[] {
-	return SOUND_ASSET_PATHS[action].map((path) => browser.runtime.getURL(path as any));
-}
-
 async function playAudioUrl(url: string): Promise<void> {
 	await new Promise<void>((resolve, reject) => {
 		const audio = new Audio(url);
@@ -63,7 +59,9 @@ async function playAudioUrl(url: string): Promise<void> {
 }
 
 async function playBundledSound(action: SoundAction): Promise<boolean> {
-	const url = pickRandom(getBundledSoundUrls(action));
+	const url = pickRandom(
+		SOUND_ASSET_PATHS[action].map((path) => browser.runtime.getURL(path as any))
+	);
 	if (!url) {
 		warnSoundFailure(action);
 		return false;
@@ -86,18 +84,6 @@ function warnSoundFailure(action: SoundAction, error?: unknown): void {
 	}, { feedback: true });
 }
 
-async function playRunSound(): Promise<void> {
-	await playBundledSound('run');
-}
-
-function playErrorSound(): void {
-	void playBundledSound('error');
-}
-
-function playDoneSound(): void {
-	void playBundledSound('done');
-}
-
 function checkForErrorBadge(): void {
 	const errorModal = document.querySelector(ERROR_MODAL_SELECTOR);
 	if (!errorModal) return;
@@ -107,7 +93,7 @@ function checkForErrorBadge(): void {
 		.forEach((span) => {
 			if (handledBadges.has(span)) return;
 			handledBadges.add(span);
-			playErrorSound();
+			void playBundledSound('error');
 		});
 }
 
@@ -118,7 +104,7 @@ function checkForDoneBadge(): void {
 	document.querySelectorAll(DONE_BADGE_ICON_SELECTOR).forEach((span) => {
 		if (handledBadges.has(span)) return;
 		handledBadges.add(span);
-		playDoneSound();
+		void playBundledSound('done');
 	});
 }
 
@@ -148,7 +134,7 @@ function wireRunButton(runButton: HTMLButtonElement): void {
 	runButton.addEventListener(
 		'click',
 		() => {
-			if (enabled && shouldRun()) void playRunSound();
+			if (enabled && shouldRun()) void playBundledSound('run');
 		},
 		true
 	);

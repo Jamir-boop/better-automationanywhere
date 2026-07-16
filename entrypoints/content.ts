@@ -52,7 +52,7 @@ import { getAutomationAnywherePackageUpdates } from '../src/ts/automation-anywhe
 import { setScrollableFoldersAutoScrollEnabled } from '../src/ts/folders';
 import { setActiveLanguagePreference, t } from '../src/ts/i18n';
 import {
-	createUnknownControlRoomCompatibility,
+	evaluateControlRoomCompatibility,
 	formatControlRoomTarget,
 	type ControlRoomCompatibilityStatus,
 } from '../src/ts/control-room-version';
@@ -258,9 +258,10 @@ async function getCurrentControlRoomCompatibility(): Promise<ControlRoomCompatib
 			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
 		})) as ControlRoomCompatibilityResponse | undefined;
 		if (response?.ok) return response.compatibility;
-		return createUnknownControlRoomCompatibility(response?.error);
+		return evaluateControlRoomCompatibility(undefined, response?.error);
 	} catch (error) {
-		return createUnknownControlRoomCompatibility(
+		return evaluateControlRoomCompatibility(
+			undefined,
 			error instanceof Error ? error.message : undefined
 		);
 	}

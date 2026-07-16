@@ -52,8 +52,7 @@ let pasteInFlight = false;
 let watcherSaveGeneration = 0;
 
 function generateUid(): string {
-	if (crypto.randomUUID) return crypto.randomUUID();
-	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+	return crypto.randomUUID();
 }
 
 function replaceStoredUid(value: string, uid: string): string {

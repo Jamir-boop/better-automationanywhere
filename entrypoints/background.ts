@@ -24,7 +24,6 @@ import {
 	parseAutomationAnywherePageContext,
 } from '../src/ts/automation-anywhere-api';
 import {
-	createUnknownControlRoomCompatibility,
 	evaluateControlRoomCompatibility,
 	type ControlRoomCompatibilityStatus,
 	type ControlRoomVersionDetails,
@@ -215,7 +214,8 @@ async function getControlRoomCompatibility(
 		setCachedControlRoomCompatibility(context.baseUrl, compatibility);
 		return { ok: true, compatibility };
 	} catch (error) {
-		const compatibility = createUnknownControlRoomCompatibility(
+		const compatibility = evaluateControlRoomCompatibility(
+			undefined,
 			error instanceof Error ? error.message : 'Control Room version unavailable.'
 		);
 		setCachedControlRoomCompatibility(context.baseUrl, compatibility);
@@ -224,8 +224,7 @@ async function getControlRoomCompatibility(
 }
 
 function createNonce(): string {
-	if (crypto.randomUUID) return crypto.randomUUID();
-	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+	return crypto.randomUUID();
 }
 
 type SidebarOpenRequest = {
