@@ -38,7 +38,7 @@ export default defineConfig({
 			'unlimitedStorage',
 			'tabs',
 			...(browser === 'chrome'
-				? ['webNavigation', 'sidePanel', 'scripting', 'activeTab', 'contextMenus', 'debugger']
+				? ['sidePanel', 'scripting', 'activeTab', 'contextMenus', 'debugger']
 				: ['menus']),
 		],
 		host_permissions: browser === 'chrome' ? ['<all_urls>'] : automationAnywhereMatches,

@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.35.2           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.35.3           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -31,7 +31,7 @@ This project replaces the older Tampermonkey userscript and Stylus theme. Everyt
 
 ### Better Recorder bridge
 
-The Chrome/Edge-only Better Recorder bridge connects the extension to a local `BetterRecorder` Automation Anywhere package. It is enabled by default for zero-config pairing on `127.0.0.1:8765` and can be disabled or assigned a port/token from Settings. The recorder page script is injected only after BetterRecorder selects a tab. The bridge trusts the local process that owns the configured port; the optional token gates clients at the BetterRecorder server but is not mutual server authentication. It uses `<all_urls>` and `webNavigation` so capture actions can operate on user-selected web pages, while the trusted-click verb also requires `debugger`. Firefox hides the settings and does not package or start the bridge.
+The Chrome/Edge-only Better Recorder bridge connects the extension to a local `BetterRecorder` Automation Anywhere package. It is enabled by default for zero-config pairing on `127.0.0.1:8765` and can be disabled or assigned a port/token from Settings. The recorder page script is injected only after BetterRecorder selects a tab. The bridge trusts the local process that owns the configured port; the optional token gates clients at the BetterRecorder server but is not mutual server authentication. It uses `<all_urls>` and `scripting` so capture actions can operate on user-selected web pages, while the trusted-click verb also requires `debugger`. Firefox hides the settings and does not package or start the bridge.
 
 ### Universal action copy/paste
 
