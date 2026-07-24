@@ -8,7 +8,7 @@
     "description": "Short browser action title"
   },
   "extensionDescription": {
-    "message": "Better AA Developer Experience for Automation Anywhere.",
+    "message": "50+ developer tools and improvements for Automation Anywhere: command palette, cross-Control Room copy/paste, JSON, packages & UI.",
     "description": "Extension description"
   },
   "openSidebarCommandDescription": {
