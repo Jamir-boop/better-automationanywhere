@@ -20,21 +20,21 @@ type SoundAction = 'run' | 'error' | 'done';
 
 const SOUND_ASSET_PATHS: Record<SoundAction, string[]> = {
 	run: [
-		'sounds/run-10.wav',
-		'sounds/run-14.wav',
-		'sounds/run-15.wav',
-		'sounds/run-16.wav',
-		'sounds/run-17.wav',
-		'sounds/run-18.wav',
-		'sounds/run-1.wav',
-		'sounds/run-24.wav',
-		'sounds/run-3.wav',
-		'sounds/run-5.wav',
-		'sounds/run-6.wav',
-		'sounds/run-9.wav',
+		'sounds/run-10.mp3',
+		'sounds/run-14.mp3',
+		'sounds/run-15.mp3',
+		'sounds/run-16.mp3',
+		'sounds/run-17.mp3',
+		'sounds/run-18.mp3',
+		'sounds/run-1.mp3',
+		'sounds/run-24.mp3',
+		'sounds/run-3.mp3',
+		'sounds/run-5.mp3',
+		'sounds/run-6.mp3',
+		'sounds/run-9.mp3',
 	],
-	error: ['sounds/error.wav'],
-	done: ['sounds/done.wav'],
+	error: ['sounds/error.mp3'],
+	done: ['sounds/done.mp3'],
 };
 
 function shouldRun(url = location.href): boolean {

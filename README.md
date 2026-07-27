@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.35.4           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.35.5           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -220,6 +220,8 @@ Open the extension sidebar from the toolbar or configured shortcut.
 - **Config:** shortcuts, sounds, suggestions, keep-alive, browser context menu, package and MessageBox notifications, chunked clipboard paste, language, and debug controls.
 - **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.
 - **Tools:** context-aware Control Room tools; export format appears when Export Bots is selected.
+
+Maintenance note: keep bundled sounds in MP3 format. Firefox on Linux may expose extension-packaged WAV files as unsupported `audio/vnd.wave` media.
 
 ------
 

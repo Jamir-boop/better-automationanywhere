@@ -167,9 +167,10 @@ Selector source of truth:
 
 - [ ] Sounds
   - Source: `src/ts/sounds.ts`
+  - Assets: `public/sounds/*.mp3`; MP3 avoids Firefox/Linux exposing WAV files as unsupported `audio/vnd.wave` media.
   - Setting/id: `local:soundsEnabled`
   - Selectors: `run-button`, `error-modal`, `error-badge-icon`, `done-modal`, `done-badge-icon`
-  - Validate: enable Sounds; click Run; complete one bot and trigger one bot error.
+  - Validate: on Firefox/Linux, enable Sounds; click Run; complete one bot and trigger one bot error; confirm all tones play without media errors.
   - Expected: Run starts immediately while its tone plays; done and error tones play once per result.
   - Status: active
   - Delete condition: sound setting removed.
