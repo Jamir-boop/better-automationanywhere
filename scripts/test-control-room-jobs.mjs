@@ -126,13 +126,16 @@ assert.ok(toolsSource.includes("toolsJobsBackButton.addEventListener('click', ()
 assert.ok(toolsSource.includes('The selected page is logged out. Sign in, then select Refresh.'));
 assert.ok(toolsSource.includes('await syncToolsTargetToTab(tabId)'));
 assert.ok(toolsSource.includes('await refreshToolsContext(authToken)'));
-assert.ok(toolsStyle.includes('grid-template-columns: repeat(2, minmax(0, 1fr))'));
+assert.match(
+	toolsStyle,
+	/\.tools-target-picker\s+grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+	'Tools target selectors use equal-width columns'
+);
 assert.match(
 	toolsStyle,
 	/\.tools-target-picker select\s+width: 100%\s+max-width: none\s+min-height: 36px/,
 	'Tools selectors fill their columns'
 );
-assert.ok(toolsStyle.includes('grid-template-columns: minmax(0, 2fr) minmax(0, 3fr)'));
 assert.ok(mainSource.includes("aria-controls=\"panel-appearance\""));
 assert.ok(mainSource.includes("event.key === 'Home'"));
 assert.ok(mainSource.includes('browser.tabs.onActivated'));
