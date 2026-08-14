@@ -33,10 +33,16 @@ export const SUPPORTED_CONTROL_ROOM_TARGETS: SupportedControlRoomTarget[] = [
 		productVersion: '40.0.0',
 	},
 	{
-	  versionNumber: '20.1.0.0',
-	  versionRelease: 'LTS',
-	  buildNumber: '45983', //prot
-	  productVersion: '40.0.0',
+		versionNumber: '20.1.0.0',
+		versionRelease: 'LTS',
+		buildNumber: '45983', //prot
+		productVersion: '40.0.0',
+	},
+	{
+		versionNumber: '20.1.0.0',
+		versionRelease: 'LTS',
+		buildNumber: '46078',
+		productVersion: '40.0.0',
 	},
 ];
 export const SUPPORTED_CONTROL_ROOM_TARGET = SUPPORTED_CONTROL_ROOM_TARGETS[0];

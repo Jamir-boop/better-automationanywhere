@@ -10,8 +10,6 @@ import { debugInfo, debugWarn } from './debug';
 
 let enabled = false;
 let observer: MutationObserver | null = null;
-let lastHref = '';
-let navigationIntervalId: number | null = null;
 const handledBadges = new WeakSet<Element>();
 const wiredRunButtons = new WeakSet<HTMLButtonElement>();
 const warnedSoundFailures = new Set<SoundAction>();
@@ -84,28 +82,31 @@ function warnSoundFailure(action: SoundAction, error?: unknown): void {
 	}, { feedback: true });
 }
 
-function checkForErrorBadge(): void {
-	const errorModal = document.querySelector(ERROR_MODAL_SELECTOR);
-	if (!errorModal) return;
-
-	document
-		.querySelectorAll(ERROR_BADGE_ICON_SELECTOR)
-		.forEach((span) => {
-			if (handledBadges.has(span)) return;
-			handledBadges.add(span);
-			void playBundledSound('error');
+function checkForBadges(
+	root: ParentNode,
+	modalSelector: string,
+	badgeSelector: string,
+	action: SoundAction
+): void {
+	const modals = new Set<Element>();
+	if (root instanceof Element) {
+		const closest = root.closest(modalSelector);
+		if (closest) modals.add(closest);
+		if (root.matches(modalSelector)) modals.add(root);
+	}
+	root.querySelectorAll(modalSelector).forEach((modal) => modals.add(modal));
+	for (const modal of modals) {
+		modal.querySelectorAll(badgeSelector).forEach((badge) => {
+			if (handledBadges.has(badge)) return;
+			handledBadges.add(badge);
+			void playBundledSound(action);
 		});
+	}
 }
 
-function checkForDoneBadge(): void {
-	const doneModal = document.querySelector(DONE_MODAL_SELECTOR);
-	if (!doneModal) return;
-
-	document.querySelectorAll(DONE_BADGE_ICON_SELECTOR).forEach((span) => {
-		if (handledBadges.has(span)) return;
-		handledBadges.add(span);
-		void playBundledSound('done');
-	});
+function checkForResultBadges(root: ParentNode = document): void {
+	checkForBadges(root, ERROR_MODAL_SELECTOR, ERROR_BADGE_ICON_SELECTOR, 'error');
+	checkForBadges(root, DONE_MODAL_SELECTOR, DONE_BADGE_ICON_SELECTOR, 'done');
 }
 
 function observeBadges(): void {
@@ -113,10 +114,12 @@ function observeBadges(): void {
 	observer = new MutationObserver((mutationsList) => {
 		if (!enabled || !shouldRun()) return;
 		for (const mutation of mutationsList) {
-			if (mutation.type === 'childList' || mutation.type === 'attributes') {
-				checkForErrorBadge();
-				checkForDoneBadge();
-				return;
+			if (mutation.type === 'attributes') {
+				if (mutation.target instanceof Element) checkForResultBadges(mutation.target);
+				continue;
+			}
+			for (const node of mutation.addedNodes) {
+				if (node instanceof Element) checkForResultBadges(node);
 			}
 		}
 	});
@@ -124,6 +127,7 @@ function observeBadges(): void {
 		childList: true,
 		subtree: true,
 		attributes: true,
+		attributeFilter: ['class'],
 	});
 }
 
@@ -151,18 +155,6 @@ function captureRunButton(attempts = 5): void {
 	}
 }
 
-function startNavigationWatch(): void {
-	if (navigationIntervalId !== null) return;
-	lastHref = document.location.href;
-	navigationIntervalId = window.setInterval(() => {
-		if (!enabled) return;
-		const currentHref = document.location.href;
-		if (lastHref === currentHref) return;
-		lastHref = currentHref;
-		refreshSounds();
-	}, 5000);
-}
-
 function stopObserver(): void {
 	observer?.disconnect();
 	observer = null;
@@ -174,6 +166,7 @@ export function refreshSounds(): void {
 		return;
 	}
 	observeBadges();
+	checkForResultBadges();
 	captureRunButton(5);
 }
 
@@ -182,7 +175,6 @@ export function setSoundsEnabled(value: boolean): void {
 	void debugInfo('sounds', value ? 'Sounds enabled.' : 'Sounds disabled.', { enabled });
 	if (enabled) {
 		refreshSounds();
-		startNavigationWatch();
 		return;
 	}
 	stopObserver();

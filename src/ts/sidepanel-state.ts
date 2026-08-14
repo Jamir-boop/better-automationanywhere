@@ -1,7 +1,7 @@
 import { storage } from '#imports';
 
-export type SidepanelTab = 'tools' | 'userstyle' | 'settings' | 'doctor';
-export type SidepanelFocusTarget = 'actionJson';
+export type SidepanelTab = 'tools' | 'appearance' | 'settings' | 'help';
+export type SidepanelFocusTarget = 'actionJson' | 'jobs' | 'diagnostics';
 
 export interface SidepanelRequest {
 	tab: SidepanelTab;

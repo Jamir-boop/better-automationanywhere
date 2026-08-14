@@ -5,6 +5,7 @@ import type {
 	ContentActionResponse,
 	ControlRoomCompatibilityMessage,
 	ControlRoomCompatibilityResponse,
+	JobNotificationMessage,
 	RuntimeMessage,
 	SettingsBackgroundMessage,
 } from '../src/ts/messages';
@@ -30,6 +31,7 @@ import {
 } from '../src/ts/control-room-version';
 import {
 	botExecutionModalPosition,
+	backgroundJobNotificationsEnabled,
 	blockTaskbotNodeLabelClicks,
 	browserContextMenuEnabled,
 	commandPaletteEnabled,
@@ -72,6 +74,8 @@ const SLOW_API_REQUEST_MS = 2000;
 const OPEN_SIDEBAR_CONTEXT_MENU_ID = 'open-better-aa-sidebar';
 const UNIVERSAL_CLIPBOARD_CONTEXT_MENU_ID = 'better-aa-universal-clipboard';
 const CONTEXT_MENU_CLIPBOARD_SLOTS = [1, 2, 3] as const;
+const JOB_NOTIFICATION_PREFIX = 'better-aa-job:';
+const jobNotificationWindows = new Map<string, number | undefined>();
 
 type UniversalClipboardSlot = (typeof CONTEXT_MENU_CLIPBOARD_SLOTS)[number];
 
@@ -128,6 +132,7 @@ async function queryAutomationAnywhereTabs(): Promise<
 }
 
 async function getCompatibilityTab(
+	tabId: number | undefined,
 	sender: Parameters<typeof browser.runtime.onMessage.addListener>[0] extends (
 		message: any,
 		sender: infer Sender,
@@ -136,6 +141,14 @@ async function getCompatibilityTab(
 		? Sender
 		: never
 ): Promise<{ tabId: number; url: string } | null> {
+	if (tabId !== undefined) {
+		try {
+			const tab = await browser.tabs.get(tabId);
+			if (tab.url && isAutomationAnywhereUrl(tab.url)) return { tabId, url: tab.url };
+		} catch {
+			return null;
+		}
+	}
 	if (sender.tab?.id !== undefined && sender.tab.url) {
 		return { tabId: sender.tab.id, url: sender.tab.url };
 	}
@@ -181,7 +194,7 @@ async function getControlRoomCompatibility(
 		? Sender
 		: never
 ): Promise<ControlRoomCompatibilityResponse> {
-	const target = await getCompatibilityTab(sender);
+	const target = await getCompatibilityTab(message.tabId, sender);
 	if (!target) return { ok: false, error: 'Open an Automation Anywhere tab first.' };
 
 	const context = parseAutomationAnywherePageContext(target.url);
@@ -225,6 +238,58 @@ async function getControlRoomCompatibility(
 
 function createNonce(): string {
 	return crypto.randomUUID();
+}
+
+function showJobNotification(message: JobNotificationMessage): void {
+	const notifications =
+		(browser as any).notifications ?? (globalThis as any).chrome?.notifications;
+	if (!notifications?.create) return;
+	const id = `${JOB_NOTIFICATION_PREFIX}${message.jobId}`;
+	jobNotificationWindows.set(id, message.windowId);
+	void Promise.resolve(
+		notifications.create(id, {
+			type: 'basic',
+			iconUrl: browser.runtime.getURL('icon/128.png' as any),
+			title: message.title,
+			message: message.message,
+		})
+	).catch((error) => {
+		void debugWarn('jobs', 'Background job notification failed.', { error }, {
+			feedback: true,
+		});
+	});
+}
+
+function registerJobNotificationClicks(): void {
+	const notifications =
+		(browser as any).notifications ?? (globalThis as any).chrome?.notifications;
+	if (!notifications?.onClicked?.addListener) return;
+	notifications.onClicked.addListener((notificationId: string) => {
+		if (!notificationId.startsWith(JOB_NOTIFICATION_PREFIX)) return;
+		const request: SidebarOpenRequest = {
+			tab: 'tools',
+			focus: 'jobs',
+			userAction: true,
+		};
+		if (import.meta.env.FIREFOX) {
+			openFirefoxSidebarFromUserAction(request);
+		} else {
+			openChromeSidePanel({ windowId: jobNotificationWindows.get(notificationId) });
+			queueSidepanelRequest(request);
+		}
+		void Promise.resolve(notifications.clear?.(notificationId));
+		jobNotificationWindows.delete(notificationId);
+	});
+}
+
+try {
+	browser.permissions.onRemoved.addListener((permissions) => {
+		if (permissions.permissions?.includes('notifications')) {
+			void backgroundJobNotificationsEnabled.setValue(false);
+		}
+	});
+} catch {
+	// WXT's build-time fake browser does not implement this event.
 }
 
 type SidebarOpenRequest = {
@@ -554,12 +619,12 @@ function registerBrowserContextMenus(): void {
 	}
 
 	menus.onClicked.addListener((info: any, tab?: { id?: number; url?: string }) => {
+		if (info?.menuItemId === OPEN_SIDEBAR_CONTEXT_MENU_ID) {
+			openSidebarFromContextMenu(tab?.id);
+			return;
+		}
 		void (async () => {
 			if (!(await getBrowserContextMenuEnabled())) return;
-			if (info?.menuItemId === OPEN_SIDEBAR_CONTEXT_MENU_ID) {
-				openSidebarFromContextMenu(tab?.id);
-				return;
-			}
 			for (const slot of CONTEXT_MENU_CLIPBOARD_SLOTS) {
 				if (info?.menuItemId === getClipboardCopyContextMenuId(slot)) {
 					await runClipboardContextMenuAction('copy', slot, tab);
@@ -997,6 +1062,10 @@ export default defineBackground(() => {
 			return getControlRoomCompatibility(message, sender);
 		}
 		if (message.type === 'GET_EXTENSION_SHORTCUTS') return getExtensionShortcuts();
+		if (message.type === 'SHOW_JOB_NOTIFICATION') {
+			showJobNotification(message);
+			return;
+		}
 		if (!isSettingsBackgroundMessage(message)) return;
 		void handleSettingsMessage(message).catch((error) => {
 			void debugError('background', 'Settings message failed.', {
@@ -1008,5 +1077,6 @@ export default defineBackground(() => {
 
 	void setPanelActionBehavior();
 	registerBrowserContextMenus();
+	registerJobNotificationClicks();
 	if (import.meta.env.CHROME) startRecorderBridge();
 });

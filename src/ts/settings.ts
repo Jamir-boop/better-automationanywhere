@@ -84,6 +84,12 @@ export const apiHealthLastResults = storage.defineItem<
 export const recorderBridgeEnabled = storage.defineItem<boolean>('local:recorderBridgeEnabled');
 export const recorderBridgePort = storage.defineItem<number>('local:recorderBridgePort');
 export const recorderBridgeToken = storage.defineItem<string>('local:recorderBridgeToken');
+export const backgroundJobNotificationsEnabled = storage.defineItem<boolean>(
+	'local:backgroundJobNotificationsEnabled'
+);
+export const gettingStartedGuidanceEnabled = storage.defineItem<boolean>(
+	'local:gettingStartedGuidanceEnabled'
+);
 
 export const DEFAULT_STYLES_ENABLED = true;
 export const DEFAULT_RUN_BUTTON = false;
@@ -108,6 +114,8 @@ export const DEFAULT_BOT_EXECUTION_MODAL_POSITION =
 	BOT_EXECUTION_MODAL_POSITIONS.TOP_RIGHT;
 export const DEFAULT_RECORDER_BRIDGE_ENABLED = true;
 export const DEFAULT_RECORDER_BRIDGE_PORT = 8765;
+export const DEFAULT_BACKGROUND_JOB_NOTIFICATIONS_ENABLED = false;
+export const DEFAULT_GETTING_STARTED_GUIDANCE_ENABLED = true;
 
 export const OPEN_SIDEBAR_SHORTCUT_LABELS: Record<OpenSidebarShortcut, string> = {
 	[OPEN_SIDEBAR_SHORTCUTS.ALT_SHIFT_L]: 'Alt + Shift + L',
@@ -344,6 +352,20 @@ export async function getChunkedClipboardPasteEnabled(): Promise<boolean> {
 	return (
 		(await chunkedClipboardPasteEnabled.getValue()) ??
 		DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED
+	);
+}
+
+export async function getBackgroundJobNotificationsEnabled(): Promise<boolean> {
+	return (
+		(await backgroundJobNotificationsEnabled.getValue()) ??
+		DEFAULT_BACKGROUND_JOB_NOTIFICATIONS_ENABLED
+	);
+}
+
+export async function getGettingStartedGuidanceEnabled(): Promise<boolean> {
+	return (
+		(await gettingStartedGuidanceEnabled.getValue()) ??
+		DEFAULT_GETTING_STARTED_GUIDANCE_ENABLED
 	);
 }
 

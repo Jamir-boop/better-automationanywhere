@@ -5,7 +5,6 @@ import {
 	SHARED_COPY_BUTTON_SELECTOR,
 	SHARED_PASTE_BUTTON_SELECTOR,
 	TASKBOT_ACTIVE_CURSOR_SELECTOR,
-	TASK_EDITOR_CAPABILITY_SELECTOR,
 	TASKBOT_RENDERED_NODE_SELECTOR,
 } from './automation-anywhere-selectors';
 import {
@@ -44,8 +43,7 @@ const CLIPBOARD_PASTE_READY_WAIT_MS = 1500;
 const CLIPBOARD_PASTE_BEFORE_CLICK_MS = 2500;
 const CLIPBOARD_PASTE_AFTER_CLICK_LOCK_MS = 1500;
 const CLIPBOARD_CHUNK_COMPLETION_WAIT_MS = 120_000;
-let globalClipboardWatcherStarted = false;
-let globalClipboardWatcherOnEditorPage = false;
+let globalClipboardWatcherTimer: ReturnType<typeof setInterval> | undefined;
 let lastSeenGlobalClipboard: string | null = null;
 let ignoredGlobalClipboardWrite: string | null = null;
 let pasteInFlight = false;
@@ -133,12 +131,6 @@ async function readFreshSharedCopy(context: string): Promise<string | null> {
 	}
 	if (globalClipboardJSON) markGlobalClipboardWrite(globalClipboardJSON);
 	return globalClipboardJSON;
-}
-
-function isTaskEditorPage(): boolean {
-	const hash = location.hash.toLowerCase();
-	if (hash.includes('taskbot') || hash.includes('editor')) return true;
-	return Boolean(document.querySelector(TASK_EDITOR_CAPABILITY_SELECTOR));
 }
 
 function getBase64Resource(
@@ -254,26 +246,22 @@ async function saveGlobalClipboardValueToDefaultSlot(
 	}
 }
 
-export function startGlobalClipboardWatcher(): void {
-	if (globalClipboardWatcherStarted) return;
-	globalClipboardWatcherStarted = true;
+export function setGlobalClipboardWatcherEnabled(enabled: boolean): void {
+	if (!enabled) {
+		if (globalClipboardWatcherTimer) clearInterval(globalClipboardWatcherTimer);
+		globalClipboardWatcherTimer = undefined;
+		lastSeenGlobalClipboard = null;
+		ignoredGlobalClipboardWrite = null;
+		return;
+	}
+	if (globalClipboardWatcherTimer) return;
 	lastSeenGlobalClipboard = getGlobalClipboardValue();
 
-	setInterval(() => {
-		if (!isTaskEditorPage()) {
-			globalClipboardWatcherOnEditorPage = false;
-			return;
-		}
-
+	globalClipboardWatcherTimer = setInterval(() => {
 		const currentClipboard = getGlobalClipboardValue();
 		if (pasteInFlight) {
 			lastSeenGlobalClipboard = currentClipboard;
 			ignoredGlobalClipboardWrite = null;
-			return;
-		}
-		if (!globalClipboardWatcherOnEditorPage) {
-			lastSeenGlobalClipboard = currentClipboard;
-			globalClipboardWatcherOnEditorPage = true;
 			return;
 		}
 		if (currentClipboard === lastSeenGlobalClipboard) return;

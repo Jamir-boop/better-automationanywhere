@@ -60,15 +60,22 @@ Current fix:
 
 - `entrypoints/background.ts` registers a Firefox toolbar click handler.
 - That handler calls `openFirefoxSidebarFromUserAction()` immediately.
+- The Firefox `menus.onClicked` handler calls
+  `openSidebarFromContextMenu()` immediately for the sidebar item, before it
+  enters any async function or reads storage.
 - `openFirefoxSidebarFromUserAction()` calls `browser.sidebarAction.open()`
   before writing `sidepanelRequest`.
 - `sidepanelRequest` is queued after the open call so the sidepanel can still
   route to the requested tab/focus.
 
 Do not move `writeSidepanelRequest()` before `browser.sidebarAction.open()`.
-That breaks Firefox with:
+Do not put the context-menu sidebar branch behind `await`, a promise callback,
+an async IIFE, storage access, or a runtime message. The menu item's synchronized
+visibility is the setting check for that click. These mistakes break Firefox
+with:
 
 ```text
+sidebarAction.open may only be called from a user input handler
 sidebarAction.toggle may only be called from a user input handler
 ```
 

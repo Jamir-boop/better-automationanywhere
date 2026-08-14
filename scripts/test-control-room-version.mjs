@@ -8,6 +8,16 @@ const target = mod.SUPPORTED_CONTROL_ROOM_TARGET;
 
 assert(mod.SUPPORTED_CONTROL_ROOM_TARGETS.length >= 1, 'targets has entries');
 assert.strictEqual(mod.SUPPORTED_CONTROL_ROOM_TARGET, mod.SUPPORTED_CONTROL_ROOM_TARGETS[0], 'alias is first');
+assert.deepStrictEqual(
+	mod.SUPPORTED_CONTROL_ROOM_TARGETS.find(({ buildNumber }) => buildNumber === '46078'),
+	{
+		versionNumber: '20.1.0.0',
+		versionRelease: 'LTS',
+		buildNumber: '46078',
+		productVersion: '40.0.0',
+	},
+	'build 46078 is registered'
+);
 
 for (const supportedTarget of mod.SUPPORTED_CONTROL_ROOM_TARGETS) {
 	const exact = mod.evaluateControlRoomCompatibility({

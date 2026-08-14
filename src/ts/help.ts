@@ -1,4 +1,5 @@
 import { getActiveLocale, t } from './i18n';
+import { icon } from './icons';
 
 export interface HelpCommandInfo {
 	aliases: readonly string[];
@@ -98,29 +99,31 @@ export function renderHelpHtml(options: {
 }): string {
 	const commands = options.commands ?? Object.values(getCommandHelp());
 	const navigationCommands = options.navigationCommands ?? [];
-	let helpContent = `<h3>${escapeHelpHtml(t('List of Commands:'))}</h3><ul>`;
+	let helpContent = `<section class="help-card" data-help-card><h3>${icon('terminal')}${escapeHelpHtml(t('Commands and tasks'))}</h3><ul>`;
 	helpContent += renderCommandList(commands);
 	helpContent += `<li><b>:<i>line</i></b>: ${escapeHelpHtml(t('Scrolls to a specific line number (e.g. {example})', { example: ':25' }))}</li>`;
-	helpContent += '</ul>';
+	helpContent += '</ul></section>';
 
 	if (navigationCommands.length) {
-		helpContent += `<h4>${escapeHelpHtml(t('Navigation:'))}</h4><ul>`;
+		helpContent += `<section class="help-card" data-help-card><h3>${icon('list-tree')}${escapeHelpHtml(t('Navigation'))}</h3><ul>`;
 		helpContent += renderCommandList(navigationCommands);
-		helpContent += '</ul>';
+		helpContent += '</ul></section>';
 	}
 
 	helpContent += `
-		<h4>${escapeHelpHtml(t('Keyboard Shortcuts:'))}</h4>
+		<section class="help-card" data-help-card><h3>${icon('keyboard')}${escapeHelpHtml(t('Commands and shortcuts'))}</h3>
 		<ul>
 			<li><b>${escapeHelpHtml(options.shortcutLabel)}</b>: ${escapeHelpHtml(t('Open command palette'))}</li>
 			<li><b>${escapeHelpHtml(options.sidebarShortcutLabel ?? 'Alt + Shift + L')}</b>: ${escapeHelpHtml(t('Open sidebar; configurable in extension sidebar.'))}</li>
 			<li><b>Alt + V</b>: ${escapeHelpHtml(t('Show variables'))}</li>
 			<li><b>Alt + A</b>: ${escapeHelpHtml(t('Show actions'))}</li>
 		</ul>
-		<h4>${escapeHelpHtml(t('Clipboard Slots:'))}</h4>
+		</section>
+		<section class="help-card" data-help-card><h3>${icon('share-2')}${escapeHelpHtml(t('Move and share actions'))}</h3>
 		<ul>
 			<li>${escapeHelpHtml(t('Native Automation Anywhere shared copy auto-saves auto slot. Use sidepanel controls for slots.'))}</li>
 		</ul>
+		</section>
 	`;
 
 	return helpContent;

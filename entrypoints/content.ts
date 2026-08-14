@@ -3,7 +3,7 @@ import {
 	copyToSlot,
 	importActionJson,
 	pasteFromSlot,
-	startGlobalClipboardWatcher,
+	setGlobalClipboardWatcherEnabled,
 	universalCopy,
 	universalPaste,
 } from '../src/ts/clipboard';
@@ -58,7 +58,8 @@ import {
 } from '../src/ts/control-room-version';
 import { runStyleDoctor, runSingleCheck } from '../src/ts/style-doctor';
 import {
-	callInitializeRepeatedly,
+	initializeUi,
+	refreshUi,
 	setActiveBlockTaskbotNodeLabelClicks,
 	setActiveCommandPaletteEnabled,
 	setActiveCommandPaletteShortcut,
@@ -123,6 +124,7 @@ import { setRunButtonAnimationEnabled } from '../src/ts/run-button-animation';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
 import { updateCommandPaletteLanguage } from '../src/ts/palette';
+import { setContentIconButton } from '../src/ts/content-icons';
 import {
 	extractVariableMetadataLookup,
 	findVariableMetadata,
@@ -145,19 +147,17 @@ let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
 let activeRunButtonStyleEnabled = false;
 let activeRunButtonWavesEnabled = false;
 let variableMetadataObserver: MutationObserver | null = null;
+let variableMetadataObservedSection: HTMLElement | null = null;
 let variableMetadataScheduled = false;
 let variableMetadataCurrentFileId: string | null = null;
 let variableMetadataMissingSignature: string | null = null;
 let variableMetadataExhaustedSignature: string | null = null;
 let variableMetadataMissingRetryCount = 0;
 let variableMetadataRetryTimer: ReturnType<typeof setTimeout> | undefined;
-// ponytail: 10s stale-while-revalidate; tune if Control Room write lag proves longer.
-const VARIABLE_METADATA_TTL_MS = 10_000;
-interface VariableMetadataCacheEntry {
-	promise: Promise<VariableMetadataLookup | null>;
-	fetchedAt: number;
-}
-const variableMetadataCache = new Map<string, VariableMetadataCacheEntry>();
+const variableMetadataCache = new Map<
+	string,
+	Promise<VariableMetadataLookup | null>
+>();
 
 function applyBundledAssetVariables(): void {
 	document.documentElement.style.setProperty(
@@ -174,7 +174,9 @@ function applyRouteClasses(): void {
 	document.documentElement.classList.toggle(TEXT_FILE_ROUTE_CLASS, isTextFileUrl(href));
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
+	if (isTopFrame()) setGlobalClipboardWatcherEnabled(isTaskEditorUrl(href));
 	scheduleVariableMetadataSync();
+	refreshUi();
 }
 
 function syncScrollableFoldersAutoScroll(): void {
@@ -375,9 +377,7 @@ async function loadVariableMetadata(
 	baseUrl: string
 ): Promise<VariableMetadataLookup | null> {
 	const existing = variableMetadataCache.get(fileId);
-	if (existing && Date.now() - existing.fetchedAt <= VARIABLE_METADATA_TTL_MS) {
-		return existing.promise;
-	}
+	if (existing) return existing;
 
 	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
 	if (!authToken) {
@@ -403,9 +403,6 @@ async function loadVariableMetadata(
 			return lookup;
 		})
 		.catch((error) => {
-			if (variableMetadataCache.get(fileId)?.promise === promise) {
-				variableMetadataCache.delete(fileId);
-			}
 			void debugWarn(
 				'variable-metadata',
 				'Variable metadata load failed.',
@@ -416,7 +413,7 @@ async function loadVariableMetadata(
 		})
 		.finally(scheduleVariableMetadataSync);
 
-	variableMetadataCache.set(fileId, { promise, fetchedAt: Date.now() });
+	variableMetadataCache.set(fileId, promise);
 	return promise;
 }
 
@@ -545,6 +542,7 @@ function applyVariableMetadataLabels(
 
 async function syncVariableMetadataLabels(): Promise<void> {
 	const context = getVariableMetadataContext();
+	setVariableMetadataObserverSection(context?.section ?? null);
 	if (!context) {
 		clearVariableMetadataMissingRefresh();
 		if (variableMetadataCurrentFileId !== null) {
@@ -557,6 +555,9 @@ async function syncVariableMetadataLabels(): Promise<void> {
 	if (context.fileId !== variableMetadataCurrentFileId) {
 		clearVariableMetadataMissingRefresh();
 		restoreVariableMetadataLabels();
+		if (variableMetadataCurrentFileId) {
+			variableMetadataCache.delete(variableMetadataCurrentFileId);
+		}
 		variableMetadataCurrentFileId = context.fileId;
 	}
 
@@ -573,13 +574,20 @@ async function syncVariableMetadataLabels(): Promise<void> {
 	applyVariableMetadataLabels(context.section, lookup, context.fileId);
 }
 
-function installVariableMetadataObserver(): void {
-	if (variableMetadataObserver || !document.body) return;
+function setVariableMetadataObserverSection(section: HTMLElement | null): void {
+	if (section === variableMetadataObservedSection) return;
+	variableMetadataObserver?.disconnect();
+	variableMetadataObserver = null;
+	variableMetadataObservedSection = section;
+	if (!section) return;
 	variableMetadataObserver = new MutationObserver(scheduleVariableMetadataSync);
-	variableMetadataObserver.observe(document.body, {
+	variableMetadataObserver.observe(section, {
 		childList: true,
 		subtree: true,
 	});
+}
+
+function installVariableMetadataObserver(): void {
 	document.addEventListener('click', scheduleVariableMetadataSync, true);
 	scheduleVariableMetadataSync();
 }
@@ -705,11 +713,22 @@ async function checkSavedTaskbotForNonClosingMessageBoxes(
 	}
 }
 
-function installNativeSaveWarning(): void {
+function handleSuccessfulNativeSave(fileId: string, baseUrl: string): void {
+	variableMetadataCache.delete(fileId);
+	if (variableMetadataCurrentFileId === fileId) scheduleVariableMetadataSync();
+	if (nonClosingMessageBoxWarningActive) {
+		void checkSavedTaskbotForNonClosingMessageBoxes(fileId, baseUrl);
+	}
+}
+
+function installNativeSaveListener(): void {
 	document.addEventListener(
 		'click',
 		(event) => {
-			if (!nonClosingMessageBoxWarningActive || !document.body) return;
+			if (
+				(!nonClosingMessageBoxWarningActive && !variableMetadataActive) ||
+				!document.body
+			) return;
 			const button =
 				event.target instanceof Element
 					? event.target.closest<HTMLButtonElement>(TASKBOT_SAVE_BUTTON_SELECTOR)
@@ -739,7 +758,7 @@ function installNativeSaveWarning(): void {
 				);
 				if (!sawBusy || !sawToast || isNativeSaveBusy(button)) return;
 				clearNativeSaveWait();
-				void checkSavedTaskbotForNonClosingMessageBoxes(fileId, baseUrl);
+				handleSuccessfulNativeSave(fileId, baseUrl);
 			});
 			nativeSaveObserver.observe(document.body, {
 				attributes: true,
@@ -818,8 +837,8 @@ async function applyInitialSettings(): Promise<void> {
 
 function updateOpenSidebarButtonLabel(): void {
 	const button = document.getElementById(OPEN_SIDEBAR_BUTTON_ID);
-	if (!button) return;
-	button.textContent = t('Better AA');
+	if (!(button instanceof HTMLButtonElement)) return;
+	setContentIconButton(button, 'panel-right-open', t('Better AA'));
 	button.title = t('Open Better AA sidebar');
 	button.setAttribute('aria-label', t('Open Better AA sidebar'));
 }
@@ -871,7 +890,7 @@ function insertOpenSidebarButton(): void {
 	const button = document.createElement('button');
 	button.id = OPEN_SIDEBAR_BUTTON_ID;
 	button.type = 'button';
-	button.textContent = t('Better AA');
+	setContentIconButton(button, 'panel-right-open', t('Better AA'));
 	button.title = t('Open Better AA sidebar');
 	button.setAttribute('aria-label', t('Open Better AA sidebar'));
 	button.addEventListener('click', () => {
@@ -1001,7 +1020,7 @@ async function handleRuntimeMessage(
 			setActiveLanguagePreference(message.language);
 			updateOpenSidebarButtonLabel();
 			updateCommandPaletteLanguage();
-			callInitializeRepeatedly(1, 1);
+			refreshUi();
 			return;
 		}
 		if (message.type === 'SET_COMMAND_PALETTE_SHORTCUT') {
@@ -1104,8 +1123,7 @@ export default defineContentScript({
 		});
 		await applyInitialSettings();
 		if (isTopFrame()) {
-			startGlobalClipboardWatcher();
-			installNativeSaveWarning();
+			installNativeSaveListener();
 		}
 
 		stylesEnabled.watch(() => {
@@ -1130,10 +1148,15 @@ export default defineContentScript({
 		nonClosingMessageBoxWarningEnabled.watch((value) => {
 			nonClosingMessageBoxWarningActive =
 				value ?? DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
-			if (!nonClosingMessageBoxWarningActive) clearNativeSaveWait();
+			if (!nonClosingMessageBoxWarningActive && !variableMetadataActive) {
+				clearNativeSaveWait();
+			}
 		});
 		variableMetadataEnabled.watch((value) => {
 			variableMetadataActive = value ?? DEFAULT_VARIABLE_METADATA_ENABLED;
+			if (!variableMetadataActive && !nonClosingMessageBoxWarningActive) {
+				clearNativeSaveWait();
+			}
 			scheduleVariableMetadataSync();
 		});
 		blockTaskbotNodeLabelClicks.watch((value) => {
@@ -1154,7 +1177,7 @@ export default defineContentScript({
 			setActiveLanguagePreference(value);
 			updateOpenSidebarButtonLabel();
 			updateCommandPaletteLanguage();
-			callInitializeRepeatedly(1, 1);
+			refreshUi();
 		});
 		openSidebarShortcut.watch((value) => {
 			setActiveOpenSidebarShortcut(normalizeOpenSidebarShortcut(value));
@@ -1177,7 +1200,7 @@ export default defineContentScript({
 		runOnReady(() => {
 			insertOpenSidebarButton();
 			installVariableMetadataObserver();
-			callInitializeRepeatedly();
+			initializeUi();
 		});
 	},
 });

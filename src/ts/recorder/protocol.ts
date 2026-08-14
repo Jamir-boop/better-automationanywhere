@@ -22,6 +22,8 @@ export const RECORDER_VERBS = [
 	'setFocus',
 ] as const;
 
+export const RECORDER_RECONNECT_DELAYS_MS = [3_000, 6_000, 12_000, 20_000] as const;
+
 export type RecorderVerb = (typeof RECORDER_VERBS)[number];
 
 export function isRecorderVerb(value: unknown): value is RecorderVerb {

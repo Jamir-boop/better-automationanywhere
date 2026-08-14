@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.35.5           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.37.4           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -63,7 +63,9 @@ https://github.com/Jamir-boop/better-automationanywhere/assets/73477811/f7c6eec2
 
 ### Control Room tools
 
-The sidepanel Tools tab adapts to the active Control Room page.
+The side panel scans signed-in Automation Anywhere pages in the current browser window when Tools opens. Control Room and Page share one compact row. If the current tab is the only eligible page in the only authenticated Control Room, it is selected automatically. That target stays pinned when browser tabs change. The round **Refresh** control rescans connections, revalidates login, and accepts the selected page's current eligible route. If a target is lost, Refresh may recover to the current eligible page only when one authenticated Control Room remains.
+
+Long Tools operations run as panel-scoped background jobs. Jobs keep running while you switch browser tabs or use Appearance, Settings, and Help. The Jobs action appears only for running or unread work and stays visible while Jobs is open. The latest ten jobs, progress, stop state, and per-item logs remain in session storage. Closing or reloading the side panel interrupts a running job. Optional completion notifications are off by default and request the browser's `notifications` permission only when enabled.
 
 - Folder pages: copy files, update package versions, and export bots.
 - Taskbot pages: inspect/edit Taskbot JSON, update package versions, and export bots.
@@ -215,9 +217,9 @@ Examples:
 
 ## Configuration
 
-Open the extension sidebar from the toolbar or configured shortcut.
+Open the extension side panel from the toolbar or configured shortcut. Use **Open full settings** for the full-page Appearance, Settings, and Help view. Stable routes are `#appearance`, `#settings`, and `#help`; live Diagnostics stay in the side panel.
 
-- **Config:** shortcuts, sounds, suggestions, keep-alive, browser context menu, package and MessageBox notifications, chunked clipboard paste, language, and debug controls.
+- **Settings:** global shortcuts, sounds, suggestions, keep-alive, browser context menu, package and MessageBox notices, optional background-job notifications, getting-started guidance, chunked clipboard paste, language, and integrations.
 - **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.
 - **Tools:** context-aware Control Room tools; export format appears when Export Bots is selected.
 

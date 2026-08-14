@@ -20,8 +20,8 @@ Selector source of truth:
   - Source: `src/ts/recorder/ws-client.ts`, `entrypoints/recorder.content.ts`, `entrypoints/background.ts`
   - Setting/id: Chrome/Edge only; `local:recorderBridgeEnabled` (default `true`), `local:recorderBridgePort` (default `8765`), `local:recorderBridgeToken`; all rows are hidden on Firefox and port/token rows are hidden while disabled.
   - Selectors: web-page selectors are generated at runtime by `src/ts/recorder/selector.ts`; no Automation Anywhere external selector.
-  - Validate: on Chrome/Edge, confirm the manifest omits `webNavigation`, start BetterRecorder on `127.0.0.1:8765`, and confirm `hello` then `ping`; verify runtime-only injection after `selectTab`; exercise `listTabs`, `navigate`, `observePage`, semantic target descriptors, state-aware form verbs, interaction glow, throttled screenshots, and debugger click. On Firefox, confirm settings, bridge startup, recorder output, and `<all_urls>` are absent.
-  - Expected: zero-config mode trusts the process owning the configured loopback port; the optional token authenticates the extension to BetterRecorder but is not mutual server authentication. Runtime injection occurs only for the selected tab; leaving or closing it returns `NO_TAB`; click navigation settles before the response; DOM requests return protocol results or `NO_MATCH`/`NOT_VISIBLE`/`NO_TAB`/`TIMEOUT`/`NOT_ALLOWED`/`INTERNAL`; password reads are rejected and debugger clicks detach after use. Firefox retains only its Automation Anywhere host permissions.
+  - Validate: on Chrome/Edge, confirm failed loopback connections retry after 3, 6, 12, then 20 seconds; start BetterRecorder on `127.0.0.1:8765` and confirm the delay resets before `hello` then `ping`; verify runtime-only injection after `selectTab`; exercise `listTabs`, `navigate`, `observePage`, semantic target descriptors, state-aware form verbs, interaction glow, throttled screenshots, and debugger click. On Firefox, confirm settings, bridge startup, recorder output, and `<all_urls>` are absent.
+  - Expected: zero-config mode trusts the process owning the configured loopback port; the optional token authenticates the extension to BetterRecorder but is not mutual server authentication. Only one reconnect is pending, retries cap at 20 seconds, and disabling or changing bridge settings cancels and resets the connection lifecycle. Runtime injection occurs only for the selected tab; leaving or closing it returns `NO_TAB`; click navigation settles before the response; DOM requests return protocol results or `NO_MATCH`/`NOT_VISIBLE`/`NO_TAB`/`TIMEOUT`/`NOT_ALLOWED`/`INTERNAL`; password reads are rejected and debugger clicks detach after use. Firefox retains only its Automation Anywhere host permissions.
   - Validated: pending — v2 live Java/browser checkpoints required.
   - Status: active
   - Delete condition: BetterRecorder package support is removed or replaced by a native bridge.
@@ -30,8 +30,8 @@ Selector source of truth:
   - Source: `entrypoints/content.ts`, `wxt.config.ts`
   - Setting/id: `AUTOMATION_ANYWHERE_MATCHES`
   - Selectors: route/url based
-  - Validate: open supported Control Room page and confirm sidebar button, styles, shortcuts, and tools initialize.
-  - Expected: no console errors; route class updates when moving between folder/taskbot/text pages.
+  - Validate: open a supported Control Room page; use SPA navigation, clicks, and shortcuts; confirm sidebar button, styles, palette controls, and tools initialize without recurring UI polling.
+  - Expected: no console errors or permanent one-second/five-second UI timers; route classes and injected UI update when moving between folder/taskbot/text pages.
   - Status: active
   - Delete condition: never delete unless extension host matching changes.
 
@@ -57,55 +57,73 @@ Selector source of truth:
   - Source: `entrypoints/background.ts`, `AGENTS.md`
   - Setting/id: `openFirefoxSidebarFromUserAction`
   - Selectors: none
-  - Validate: toolbar click opens sidebar; content-script request shows manual-open message.
-  - Expected: no `sidebarAction.toggle may only be called from a user input handler`.
+  - Validate: toolbar click, configured shortcut, and **Open extension sidebar** context-menu item each open the sidebar; content-script requests show the manual-open message.
+  - Expected: toolbar, shortcut, context-menu, and notification handlers call `browser.sidebarAction.open()` before async work; no `sidebarAction.open may only be called from a user input handler` or equivalent `toggle` error.
   - Status: active
   - Delete condition: Firefox removes user-action restriction.
 
 - [ ] Route change watcher
-  - Source: `entrypoints/content.ts`, `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/tools.ts`
-  - Setting/id: `AA_ROUTE_CHANGED`, `scheduleActiveTabRefresh`
-  - Selectors: route/url based
-  - Validate: navigate between Control Room pages without full reload.
-  - Expected: one sidepanel listener set refreshes tools and active health/build state; page classes update.
+	- Source: `entrypoints/content.ts`, `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/tools.ts`
+	- Setting/id: `AA_ROUTE_CHANGED`, `session:selectedControlRoomTarget`
+	- Selectors: route/url based
+	- Validate: select a Tools page, navigate it without full reload, then switch unrelated browser tabs.
+	- Expected: the selected page becomes stale and new actions stay disabled until the round **Refresh** control accepts its current eligible route; browser-tab activation never changes a healthy selected target, results, or job progress.
   - Status: active
   - Delete condition: WXT route/content lifecycle replaces manual watcher.
 
 ## Sidepanel
 
+- [ ] Lucide action icons
+	- Source: `src/ts/icons.ts`, `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/tools.ts`, `src/ts/ui.ts`, `src/ts/bot-execution-modal.ts`
+	- Setting/id: none; user-requested always-on visual language. `lucide` is pinned and only named icons are bundled.
+	- Selectors: extension-owned `.better-aa-icon` and `data-lucide`; no Automation Anywhere external selector.
+	- Validate: inspect the side panel, full options routes, launcher, TaskBot palette controls, notification close control, and minimized bot window in Chrome and Firefox at normal and 200% zoom; use keyboard focus on icon-only controls.
+	- Expected: icons support visible labels where space permits; icon-only buttons keep an accessible button name and target size; dynamic labels retain their icon; SVG strokes use `currentColor` without filled paths; no remote icon asset or full icon catalog is bundled.
+	- Status: active
+	- Delete condition: the extension visual language no longer uses icons or Lucide is replaced.
+
+- [ ] Full configuration options page
+	- Source: `entrypoints/options/index.html`, `entrypoints/options/main.ts`, `entrypoints/sidepanel/main.ts`, `wxt.config.ts`
+	- Setting/id: browser `options_ui`; routes `#appearance`, `#settings`, `#help`
+	- Selectors: extension-owned IDs only
+	- Validate: open from the browser extension details page and **Open full settings**; inspect all three routes in Chrome and Firefox at 200% zoom and a narrow viewport; change settings in both surfaces.
+	- Expected: one centered 760–840px configuration column reuses the side-panel markup, handlers, and storage wiring; stable routes and Help section anchors open the correct primary tab and subtab; Tools and live Diagnostics are not available; global changes synchronize across open extension surfaces.
+	- Status: active
+	- Delete condition: browser options support is removed.
+
 - [ ] Tools tab
-  - Source: `entrypoints/sidepanel/tools.ts`
-  - Setting/id: `data-panel="tools"`
-  - Selectors: internal sidepanel only
-  - Validate: open sidepanel on unsupported, folder, taskbot, and packages pages.
-  - Expected: availability dot, context text, and tool buttons match page.
+	- Source: `entrypoints/sidepanel/tools.ts`, `src/ts/control-room-targets.ts`
+	- Setting/id: `data-panel="tools"`, `session:selectedControlRoomTarget`
+	- Selectors: internal sidepanel only
+	- Validate: open Tools with signed-in Control Rooms in the current window, including eligible and unsupported pages; repeat with another browser window and unrelated sites; switch active tabs; change route; close and log out of the selected page; use the round Refresh control.
+	- Expected: selectors share one full-width row with extra width for Page and use the 36px secondary-control height; authenticated pages group by hostname; the only authenticated Control Room is selected automatically and, when it has no pinned page, its first eligible page is selected automatically. Selector labels omit a trailing `.my.automationanywhere.digital`, and TaskBot page labels omit `| Edit Task Bot` plus the browser-title suffix, while stored origins and full page titles remain unchanged; only Folder, TaskBot, and Packages pages are selectable. A healthy target stays session-pinned. When no room or supported page is available, every tool remains visible but disabled under a clear target status. Refresh rescans rooms, revalidates login, accepts a selected eligible route change, and can recover a lost target to the current eligible page only when one authenticated room remains.
   - Status: active
   - Delete condition: tools panel replaced.
 
-- [ ] UI tab
+- [ ] Appearance tab
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/settings.ts`
   - Setting/id: `STYLE_FEATURES`, `STYLE_VALUE_FIELDS`
   - Selectors: internal sidepanel only
   - Validate: toggle each UI feature and color/upload control.
   - Expected: content page updates without reload where supported.
   - Status: active
-  - Delete condition: settings move to browser options page.
+	- Delete condition: appearance controls are removed.
 
-- [ ] Settings/About tab
+- [ ] Settings and Help tabs
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/help.ts`
   - Setting/id: language, shortcuts, debug, suggestions, keep alive, supported builds
   - Selectors: internal sidepanel only
-  - Validate: change each setting and reload sidepanel/page; review Supported Builds list and build candidate flow.
-  - Expected: persisted values restore; About help renders current shortcuts; Supported Builds renders here (moved from Health).
+	- Validate: use the four primary ARIA tabs and the Help subtabs with mouse and Left/Right/Home/End; inspect Help at narrow width and 200% zoom; verify `#help-start`, `#help-about`, `#help-commands`, `#help-compatibility`, and `#help-diagnostics`; expand settings groups; search Help; dismiss Start here; change one simple setting and use the eight-second Undo; confirm its checkbox or select stays right-aligned in Firefox; change the same setting in another open extension surface; confirm color and Appearance resets.
+	- Expected: General is the only initially open settings group; primary and Help tabs have roving `tabindex` and linked panels; Help separates Overview, Commands, Compatibility, and Diagnostics, with only the active panel in reading/focus order and a two-column tab grid below 440px; About identifies Jamir, states the confirmed creator mission, shows the current version, and provides accessible 44px GitHub and email icon actions; Saved appears before the changed control without moving its right edge; one latest eligible change is undoable and expires after a same-setting external change; language, uploads, recorder token, and resets have no Undo; reset dialogs name the affected settings.
   - Status: active
   - Delete condition: settings surface replaced.
 
-- [ ] Health tab
+- [ ] Help Diagnostics
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/style-doctor.ts`
   - Setting/id: `RUN_STYLE_DOCTOR_CHECK`
   - Selectors: `AUTOMATION_ANYWHERE_SELECTOR_CHECKS`
   - Validate: switch UI Health, API Health, and Debug Logs sub-tabs; run General, Taskbot Editor, Folder Navigation checks under UI Health.
-  - Expected: three sub-tabs render; rows show feature, selector, source, severity, selector status, count.
+	- Expected: Diagnostics appears only under side-panel Help; UI Health, API Health, and logs render. The options page explains that live diagnostics require the side panel.
   - Status: active
   - Delete condition: external validation moves elsewhere.
 
@@ -170,8 +188,8 @@ Selector source of truth:
   - Assets: `public/sounds/*.mp3`; MP3 avoids Firefox/Linux exposing WAV files as unsupported `audio/vnd.wave` media.
   - Setting/id: `local:soundsEnabled`
   - Selectors: `run-button`, `error-modal`, `error-badge-icon`, `done-modal`, `done-badge-icon`
-  - Validate: on Firefox/Linux, enable Sounds; click Run; complete one bot and trigger one bot error; confirm all tones play without media errors.
-  - Expected: Run starts immediately while its tone plays; done and error tones play once per result.
+  - Validate: on Firefox/Linux, enable Sounds; click Run; complete one bot and trigger one bot error; confirm all tones play without media errors and no navigation timer remains active.
+  - Expected: Run starts immediately while its tone plays; changed modal nodes are inspected without full-document rescans, and done/error tones play once per result.
   - Status: active
   - Delete condition: sound setting removed.
 
@@ -339,7 +357,7 @@ Selector source of truth:
   - Setting/id: `local:universalClipboard`, slot `0`
   - Selectors: `shared-copy-button`, `shared-paste-button`, task editor capability selector
   - Validate: use native AA shared copy on a task editor containing an iframe and a capture action.
-  - Expected: only the top frame polls `globalClipboard`; the newest copy updates the auto slot in extension `storage.local`; `unlimitedStorage` removes its normal quota; available capture resources are stored in the portable envelope.
+  - Expected: only the top frame polls `globalClipboard`, only while on a TaskBot editor route; entry snapshots existing content and route exit clears the 500 ms timer. The newest copy updates the auto slot in extension `storage.local`; `unlimitedStorage` removes its normal quota; available capture resources are stored in the portable envelope.
   - Status: active
   - Delete condition: AA shared clipboard mechanism removed.
 
@@ -420,10 +438,10 @@ Selector source of truth:
 
 - [ ] Variable metadata revalidation
   - Source: `entrypoints/content.ts`
-  - Setting/id: `VARIABLE_METADATA_TTL_MS`
+  - Setting/id: `local:variableMetadataEnabled`; event-invalidated per-file cache
   - Selectors: variable row/label selectors
-  - Validate: toggle input/output without rename; rename a variable; save taskbot JSON via tool; paste actions from clipboard.
-  - Expected: arrows/labels update within ~10s; no duplicated variable names after palette re-render.
+  - Validate: toggle input/output without rename; rename a variable; complete a successful native save; change TaskBot routes; paste actions from clipboard.
+  - Expected: bot content remains cached during ordinary editor mutations, then refreshes after a successful native save, file-id route change, or visible-variable mismatch; no duplicated variable names after palette re-render. The MutationObserver is attached only to the active Variables section.
   - Status: active
   - Delete condition: metadata source becomes push-based/reliable.
 
@@ -447,12 +465,21 @@ Selector source of truth:
 
 ## Tools
 
+- [ ] Background Jobs
+	- Source: `entrypoints/sidepanel/tools.ts`, `src/ts/tool-jobs.ts`, `entrypoints/background.ts`
+	- Setting/id: `session:toolJobHistory`, optional permission `notifications`, `local:backgroundJobNotificationsEnabled` (default `false`)
+	- Selectors: extension-owned Jobs controls only
+	- Validate: run Package Usage and a read-only export; switch browser and extension tabs; request Stop; open Jobs; use Back to Tools; reload the side panel during a fake job; grant, deny, and revoke notifications; select a completion notification.
+	- Expected: the permanent Actions/Jobs selector is absent. Jobs appears only for running or unread work and while its view is open; opening clears unread, and Back hides access when no running/unread job remains. One job runs globally; selectors and other Tools actions lock; sequential jobs stop after the current item and ZIP jobs after the current batch of at most 20; a stopped ZIP is not emitted; partial downloads or tenant writes are reported; latest ten session records retain target, timing, counts, summary, and per-item logs; reload recovers running as interrupted; notification selection opens Tools → Jobs without changing the active browser tab and Firefox opens synchronously from the click handler.
+	- Status: active
+	- Delete condition: all long Tools operations move to a persistent browser-native queue.
+
 - [ ] Tool context detection
-  - Source: `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-api.ts`
-  - Setting/id: `getActiveAutomationAnywhereContext`
+	- Source: `entrypoints/sidepanel/tools.ts`, `src/ts/control-room-targets.ts`, `src/ts/automation-anywhere-api.ts`
+	- Setting/id: `session:selectedControlRoomTarget`, `session:selectedControlRoomOrigin`
   - Selectors: route/url based and task editor capability selector
-  - Validate: non-AA active tab, unsupported AA route, private/public folder, private/public taskbot, packages page, package detail page.
-  - Expected: correct tools appear for page and capabilities; no-tools context names current host when active tab is not an AA tools page.
+	- Validate: authenticated and logged-out AA tabs, unrelated sites, another browser window, unsupported AA route, private/public folder, private/public taskbot, packages page, and package detail page.
+	- Expected: only current-window authenticated AA pages appear; correct tools follow the pinned selected page and capabilities; active-tab changes have no effect.
   - Status: active
   - Delete condition: tools panel removed.
 
@@ -618,10 +645,19 @@ Selector source of truth:
   - Source: `src/ts/control-room-version.ts`, `entrypoints/background.ts`
   - Setting/id: `SUPPORTED_CONTROL_ROOM_TARGETS`, force unsupported toggle
   - Selectors: none
-  - Validate: supported, unsupported, unknown version states.
+  - Validate: supported builds `45946`, `45983`, and `46078`; unsupported and unknown version states.
   - Expected: styles block only when unsupported unless force enabled.
   - Status: active
   - Delete condition: support policy removed.
+
+- [ ] Settings disclosure indicators
+  - Source: `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/style.styl`
+  - Setting/id: none; shared side-panel and options-page presentation
+  - Selectors: `.settings-group > summary`, `.settings-group[open] > summary .better-aa-icon`
+  - Validate: open and close each Settings group and Appearance compatibility override in both extension surfaces.
+  - Expected: a right-facing chevron is visible when collapsed and rotates down with amber emphasis when expanded.
+  - Status: active
+  - Delete condition: native disclosure markers become visually consistent across supported Chrome and Firefox builds.
 
 - [ ] Debug mode
   - Source: `src/ts/debug.ts`, `src/ts/debug-utils.ts`
@@ -642,6 +678,15 @@ Selector source of truth:
   - Delete condition: support workflow changes.
 
 ## Settings And Localization
+
+- [ ] Getting started guidance
+	- Source: `entrypoints/sidepanel/main.ts`, `src/ts/settings.ts`
+	- Setting/id: `local:gettingStartedGuidanceEnabled` (default `true`)
+	- Selectors: extension-owned `help-start`
+	- Validate: dismiss the Start here card, re-enable it in General, and open both configuration surfaces.
+	- Expected: dismissal and the global toggle stay synchronized; Help search remains usable when the card is hidden.
+	- Status: active
+	- Delete condition: onboarding moves to a different surface.
 
 - [ ] Language preference
   - Source: `src/ts/i18n.ts`, `src/ts/settings.ts`

@@ -225,6 +225,18 @@ export async function getActiveAutomationAnywhereContext(): Promise<
 	};
 }
 
+export async function getAutomationAnywhereContextForTab(
+	tabId: number
+): Promise<ActiveAutomationAnywhereContext | null> {
+	try {
+		const tab = await browser.tabs.get(tabId);
+		if (!tab.url) return null;
+		return { tabId, context: parseAutomationAnywherePageContext(tab.url) };
+	} catch {
+		return null;
+	}
+}
+
 export function readAutomationAnywhereAuthTokenFromLocalStorage(): string | null {
 	try {
 		const raw = localStorage.getItem('authToken');

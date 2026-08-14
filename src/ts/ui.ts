@@ -1,6 +1,8 @@
 import * as commands from './commands';
 import { debugWarn } from './debug';
 import { t } from './i18n';
+import { setContentIconButton } from './content-icons';
+import type { BetterAaIconName } from './icons';
 import {
 	ACTIVE_EDITOR_PALETTE_LABEL_SELECTOR,
 	EDITOR_PALETTE_SCROLLER_SELECTOR,
@@ -25,6 +27,12 @@ let pathFinderSlimSidebarEnabled = false;
 let pathFinderExpanderGuardInstalled = false;
 let allowPathFinderExpanderClick = false;
 let customEditorPaletteButtonsHoverRecoveryInstalled = false;
+
+const EDITOR_PALETTE_ICONS: Record<string, BetterAaIconName> = {
+	Variables: 'variable',
+	Actions: 'workflow',
+	Triggers: 'zap',
+};
 
 export function setCustomEditorPaletteButtonsEnabled(enabled: boolean): void {
 	customEditorPaletteButtonsEnabled = enabled;
@@ -170,7 +178,9 @@ export function updateCustomEditorPaletteButtonLabels(): void {
 	document
 		.querySelectorAll<HTMLButtonElement>('#customActionVariableButtons button')
 		.forEach((button) => {
-			if (button.dataset.aaLabel) button.textContent = t(button.dataset.aaLabel);
+			const label = button.dataset.aaLabel;
+			if (!label) return;
+			setContentIconButton(button, EDITOR_PALETTE_ICONS[label], t(label));
 		});
 }
 
@@ -185,7 +195,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	const variableButton = document.createElement('button');
 	variableButton.className = 'customActionVariableButton';
 	variableButton.dataset.aaLabel = 'Variables';
-	variableButton.textContent = t('Variables');
+	setContentIconButton(variableButton, 'variable', t('Variables'));
 	variableButton.onclick = () => {
 		void commands.showVariables();
 		updateActiveButton();
@@ -194,7 +204,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	const actionButton = document.createElement('button');
 	actionButton.className = 'customActionVariableButton';
 	actionButton.dataset.aaLabel = 'Actions';
-	actionButton.textContent = t('Actions');
+	setContentIconButton(actionButton, 'workflow', t('Actions'));
 	actionButton.onclick = () => {
 		void commands.showActions();
 		updateActiveButton();
@@ -203,7 +213,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	const triggerButton = document.createElement('button');
 	triggerButton.className = 'customActionVariableButton';
 	triggerButton.dataset.aaLabel = 'Triggers';
-	triggerButton.textContent = t('Triggers');
+	setContentIconButton(triggerButton, 'zap', t('Triggers'));
 	triggerButton.onclick = () => {
 		commands.showTriggers();
 		updateActiveButton();
@@ -321,8 +331,9 @@ export function showNotification(
 	const closeButton = document.createElement('button');
 	closeButton.type = 'button';
 	closeButton.setAttribute('aria-label', t('Close notification'));
+	closeButton.title = t('Close notification');
 	closeButton.className = 'toast-close';
-	closeButton.textContent = '\u00d7';
+	setContentIconButton(closeButton, 'x');
 	toast.append(content, closeButton);
 	toastWrapper.appendChild(toast);
 

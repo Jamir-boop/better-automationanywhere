@@ -8,6 +8,22 @@
 	color: #000000 !important
 	background: var(--better-aa-accent, #FFB900) !important
 
+.better-aa-icon
+	display: inline-block !important
+	width: 16px !important
+	height: 16px !important
+	flex: 0 0 auto !important
+	vertical-align: -3px !important
+	fill: none !important
+	stroke: currentColor !important
+
+	*
+		fill: none !important
+		stroke: currentColor !important
+
+.better-aa-icon-leading
+	margin-inline-end: 6px !important
+
 #better-aa-open-sidebar-button
 	all: initial
 	box-sizing: border-box
@@ -129,9 +145,9 @@
 			outline: 2px solid #FFB900
 			outline-offset: 2px
 
-		svg,
-		svg *
-			fill: currentColor !important
+		.better-aa-icon,
+		.better-aa-icon *
+			fill: none !important
 			stroke: currentColor !important
 
 html.better-aa-styles-enabled.better-aa-route-taskbot

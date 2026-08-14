@@ -16,6 +16,99 @@ const ES: Record<string, string> = {
 	'Open Better AA Developer Experience sidebar': 'Abrir panel de Better AA Developer Experience',
 	'Better AA': 'Better AA',
 	Tools: 'Herramientas',
+	Appearance: 'Apariencia',
+	Jobs: 'Trabajos',
+	'Diagnostics': 'Diagnosticos',
+	'Open full settings': 'Abrir ajustes completos',
+	'Full settings': 'Ajustes completos',
+	Overview: 'Resumen',
+	Commands: 'Comandos',
+	Compatibility: 'Compatibilidad',
+	'Help sections': 'Secciones de ayuda',
+	'Built by Jamir': 'Creado por Jamir',
+	'I build practical tools that remove friction from Automation Anywhere development, so you can focus on the automation—not the interface.':
+		'Creo herramientas practicas que eliminan friccion del desarrollo en Automation Anywhere, para que puedas enfocarte en la automatizacion, no en la interfaz.',
+	'Contact Jamir': 'Contactar a Jamir',
+	'GitHub profile': 'Perfil de GitHub',
+	'Email Jamir': 'Enviar correo a Jamir',
+	'All Control Rooms': 'Todos los Control Rooms',
+	'Reloads pages': 'Recarga paginas',
+	'Shortcuts and access': 'Atajos y acceso',
+	'Control Room behavior': 'Comportamiento de Control Room',
+	'Integrations': 'Integraciones',
+	'TaskBot editor': 'Editor TaskBot',
+	'Background and loading': 'Fondo y carga',
+	'Background job notifications': 'Notificaciones de trabajos en segundo plano',
+	'Notify when a background job finishes. Optional browser permission.':
+		'Notifica cuando termina un trabajo en segundo plano. Permiso opcional del navegador.',
+	'Show getting started guidance': 'Mostrar guia de inicio',
+	'Start here': 'Empieza aqui',
+	'Dismiss': 'Descartar',
+	'Search help': 'Buscar ayuda',
+	'Supported builds': 'Versiones compatibles',
+	'Live diagnostics require the side panel.': 'Los diagnosticos en vivo requieren el panel lateral.',
+	'Live diagnostics inspect Control Room state and never modify it.':
+		'Los diagnosticos en vivo revisan el estado de Control Room y nunca lo modifican.',
+	'Live compatibility requires the side panel.': 'La compatibilidad en vivo requiere el panel lateral.',
+	'Saved': 'Guardado',
+	'Undo': 'Deshacer',
+	'Setting saved.': 'Ajuste guardado.',
+	'Control Room target': 'Destino de Control Room',
+	'Target page': 'Pagina de destino',
+	'Available tools': 'Herramientas disponibles',
+	'Not connected': 'Sin conexion',
+	'Ready': 'Listo',
+	'Checking connections...': 'Revisando conexiones...',
+	'Disconnected': 'Desconectado',
+	'Refresh required': 'Se requiere actualizar',
+	'No signed-in Control Room': 'No hay Control Room con sesion',
+	'Select a supported page': 'Selecciona una pagina compatible',
+	'Connection failed': 'Fallo la conexion',
+	'Page': 'Pagina',
+	'Select a Control Room': 'Selecciona un Control Room',
+	'Select a page': 'Selecciona una pagina',
+	'Refresh Control Rooms and page': 'Actualizar Control Rooms y pagina',
+	'Unsupported page': 'Pagina no compatible',
+	'The selected page stays pinned when you switch browser tabs.':
+		'La pagina seleccionada permanece fija cuando cambias de pestana.',
+	'Jobs continue while you use other tabs or extension views. Closing this side panel interrupts them.':
+		'Los trabajos continuan al usar otras pestanas o vistas. Cerrar el panel lateral los interrumpe.',
+	'Clear completed': 'Limpiar completados',
+	'Back to Tools': 'Volver a Herramientas',
+	'Stop after current item': 'Detener despues del elemento actual',
+	'Stopping after current item...': 'Deteniendo despues del elemento actual...',
+	'No jobs yet.': 'No hay trabajos.',
+	'In progress': 'En progreso',
+	'Details': 'Detalles',
+	'Checking signed-in Control Rooms in this window...':
+		'Revisando Control Rooms con sesion iniciada en esta ventana...',
+	'Select a signed-in Control Room and page.': 'Selecciona un Control Room con sesion y una pagina.',
+	'No signed-in Control Rooms found in this window. Open one, then select Refresh.':
+		'No se encontraron Control Rooms con sesion en esta ventana. Abre uno y selecciona Actualizar.',
+	'No supported page is open in this Control Room.':
+		'No hay una pagina compatible abierta en este Control Room.',
+	'The selected page changed. Select Refresh to continue.':
+		'La pagina seleccionada cambio. Selecciona Actualizar para continuar.',
+	'The selected page is disconnected. Select Refresh to reconnect or choose another page.':
+		'La pagina seleccionada esta desconectada. Selecciona Actualizar para reconectar o elige otra pagina.',
+	'Select a connected Control Room page first.': 'Selecciona primero una pagina de Control Room conectada.',
+	'Notification permission was denied. Enable it in the extension permissions and try again.':
+		'El permiso de notificaciones fue denegado. Activalo en los permisos de la extension e intenta de nuevo.',
+	'Notification permission was removed. Background job notifications are off.':
+		'El permiso de notificaciones fue eliminado. Las notificaciones de trabajos estan desactivadas.',
+	'Reset the background and loading gradient colors?': 'Restablecer los colores del fondo y del gradiente de carga?',
+	'Restore all Appearance settings to their defaults?': 'Restaurar todos los ajustes de Apariencia?',
+	'Compatibility override': 'Anulacion de compatibilidad',
+	'Commands and tasks': 'Comandos y tareas',
+	'Commands and shortcuts': 'Comandos y atajos',
+	'Move and share actions': 'Mover y compartir acciones',
+	'The selected page is logged out. Sign in, then select Refresh.':
+		'La pagina seleccionada cerro sesion. Inicia sesion y selecciona Actualizar.',
+	'Customize the interface in Appearance, review global behavior in Settings, and use the side panel for Tools and live Diagnostics.':
+		'Personaliza la interfaz en Apariencia, revisa el comportamiento global en Ajustes y usa el panel lateral para Herramientas y Diagnosticos en vivo.',
+	'Scanning package usage...': 'Buscando uso de paquetes...',
+	'Stopped after the current item. Completed work remains and is listed in the job log.':
+		'Se detuvo despues del elemento actual. El trabajo completado permanece en el registro.',
 	'UI Improvements': 'Mejoras UI',
 	Settings: 'Ajustes',
 	'Extension Settings': 'Ajustes de extension',
@@ -427,12 +520,8 @@ const ES: Record<string, string> = {
 	'Import queued': 'Importacion en cola',
 	'JSON accepted. Pasting action now.':
 		'JSON aceptado. Pegando accion ahora.',
-	'Tools unavailable': 'Herramientas no disponibles',
 	'Tools available on current page': 'Herramientas disponibles en la pagina actual',
 	'No tools available on current page': 'No hay herramientas disponibles en la pagina actual',
-	'Green = tools available. Red = no tools here.':
-		'Verde = herramientas disponibles. Rojo = no hay herramientas aqui.',
-	'Refresh tools': 'Actualizar herramientas',
 	'Detect tools for current AA page.':
 		'Detecta herramientas para la pagina actual de AA.',
 	'Open Automation Anywhere folder, taskbot, or packages page.':
@@ -441,15 +530,6 @@ const ES: Record<string, string> = {
 		'Abre una carpeta, taskbot o pagina de Paquetes de Automation Anywhere.',
 	'Open an Automation Anywhere folder, taskbot, or Packages page, then refresh.':
 		'Abre una carpeta, taskbot o pagina de Paquetes de Automation Anywhere y actualiza.',
-	'Tools appear when the active tab is on a supported Automation Anywhere page.':
-		'Las herramientas aparecen cuando la pestana activa esta en una pagina compatible de Automation Anywhere.',
-	'Taskbot editor': 'Editor de taskbot',
-	'Folder view': 'Vista de carpeta',
-	'Packages page': 'Pagina de paquetes',
-	'Universal Clipboard, Taskbot JSON, Update Packages, Export Bots/Files':
-		'Portapapeles universal, JSON de taskbot, Actualizar paquetes, Exportar bots/archivos',
-	'Copy Files, Update Packages, Export Bots/Files, Import Taskbot':
-		'Copiar archivos, Actualizar paquetes, Exportar bots/archivos, Importar taskbot',
 	'Import Taskbot': 'Importar Taskbot',
 	'Create a new taskbot in this folder from a JSON file.':
 		'Crea un nuevo taskbot en esta carpeta desde un archivo JSON.',

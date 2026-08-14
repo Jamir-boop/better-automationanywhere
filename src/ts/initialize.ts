@@ -19,6 +19,7 @@ import { toggleToolbar } from './utils';
 import * as ui from './ui';
 
 let initialized = false;
+let uiSyncScheduled = false;
 let forceEnglishLocaleEnabled = true;
 let pathFinderSlimSidebarEnabled = false;
 
@@ -99,6 +100,7 @@ function showTaskbotLinkClickBlockedToast(): void {
 }
 
 function handleTaskbotNodeLinkClick(e: MouseEvent): void {
+	refreshUi();
 	if (!activeBlockTaskbotNodeLabelClicks) return;
 	const target = e.target as HTMLElement | null;
 	const nodeLink = target?.closest?.(TASKBOT_NODE_LINK_SELECTOR);
@@ -120,6 +122,7 @@ function handleCommandPaletteOutsideMouseDown(e: MouseEvent): void {
 }
 
 function handleGlobalKeyDown(e: KeyboardEvent): void {
+	refreshUi();
 	if (e.key === 'Escape' && palette.isCommandPaletteVisible()) {
 		palette.closeCommandPalette();
 		e.preventDefault();
@@ -208,6 +211,15 @@ function injectUi(): void {
 	refreshSounds();
 }
 
+export function refreshUi(): void {
+	if (!initialized || uiSyncScheduled) return;
+	uiSyncScheduled = true;
+	requestAnimationFrame(() => {
+		uiSyncScheduled = false;
+		injectUi();
+	});
+}
+
 function initialize(): void {
 	injectUi();
 
@@ -219,30 +231,10 @@ function initialize(): void {
 		document.addEventListener('mousedown', handleCommandPaletteOutsideMouseDown);
 		document.addEventListener('keydown', handleGlobalKeyDown);
 		registerMouseClickSuggestions(() => getCommandPaletteShortcutLabel(activeCommandPaletteShortcut));
-		setInterval(ui.updateActiveButton, 1000);
 		initialized = true;
-
-		let lastHref = document.location.href;
-		setInterval(() => {
-			const currentHref = document.location.href;
-			if (lastHref !== currentHref) {
-				lastHref = currentHref;
-				injectUi();
-			}
-		}, 5000);
 	}
 }
 
-export function callInitializeRepeatedly(times = 3, interval = 5000): void {
-	if (times <= 0) return;
+export function initializeUi(): void {
 	initialize();
-	let count = 1;
-	if (count >= times) return;
-	const intervalId = setInterval(() => {
-		initialize();
-		count++;
-		if (count >= times) {
-			clearInterval(intervalId);
-		}
-	}, interval);
 }

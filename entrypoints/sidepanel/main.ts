@@ -6,9 +6,12 @@ import {
 	type JsonWorkbench,
 } from './json-workbench';
 import {
+	getSelectedToolsTargetTabId,
 	initializeToolsPanel,
+	markToolsTargetDisconnected,
+	markToolsTargetRouteChanged,
+	openToolsJobs,
 	renderToolsPanel,
-	scheduleToolsContextRefresh,
 } from './tools';
 import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
 import {
@@ -64,6 +67,7 @@ import {
 	BOT_EXECUTION_MODAL_POSITION_OPTIONS,
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
 	DEFAULT_BOT_EXECUTION_MODAL_POSITION,
+	DEFAULT_BACKGROUND_JOB_NOTIFICATIONS_ENABLED,
 	DEFAULT_BROWSER_CONTEXT_MENU_ENABLED,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_DEBUG_ENABLED,
@@ -77,11 +81,13 @@ import {
 	DEFAULT_SOUNDS_ENABLED,
 	DEFAULT_SHOW_SUGGESTIONS,
 	DEFAULT_STYLES_ENABLED,
+	DEFAULT_GETTING_STARTED_GUIDANCE_ENABLED,
 	EXTENSION_LANGUAGE_OPTIONS,
 	OPEN_SIDEBAR_SHORTCUT_OPTIONS,
 	STYLE_FEATURES,
 	STYLE_VALUE_FIELDS,
 	botExecutionModalPosition,
+	backgroundJobNotificationsEnabled,
 	blockTaskbotNodeLabelClicks,
 	browserContextMenuEnabled,
 	chunkedClipboardPasteEnabled,
@@ -93,6 +99,7 @@ import {
 	forceUnsupportedControlRoomStyles,
 	getBlockTaskbotNodeLabelClicks,
 	getBotExecutionModalPosition,
+	getBackgroundJobNotificationsEnabled,
 	getBrowserContextMenuEnabled,
 	getCommandPaletteEnabled,
 	getChunkedClipboardPasteEnabled,
@@ -111,6 +118,7 @@ import {
 	getStyleFeatureValues,
 	getStyleValues,
 	getStylesEnabled,
+	getGettingStartedGuidanceEnabled,
 	normalizeBotExecutionModalPosition,
 	normalizeExtensionLanguage,
 	normalizeOpenSidebarShortcut,
@@ -122,6 +130,7 @@ import {
 	styleFeatureItems,
 	styleValueItems,
 	stylesEnabled,
+	gettingStartedGuidanceEnabled,
 	styleDoctorLastResults,
 	apiHealthLastResults,
 	packageUpdateToastEnabled,
@@ -169,9 +178,19 @@ import {
 	type FeedbackSeverity,
 } from '@/src/ts/debug';
 import { replaceChildrenFromHtml } from '@/src/ts/utils';
+import {
+	icon,
+	type BetterAaIconName,
+} from '@/src/ts/icons';
+import {
+	renderLucideIcons,
+	setSidepanelIconButtonContent,
+	setSidepanelIconContent,
+} from './icons';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root.');
+const isOptionsSurface = document.documentElement.dataset.surface === 'options';
 
 void (async () => {
 setActiveLanguagePreference(
@@ -205,12 +224,12 @@ const STYLE_FEATURE_GROUPS = [
 		],
 	},
 	{
-		title: 'Folder navigation',
-		keys: ['makeSidebarScrollable', 'adjustFolderColumnsWidth'],
+		title: 'Navigation',
+		keys: ['makeSidebarScrollable', 'adjustFolderColumnsWidth', 'pathFinder'],
 	},
 	{
-		title: 'General',
-		keys: ['pathFinder', 'bgStyle', 'loadingCat'],
+		title: 'Background and loading',
+		keys: ['bgStyle', 'loadingCat'],
 	},
 ] as const satisfies ReadonlyArray<{
 	title: string;
@@ -231,16 +250,20 @@ function renderClipboardSlotRow(slot: number): string {
 		<div class="slot-row is-empty" data-slot-row="${slot}" role="button" tabindex="0" aria-label="${t('Load {label}', { label })}">
 			<span class="slot-label">${label}</span>
 			<span class="slot-state" data-slot-state="${slot}">${t('Empty')}</span>
-			<button type="button" data-copy-slot="${slot}" title="${t('Save current AA clipboard to this slot.')}">${t('Copy')}</button>
-			<button type="button" data-paste-slot="${slot}" title="${t('Paste this slot through AA shared paste.')}">${t('Paste')}</button>
+			<button type="button" data-copy-slot="${slot}" title="${t('Save current AA clipboard to this slot.')}">${icon('clipboard-copy')}${t('Copy')}</button>
+			<button type="button" data-paste-slot="${slot}" title="${t('Paste this slot through AA shared paste.')}">${icon('clipboard-paste')}${t('Paste')}</button>
 		</div>
 	`;
 }
 
 function renderToolsConfigSection(): string {
 	return `
-		<section class="panel-section">
-			<h2>${t('Extension Settings')}</h2>
+		<section class="panel-section settings-intro">
+			<h2>${t('Settings')}</h2>
+			<p class="inline-hint">${t('Settings apply to all Control Rooms.')}</p>
+			<details class="settings-group" id="settings-general" open>
+				<summary>${t('General')}${icon('chevron-right', false)}</summary>
+				<div class="settings-group-content">
 			<label class="select-row">
 				<span>
 					<strong>${t('Extension language')}</strong>
@@ -250,6 +273,32 @@ function renderToolsConfigSection(): string {
 					${EXTENSION_LANGUAGE_OPTIONS.map((option) => `<option value="${option.value}">${t(option.label)}</option>`).join('')}
 				</select>
 			</label>
+			<label class="setting-row">
+				<span><strong>${t('Sounds')}</strong><small>${t('Run, error, and done tones')}</small></span>
+				<input id="soundsEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span><strong>${t('Show suggestions')}</strong><small>${t('Short mouse-click tips for common shortcuts')}</small></span>
+				<input id="showSuggestions" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span><strong>${t('Notify outdated packages')}</strong><small>${t('Shows a toast when an open taskbot has package updates available.')}</small></span>
+				<input id="packageUpdateToastEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span><strong>${t('Background job notifications')}</strong><small>${t('Show a browser notification when a Tools job finishes.')}</small></span>
+				<input id="backgroundJobNotificationsEnabled" type="checkbox">
+			</label>
+			<label class="setting-row">
+				<span><strong>${t('Show getting started guidance')}</strong><small>${t('Show the dismissible Start here card in Help.')}</small></span>
+				<input id="gettingStartedGuidanceEnabled" type="checkbox">
+			</label>
+				</div>
+			</details>
+
+			<details class="settings-group" id="settings-shortcuts">
+				<summary>${t('Shortcuts and access')}${icon('chevron-right', false)}</summary>
+				<div class="settings-group-content">
 			<label class="select-row">
 				<span>
 					<strong>${t('Command palette')}</strong>
@@ -277,32 +326,21 @@ function renderToolsConfigSection(): string {
 				</select>
 			</label>
 			<label class="setting-row">
-				<span>
-					<strong>${t('Sounds')}</strong>
-					<small>${t('Run, error, and done tones')}</small>
-				</span>
-				<input id="soundsEnabled" type="checkbox">
+				<span><strong>${t('Browser context menu')}</strong><small>${t('Shows Open Sidebar and Universal Clipboard commands in the browser right-click menu.')}</small></span>
+				<input id="browserContextMenuEnabled" type="checkbox">
 			</label>
-			<label class="setting-row">
-				<span>
-					<strong>${t('Notify outdated packages')}</strong>
-					<small>${t('Shows a toast when an open taskbot has package updates available.')}</small>
-				</span>
-				<input id="packageUpdateToastEnabled" type="checkbox">
-			</label>
+				</div>
+			</details>
+
+			<details class="settings-group" id="settings-control-room">
+				<summary>${t('Control Room behavior')}${icon('chevron-right', false)}</summary>
+				<div class="settings-group-content">
 			<label class="setting-row">
 				<span>
 					<strong>${t('Warn about non-closing message boxes')}</strong>
 					<small>${t('Checks saved TaskBots for message boxes without a definite positive timeout.')}</small>
 				</span>
 				<input id="nonClosingMessageBoxWarningEnabled" type="checkbox">
-			</label>
-			<label class="setting-row">
-				<span>
-					<strong>${t('Browser context menu')}</strong>
-					<small>${t('Shows Open Sidebar and Universal Clipboard commands in the browser right-click menu.')}</small>
-				</span>
-				<input id="browserContextMenuEnabled" type="checkbox">
 			</label>
 			<label class="setting-row">
 				<span>
@@ -313,15 +351,9 @@ function renderToolsConfigSection(): string {
 			</label>
 			<label class="setting-row">
 				<span>
-					<strong>${t('Show suggestions')}</strong>
-					<small>${t('Short mouse-click tips for common shortcuts')}</small>
-				</span>
-				<input id="showSuggestions" type="checkbox">
-			</label>
-			<label class="setting-row">
-				<span>
 					<strong>${t('Keep Automation Anywhere session alive')}</strong>
 					<small>${t('Sends periodic in-page activity to reduce idle logout.')}</small>
+					<em class="impact-label">${t('All Control Rooms')}</em>
 				</span>
 				<input id="keepAliveEnabled" type="checkbox">
 			</label>
@@ -329,9 +361,20 @@ function renderToolsConfigSection(): string {
 				<span>
 					<strong>${t('Force Automation Anywhere English')}</strong>
 					<small>${t('Set Automation Anywhere locale to en-US and reload when needed. Does not change this extension language.')}</small>
+					<em class="impact-label">${t('All Control Rooms')} · ${t('Reloads pages')}</em>
 				</span>
 				<input id="forceEnglishLocale" type="checkbox">
 			</label>
+			<label class="setting-row">
+				<span><strong>${t('Block taskbot link clicks')}</strong><small>${t('Prevent left-click navigation on taskbot node links; middle-click still works.')}</small></span>
+				<input id="blockTaskbotNodeLabelClicks" type="checkbox">
+			</label>
+				</div>
+			</details>
+
+			<details class="settings-group" id="settings-integrations">
+				<summary>${t('Integrations')}${icon('chevron-right', false)}</summary>
+				<div class="settings-group-content">
 			<label class="setting-row"${import.meta.env.CHROME ? '' : ' hidden'}>
 				<span>
 					<strong>Better Recorder bridge</strong>
@@ -347,6 +390,8 @@ function renderToolsConfigSection(): string {
 				<span><strong>Recorder token</strong><small>Shared only with localhost.</small></span>
 				<input id="recorderBridgeToken" type="password" autocomplete="off">
 			</label>
+				</div>
+			</details>
 		</section>
 	`;
 }
@@ -364,19 +409,13 @@ function renderUniversalClipboardSection(): string {
 		<div class="json-field">
 			<textarea id="actionJson" class="json-area" spellcheck="false" placeholder="${t('Universal copy loads selected action JSON here. Paste JSON here to import.')}"></textarea>
 			<button id="clearJson" class="clear-json-button" type="button" aria-label="${t('Clear JSON')}" title="${t('Clear JSON')}" hidden>
-				<svg aria-hidden="true" viewBox="0 0 24 24">
-					<path d="M3 6h18"></path>
-					<path d="M8 6V4h8v2"></path>
-					<path d="M6 6l1 15h10l1-15"></path>
-					<path d="M10 11v6"></path>
-					<path d="M14 11v6"></path>
-				</svg>
+				${icon('trash-2', false)}
 			</button>
 		</div>
 		<p id="actionJsonError" class="json-inline-error" hidden></p>
 		<div id="actionPackageList" class="action-package-list" hidden></div>
 		<div class="button-grid">
-			<button id="importJson" type="button">${t('Import JSON')}</button>
+			<button id="importJson" type="button">${icon('file-up')}${t('Import JSON')}</button>
 			${renderJsonWorkbenchActionButtons('actionJson')}
 		</div>
 	`;
@@ -408,7 +447,7 @@ function renderStyleFeatureControl(feature: (typeof STYLE_FEATURES)[number]): st
 	`;
 }
 
-function renderBlockTaskbotNodeLabelClicksControl(): string {
+function renderVariableMetadataControl(): string {
 	return `
 		<label class="setting-row">
 			<span>
@@ -417,21 +456,19 @@ function renderBlockTaskbotNodeLabelClicksControl(): string {
 			</span>
 			<input id="variableMetadataEnabled" type="checkbox">
 		</label>
-		<label class="setting-row">
-			<span>
-				<strong>${t('Block taskbot link clicks')}</strong>
-				<small>${t('Prevent left-click navigation on taskbot node links; middle-click still works.')}</small>
-			</span>
-			<input id="blockTaskbotNodeLabelClicks" type="checkbox">
-		</label>
 	`;
 }
 
 function renderStyleFeatureControls(): string {
 	return STYLE_FEATURE_GROUPS.map((group) => {
+		const groupId = group.title === 'Taskbot Editor'
+			? 'appearance-taskbot-editor'
+			: group.title === 'Navigation'
+				? 'appearance-navigation'
+				: 'appearance-background-loading';
 		const extraControls =
 			group.title === 'Taskbot Editor'
-				? renderBlockTaskbotNodeLabelClicksControl()
+				? renderVariableMetadataControl()
 				: '';
 		const controls = group.keys
 			.map((key) => STYLE_FEATURES.find((feature) => feature.key === key))
@@ -439,7 +476,7 @@ function renderStyleFeatureControls(): string {
 			.map(renderStyleFeatureControl)
 			.join('');
 		return `
-			<div class="style-feature-group">
+			<div id="${groupId}" class="style-feature-group">
 				<h3>${t(group.title)}</h3>
 				${extraControls}
 				${controls}
@@ -450,13 +487,15 @@ function renderStyleFeatureControls(): string {
 
 function renderControlRoomCompatibilitySection(): string {
 	return `
-		<div class="control-room-status">
+		<details id="appearance-compatibility" class="settings-group control-room-status">
+			<summary>${t('Compatibility override')}${icon('chevron-right', false)}</summary>
+			<div class="settings-group-content">
 			<div class="control-room-head">
 				<span>
 					<strong>${t('Control Room')}</strong>
 					<small id="controlRoomVersionState">${t('Checking version...')}</small>
 				</span>
-				<button id="refreshControlRoomVersion" type="button">${t('Refresh')}</button>
+				<button id="refreshControlRoomVersion" type="button">${icon('refresh-cw')}${t('Refresh')}</button>
 			</div>
 			<div id="controlRoomVersionMeta" class="control-room-meta"></div>
 			<p id="controlRoomVersionAlert" class="control-room-alert" hidden></p>
@@ -467,7 +506,8 @@ function renderControlRoomCompatibilitySection(): string {
 				</span>
 				<input id="forceUnsupportedControlRoomStyles" type="checkbox">
 			</label>
-		</div>
+			</div>
+		</details>
 	`;
 }
 
@@ -496,7 +536,7 @@ function renderStyleValueControl(field: (typeof STYLE_VALUE_FIELDS)[number]): st
 				<input id="styleValue-${field.key}" type="hidden">
 				<div class="upload-row">
 					<input id="backgroundUpload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif">
-					<button id="clearBackgroundUpload" type="button">${t('Use default')}</button>
+					<button id="clearBackgroundUpload" type="button">${icon('rotate-ccw')}${t('Use default')}</button>
 				</div>
 				<div id="backgroundPreview" class="background-preview" aria-label="${t('Loading animation preview')}"></div>
 			</div>
@@ -559,37 +599,39 @@ replaceChildrenFromHtml(app, `
 		</div>
 		<div class="header-controls">
 			<span class="version-chip">${extensionVersion}</span>
-			<label class="debug-toggle">
-				<span>${t('Debug Mode')}</span>
-				<input id="debugEnabled" type="checkbox">
-			</label>
+			${isOptionsSurface ? '' : `<button id="openFullSettings" type="button">${icon('external-link')}${t('Open full settings')}</button>`}
 		</div>
 	</header>
 
 	<p id="status" role="status"></p>
+	<div id="undoNotice" class="undo-notice" role="status" hidden>
+		<span>${t('Setting saved.')}</span>
+		<button id="undoSetting" type="button">${icon('undo-2')}${t('Undo')}</button>
+	</div>
 
 	<nav class="tab-list" role="tablist" aria-label="${t('Sidebar sections')}">
-		<button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab="tools">${t('Tools')}</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="userstyle">${t('UI')}</button>
-		<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="settings">${t('Settings')}</button>
-		<button class="tab-button tab-button-health" type="button" role="tab" aria-selected="false" data-tab="doctor" aria-label="${t('Health')}" title="${t('Health')}" hidden>ℹ</button>
+		${isOptionsSurface ? '' : `<button id="tab-tools" class="tab-button is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-tools" tabindex="0" data-tab="tools">${icon('toolbox')}${t('Tools')} <span id="jobsTabBadge" class="nav-badge" hidden></span></button>`}
+		<button id="tab-appearance" class="tab-button${isOptionsSurface ? ' is-active' : ''}" type="button" role="tab" aria-selected="${String(isOptionsSurface)}" aria-controls="panel-appearance" tabindex="${isOptionsSurface ? '0' : '-1'}" data-tab="appearance">${icon('palette')}${t('Appearance')}</button>
+		<button id="tab-settings" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1" data-tab="settings">${icon('settings')}${t('Settings')}</button>
+		<button id="tab-help" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-help" tabindex="-1" data-tab="help">${icon('circle-help')}${t('Help')}</button>
 	</nav>
 
 	<main>
 		${renderToolsPanel({
 			universalClipboardHtml: renderUniversalClipboardSection(),
+			hidden: isOptionsSurface,
 		})}
 
-		<section class="tab-panel" role="tabpanel" data-panel="userstyle" hidden>
+		<section id="panel-appearance" class="tab-panel${isOptionsSurface ? ' is-active' : ''}" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0" data-panel="appearance"${isOptionsSurface ? '' : ' hidden'}>
 			<section class="panel-section">
 				<div class="section-heading-row">
-					<h2>${t('UI Improvements')}</h2>
-					<button id="restoreUserstyleDefaults" type="button" hidden>${t('Restore to Default')}</button>
+					<h2>${t('Appearance')}</h2>
+					<button id="restoreUserstyleDefaults" type="button" hidden>${icon('rotate-ccw')}${t('Restore to Default')}</button>
 				</div>
 				${renderControlRoomCompatibilitySection()}
 				<label class="setting-row">
 					<span>
-						<strong>${t('Injected styles')}</strong>
+						<strong>${t('UI Improvements')}</strong>
 						<small>${t('Enable all custom style rules')}</small>
 					</span>
 					<input id="stylesEnabled" type="checkbox">
@@ -597,53 +639,89 @@ replaceChildrenFromHtml(app, `
 				${renderStyleFeatureControls()}
 			</section>
 
-			<section class="panel-section">
+			<section id="appearance-loading" class="panel-section">
 				<h2>${t('Loading Animation')}</h2>
 				${renderLoadingAnimationControls()}
 			</section>
 
-			<section class="panel-section">
+			<section id="appearance-background" class="panel-section">
 				<div class="section-heading-row">
 					<h2>${t('Background Customization')}</h2>
-					<button id="resetGradientColors" type="button">${t('Reset Colors')}</button>
+					<button id="resetGradientColors" type="button">${icon('rotate-ccw')}${t('Reset Colors')}</button>
 				</div>
 				${renderBackgroundColorControls()}
 			</section>
 		</section>
 
-		<section class="tab-panel" role="tabpanel" data-panel="settings" hidden>
+		<section id="panel-settings" class="tab-panel" role="tabpanel" aria-labelledby="tab-settings" tabindex="0" data-panel="settings" hidden>
 			${renderToolsConfigSection()}
-			<section class="panel-section">
-				<div class="section-heading-row">
-					<h2>${t('Supported Builds')}</h2>
-				</div>
-				<div id="supportedBuildsList" class="supported-builds-list"></div>
-				<div id="buildCandidate" class="build-candidate" hidden>
-					<p id="buildCandidateMessage" class="inline-hint"></p>
-					<pre id="buildCandidateSnippet" class="build-candidate-snippet"></pre>
-					<button id="copyBuildCandidate" type="button">${t('Copy candidate')}</button>
-				</div>
-			</section>
-			<section class="panel-section info-panel">
-				<h2>${t('About')}</h2>
-				<div class="info-row">
-					<span>${t('Version')}</span>
-					<strong>${extensionVersion}</strong>
-				</div>
-				<div id="aboutHelp" class="help-content"></div>
-				<a class="github-link" href="https://github.com/Jamir-boop/better-automationanywhere" target="_blank" rel="noreferrer" aria-label="${t('GitHub repository')}" title="${t('GitHub repository')}">
-					<svg aria-hidden="true" viewBox="0 0 24 24">
-						<path d="M12 .5C5.65.5.75 5.65.75 12.02c0 5.1 3.29 9.42 7.86 10.94.58.1.79-.25.79-.56v-2.14c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18.92-.26 1.91-.38 2.9-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.56A11.54 11.54 0 0 0 23.25 12C23.25 5.65 18.35.5 12 .5Z"></path>
-					</svg>
-				</a>
-			</section>
 		</section>
 
-		<section class="tab-panel doctor-panel" role="tabpanel" data-panel="doctor" hidden>
+		<section id="panel-help" class="tab-panel" role="tabpanel" aria-labelledby="tab-help" tabindex="0" data-panel="help" hidden>
+			<div class="help-subtabs" role="tablist" aria-label="${t('Help sections')}">
+				<button id="help-tab-overview" class="help-subtab is-active" type="button" role="tab" aria-selected="true" aria-controls="help-panel-overview" tabindex="0" data-help-section="overview">${icon('circle-help')}${t('Overview')}</button>
+				<button id="help-tab-commands" class="help-subtab" type="button" role="tab" aria-selected="false" aria-controls="help-panel-commands" tabindex="-1" data-help-section="commands">${icon('terminal')}${t('Commands')}</button>
+				<button id="help-tab-compatibility" class="help-subtab" type="button" role="tab" aria-selected="false" aria-controls="help-panel-compatibility" tabindex="-1" data-help-section="compatibility">${icon('package-check')}${t('Compatibility')}</button>
+				<button id="help-tab-diagnostics" class="help-subtab" type="button" role="tab" aria-selected="false" aria-controls="help-panel-diagnostics" tabindex="-1" data-help-section="diagnostics">${icon('stethoscope')}${t('Diagnostics')}</button>
+			</div>
+
+			<div id="help-panel-overview" class="help-subpanel" role="tabpanel" aria-labelledby="help-tab-overview" tabindex="0" data-help-subpanel="overview">
+				<section id="help-start" class="panel-section getting-started-card">
+					<div class="section-heading-row"><h2>${t('Start here')}</h2><button id="dismissGettingStarted" type="button">${icon('x')}${t('Dismiss')}</button></div>
+					<p>${isOptionsSurface
+						? t('Customize the interface in Appearance, review global behavior in Settings, and use the side panel for Tools and live Diagnostics.')
+						: t('Choose a Control Room in Tools, customize the interface in Appearance, and review global behavior in Settings.')}</p>
+				</section>
+				<section id="help-about" class="panel-section creator-panel">
+					<div class="creator-heading-row">
+						<h2>${t('About')}</h2>
+						<span class="version-chip" title="${t('Version')}">${extensionVersion}</span>
+					</div>
+					<div class="creator-signature">
+						<strong>${t('Built by Jamir')}</strong>
+						<span>@Jamir-boop</span>
+					</div>
+					<p class="creator-mission">${t('I build practical tools that remove friction from Automation Anywhere development, so you can focus on the automation—not the interface.')}</p>
+					<nav class="creator-contact-list" aria-label="${t('Contact Jamir')}">
+						<a class="creator-contact" href="https://github.com/Jamir-boop" target="_blank" rel="noreferrer" aria-label="${t('GitHub profile')}" title="${t('GitHub profile')}">${icon('git-fork', false)}</a>
+						<a class="creator-contact" href="mailto:jeiser_vargas@outlook.com" aria-label="${t('Email Jamir')}" title="${t('Email Jamir')}">${icon('mail', false)}</a>
+					</nav>
+				</section>
+			</div>
+
+			<div id="help-panel-commands" class="help-subpanel" role="tabpanel" aria-labelledby="help-tab-commands" tabindex="0" data-help-subpanel="commands" hidden>
+				<section id="help-commands" class="panel-section help-search-section">
+					<h2>${t('Help')}</h2>
+					<input id="helpSearch" type="search" placeholder="${t('Search help')}" aria-label="${t('Search help')}">
+					<div id="aboutHelp" class="help-content"></div>
+				</section>
+			</div>
+
+			<div id="help-panel-compatibility" class="help-subpanel" role="tabpanel" aria-labelledby="help-tab-compatibility" tabindex="0" data-help-subpanel="compatibility" hidden>
+				<section id="help-compatibility" class="panel-section">
+					<div class="section-heading-row">
+						<h2>${t('Supported Builds')}</h2>
+					</div>
+					<div id="supportedBuildsList" class="supported-builds-list"></div>
+					<div id="buildCandidate" class="build-candidate" hidden>
+						<p id="buildCandidateMessage" class="inline-hint"></p>
+						<pre id="buildCandidateSnippet" class="build-candidate-snippet"></pre>
+						<button id="copyBuildCandidate" type="button">${icon('copy')}${t('Copy candidate')}</button>
+					</div>
+				</section>
+			</div>
+
+			<div id="help-panel-diagnostics" class="help-subpanel" role="tabpanel" aria-labelledby="help-tab-diagnostics" tabindex="0" data-help-subpanel="diagnostics" hidden>
+				<section id="help-diagnostics" class="panel-section diagnostics-heading">
+					<div class="section-heading-row"><h2>${t('Diagnostics')}</h2><label class="debug-toggle"><span>${t('Debug Mode')}</span><input id="debugEnabled" type="checkbox"></label></div>
+					<p class="inline-hint">${isOptionsSurface ? t('Open the side panel to run live Control Room diagnostics.') : t('Live diagnostics inspect Control Room state and never modify it.')}</p>
+				</section>
+
+		<div id="diagnosticsContent" class="doctor-panel"${isOptionsSurface ? ' hidden' : ''}>
 			<div class="health-subtabs" role="tablist" aria-label="${t('Health sections')}">
-				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="health">${t('UI Health')}</button>
-				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="api">${t('API Health')}</button>
-				<button class="health-subtab is-active" type="button" role="tab" aria-selected="true" data-health-section="logs">${t('Debug Logs')}</button>
+				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="health">${icon('stethoscope')}${t('UI Health')}</button>
+				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="api">${icon('activity')}${t('API Health')}</button>
+				<button class="health-subtab is-active" type="button" role="tab" aria-selected="true" data-health-section="logs">${icon('scroll-text')}${t('Debug Logs')}</button>
 			</div>
 
 			<div class="health-subpanel" data-health-subpanel="health" hidden aria-hidden="true">
@@ -656,7 +734,7 @@ replaceChildrenFromHtml(app, `
 					</div>
 					<div id="doctorChecklist" class="doctor-checklist"></div>
 					<div class="doctor-actions">
-						<button id="runDoctorView" type="button">${t('Run Checks')}</button>
+						<button id="runDoctorView" type="button">${icon('play')}${t('Run Checks')}</button>
 						<span id="doctorSummary" class="doctor-summary"></span>
 					</div>
 				</section>
@@ -669,7 +747,7 @@ replaceChildrenFromHtml(app, `
 					<p class="inline-hint">${t('Read-only probes of Control Room endpoints this extension depends on. Nothing is created or modified.')}</p>
 					<div id="apiHealthList" class="doctor-checklist"></div>
 					<div class="doctor-actions">
-						<button id="runApiHealth" type="button">${t('Run Checks')}</button>
+						<button id="runApiHealth" type="button">${icon('play')}${t('Run Checks')}</button>
 						<span id="apiHealthSummary" class="doctor-summary"></span>
 					</div>
 				</section>
@@ -679,17 +757,20 @@ replaceChildrenFromHtml(app, `
 				<div class="section-heading-row">
 					<h2>${t('Debug Logs')}</h2>
 					<span class="feedback-actions">
-						<button id="copyFeedback" type="button">${t('Copy')}</button>
-						<button id="clearFeedback" type="button">${t('Clear')}</button>
+						<button id="copyFeedback" type="button">${icon('copy')}${t('Copy')}</button>
+						<button id="clearFeedback" type="button">${icon('trash-2')}${t('Clear')}</button>
 					</span>
 				</div>
 				<p class="inline-hint">${t('Debug Mode stores local support logs. Nothing is sent automatically.')}</p>
 				<div id="feedbackList" class="feedback-list" aria-live="polite"></div>
 			</section>
+		</div>
+			</div>
 		</section>
 	</main>
 
 `);
+renderLucideIcons(app);
 
 const stylesInput = document.querySelector<HTMLInputElement>('#stylesEnabled')!;
 const runButtonWavesInput = document.querySelector<HTMLInputElement>('#runButtonWaves')!;
@@ -699,6 +780,10 @@ const soundsInput = document.querySelector<HTMLInputElement>('#soundsEnabled')!;
 const packageUpdateToastEnabledInput = document.querySelector<HTMLInputElement>(
 	'#packageUpdateToastEnabled'
 )!;
+const backgroundJobNotificationsEnabledInput =
+	document.querySelector<HTMLInputElement>('#backgroundJobNotificationsEnabled')!;
+const gettingStartedGuidanceEnabledInput =
+	document.querySelector<HTMLInputElement>('#gettingStartedGuidanceEnabled')!;
 const nonClosingMessageBoxWarningEnabledInput =
 	document.querySelector<HTMLInputElement>('#nonClosingMessageBoxWarningEnabled')!;
 const browserContextMenuEnabledInput = document.querySelector<HTMLInputElement>(
@@ -793,6 +878,8 @@ const backgroundPreview =
 	document.querySelector<HTMLElement>('#backgroundPreview')!;
 const aboutHelp = document.querySelector<HTMLElement>('#aboutHelp')!;
 let currentDebugEnabled = DEFAULT_DEBUG_ENABLED;
+type HelpSection = 'overview' | 'commands' | 'compatibility' | 'diagnostics';
+let activeHelpSection: HelpSection = 'overview';
 type HealthSection = 'health' | 'api' | 'logs';
 let activeHealthSection: HealthSection = 'logs';
 let actionJsonWorkbench: JsonWorkbench;
@@ -805,10 +892,10 @@ let currentDoctorView: DoctorCheckGroup = 'general';
 let currentDoctorResults: StyleDoctorCheckResult[] = [];
 let previousDoctorResults: StyleDoctorCheckResult[] | null = null;
 let doctorRunning = false;
-let activeTab: SidepanelTab = 'tools';
+let activeTab: SidepanelTab = isOptionsSurface ? 'appearance' : 'tools';
 
 function showStatusMessage(message: string, severity: FeedbackSeverity = 'info'): void {
-	if (currentDebugEnabled && activeTab === 'doctor') {
+	if (currentDebugEnabled && activeTab === 'help') {
 		status.textContent = '';
 		return;
 	}
@@ -831,16 +918,14 @@ function setStatus(
 }
 
 function updateDebugVisibility(): void {
-	const doctorTabButton = document.querySelector<HTMLButtonElement>('[data-tab="doctor"]');
-	const doctorPanel = document.querySelector<HTMLElement>('[data-panel="doctor"]');
-	const tabList = document.querySelector<HTMLElement>('.tab-list')!;
-	if (doctorTabButton) doctorTabButton.hidden = !currentDebugEnabled;
-	tabList.classList.toggle('has-health-tab', currentDebugEnabled);
-	if (doctorPanel && !currentDebugEnabled) {
-		doctorPanel.hidden = true;
-		if (activeTab === 'doctor') setActiveTab('tools');
-	}
-	if (currentDebugEnabled && activeTab === 'doctor') {
+	const diagnostics = document.querySelector<HTMLElement>('#diagnosticsContent');
+	if (diagnostics) diagnostics.hidden = isOptionsSurface || !currentDebugEnabled;
+	if (
+		currentDebugEnabled &&
+		activeTab === 'help' &&
+		activeHelpSection === 'diagnostics' &&
+		!isOptionsSurface
+	) {
 		setHealthSection(activeHealthSection);
 	} else {
 		debugLogSection.hidden = true;
@@ -944,27 +1029,34 @@ function formatFeedbackForAi(events: DebugEvent[]): string {
 }
 
 function updateStatusVisibility(): void {
-	const shouldHide = currentDebugEnabled && activeTab === 'doctor';
+	const shouldHide = currentDebugEnabled && activeTab === 'help' && !isOptionsSurface;
 	status.hidden = shouldHide;
 	status.setAttribute('aria-hidden', String(shouldHide));
 	if (shouldHide) status.textContent = '';
 }
 
-function setActiveTab(tab: SidepanelTab): void {
+function setActiveTab(tab: SidepanelTab, updateHash = true): void {
 	activeTab = tab;
 	document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 		const active = button.dataset.tab === tab;
 		button.classList.toggle('is-active', active);
 		button.setAttribute('aria-selected', String(active));
+		button.tabIndex = active ? 0 : -1;
 	});
 	document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
 		const active = panel.dataset.panel === tab;
 		panel.classList.toggle('is-active', active);
 		panel.hidden = !active;
 	});
-	if (tab === 'doctor' && currentDebugEnabled) {
+	if (
+		tab === 'help' &&
+		activeHelpSection === 'diagnostics' &&
+		currentDebugEnabled &&
+		!isOptionsSurface
+	) {
 		setHealthSection(activeHealthSection);
 	}
+	if (isOptionsSurface && updateHash) history.replaceState(null, '', `#${tab}`);
 	updateStatusVisibility();
 }
 
@@ -975,12 +1067,12 @@ async function sendBackgroundMessage(message: BackgroundMessage): Promise<void> 
 async function sendActiveTabMessage(
 	message: ContentActionMessage
 ): Promise<ContentActionResponse> {
-	const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-	if (!tab?.id) return { ok: false, error: t('No active tab.') };
+	const tabId = getSelectedToolsTargetTabId();
+	if (!tabId) return { ok: false, error: t('Select a connected Control Room page first.') };
 
 	try {
 		const response = (await browser.tabs.sendMessage(
-			tab.id,
+			tabId,
 			message
 		)) as ContentActionResponse | undefined;
 		return response ?? { ok: true };
@@ -990,12 +1082,17 @@ async function sendActiveTabMessage(
 }
 
 async function refreshControlRoomCompatibility(forceRefresh = false): Promise<void> {
+	if (isOptionsSurface) {
+		controlRoomVersionState.textContent = t('Live compatibility requires the side panel.');
+		return;
+	}
 	const requestId = ++controlRoomCompatibilityRequestId;
 	controlRoomVersionState.textContent = t('Checking version...');
 	try {
 		const response = (await browser.runtime.sendMessage({
 			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
 			forceRefresh,
+			tabId: getSelectedToolsTargetTabId(),
 		})) as ControlRoomCompatibilityResponse | undefined;
 		if (requestId !== controlRoomCompatibilityRequestId) return;
 		if (!response?.ok) {
@@ -1087,8 +1184,59 @@ const runDoctorViewButton =
 	document.querySelector<HTMLButtonElement>('#runDoctorView')!;
 const doctorPills = document.querySelectorAll<HTMLButtonElement>('.doctor-pill');
 
+const helpSubtabs = [...document.querySelectorAll<HTMLButtonElement>('[data-help-section]')];
+const helpSubpanels = document.querySelectorAll<HTMLElement>('[data-help-subpanel]');
 const healthSubtabs = document.querySelectorAll<HTMLButtonElement>('[data-health-section]');
 const healthSubpanels = document.querySelectorAll<HTMLElement>('[data-health-subpanel]');
+
+const HELP_SECTION_ANCHORS: Record<HelpSection, string> = {
+	overview: 'help-start',
+	commands: 'help-commands',
+	compatibility: 'help-compatibility',
+	diagnostics: 'help-diagnostics',
+};
+
+function setHelpSection(section: HelpSection, updateHash = true): void {
+	activeHelpSection = section;
+	helpSubtabs.forEach((button) => {
+		const active = button.dataset.helpSection === section;
+		button.classList.toggle('is-active', active);
+		button.setAttribute('aria-selected', String(active));
+		button.tabIndex = active ? 0 : -1;
+	});
+	helpSubpanels.forEach((panel) => {
+		panel.hidden = panel.dataset.helpSubpanel !== section;
+	});
+	if (section === 'diagnostics' && currentDebugEnabled && !isOptionsSurface) {
+		setHealthSection(activeHealthSection);
+	}
+	if (section === 'compatibility') renderSupportedBuilds();
+	if (isOptionsSurface && updateHash) {
+		history.replaceState(null, '', `#${HELP_SECTION_ANCHORS[section]}`);
+	}
+}
+
+helpSubtabs.forEach((button) => {
+	button.addEventListener('click', () => {
+		setHelpSection(button.dataset.helpSection as HelpSection);
+	});
+});
+
+document.querySelector<HTMLElement>('.help-subtabs')?.addEventListener('keydown', (event) => {
+	if (!(event instanceof KeyboardEvent)) return;
+	const current = document.activeElement as HTMLButtonElement | null;
+	const index = current ? helpSubtabs.indexOf(current) : -1;
+	if (index < 0) return;
+	let next = index;
+	if (event.key === 'ArrowRight') next = (index + 1) % helpSubtabs.length;
+	else if (event.key === 'ArrowLeft') next = (index - 1 + helpSubtabs.length) % helpSubtabs.length;
+	else if (event.key === 'Home') next = 0;
+	else if (event.key === 'End') next = helpSubtabs.length - 1;
+	else return;
+	event.preventDefault();
+	helpSubtabs[next].focus();
+	helpSubtabs[next].click();
+});
 
 function setHealthSection(section: HealthSection): void {
 	activeHealthSection = section;
@@ -1116,11 +1264,11 @@ const apiHealthSummary = document.querySelector<HTMLElement>('#apiHealthSummary'
 const runApiHealthButton =
 	document.querySelector<HTMLButtonElement>('#runApiHealth')!;
 
-const API_HEALTH_STATUS_ICONS: Record<ApiHealthResult['status'], string> = {
-	pass: '✓',
-	fail: '✗',
-	warn: '⚠',
-	skip: '—',
+const HEALTH_STATUS_ICONS: Record<ApiHealthResult['status'], BetterAaIconName> = {
+	pass: 'circle-check-big',
+	fail: 'circle-x',
+	warn: 'triangle-alert',
+	skip: 'circle-minus',
 };
 
 function renderApiHealthResults(results: ApiHealthResult[]): void {
@@ -1133,7 +1281,7 @@ function renderApiHealthResults(results: ApiHealthResult[]): void {
 		summary.className = 'doctor-check-summary';
 		const icon = document.createElement('span');
 		icon.className = 'doctor-check-icon';
-		icon.textContent = API_HEALTH_STATUS_ICONS[result.status];
+		setSidepanelIconContent(icon, HEALTH_STATUS_ICONS[result.status]);
 		const label = document.createElement('span');
 		label.className = 'doctor-check-label';
 		label.textContent = result.label;
@@ -1230,16 +1378,9 @@ function renderDoctorChecklist(): void {
 		const icon = document.createElement('span');
 		icon.className = 'doctor-check-icon';
 		if (comp) {
-			icon.textContent =
-				comp.currentStatus === 'pass'
-					? '\u2713'
-					: comp.currentStatus === 'fail'
-						? '\u2717'
-						: comp.currentStatus === 'warn'
-							? '\u26A0'
-							: '\u2014';
+			setSidepanelIconContent(icon, HEALTH_STATUS_ICONS[comp.currentStatus]);
 		} else {
-			icon.textContent = '\u2013';
+			setSidepanelIconContent(icon, 'circle-minus');
 		}
 
 		const label = document.createElement('span');
@@ -1324,7 +1465,7 @@ async function runDoctorViewScan(): Promise<void> {
 	if (doctorRunning) return;
 	doctorRunning = true;
 	runDoctorViewButton.disabled = true;
-	runDoctorViewButton.textContent = t('Scanning...');
+	setSidepanelIconButtonContent(runDoctorViewButton, 'activity', t('Scanning...'));
 
 	const checks = getHealthChecksForView(currentDoctorView);
 	const results: StyleDoctorCheckResult[] = [];
@@ -1371,7 +1512,7 @@ async function runDoctorViewScan(): Promise<void> {
 	await refreshFeedbackHistory();
 
 	runDoctorViewButton.disabled = false;
-	runDoctorViewButton.textContent = t('Run Checks');
+	setSidepanelIconButtonContent(runDoctorViewButton, 'play', t('Run Checks'));
 	doctorRunning = false;
 }
 
@@ -1413,12 +1554,14 @@ function renderStaticAboutHelp(shortcut: CommandPaletteShortcut): void {
 		shortcutLabel: getCommandPaletteShortcutLabel(shortcut),
 		sidebarShortcutLabel: currentExtensionShortcuts.openSidebar,
 	}));
+	renderLucideIcons(aboutHelp);
 }
 
 async function refreshAboutHelp(): Promise<void> {
 	const response = await sendActiveTabMessage({ type: 'GET_HELP_HTML' });
 	if (response.ok && response.html) {
 		replaceChildrenFromHtml(aboutHelp, response.html);
+		renderLucideIcons(aboutHelp);
 		return;
 	}
 	renderStaticAboutHelp(currentShortcut);
@@ -1440,12 +1583,17 @@ async function handleSidepanelRequest(
 
 	setActiveTab(request.tab);
 	if (request.tab === 'settings') void refreshAboutHelp();
-	if (request.tab === 'doctor') {
+	if (request.tab === 'help') {
 		renderDoctorChecklist();
 		renderSupportedBuilds();
 		setHealthSection(activeHealthSection);
 	}
 	if (request.focus === 'actionJson') focusActionJsonTextarea();
+	if (request.focus === 'jobs') openToolsJobs();
+	if (request.focus === 'diagnostics') {
+		setHelpSection('diagnostics');
+		setHealthSection('health');
+	}
 
 	await sidepanelRequest.setValue(null);
 }
@@ -1743,6 +1891,8 @@ async function loadState(): Promise<void> {
 		recorderEnabled,
 		recorderPort,
 		recorderToken,
+		jobNotifications,
+		gettingStarted,
 	] = await Promise.all([
 		getStylesEnabled(),
 		getSoundsEnabled(),
@@ -1763,6 +1913,8 @@ async function loadState(): Promise<void> {
 		getRecorderBridgeEnabled(),
 		getRecorderBridgePort(),
 		getRecorderBridgeToken(),
+		getBackgroundJobNotificationsEnabled(),
+		getGettingStartedGuidanceEnabled(),
 	]);
 
 	stylesInput.checked = styles;
@@ -1810,6 +1962,9 @@ async function loadState(): Promise<void> {
 	updateRecorderBridgeDependentState();
 	recorderBridgePortInput.value = String(recorderPort);
 	recorderBridgeTokenInput.value = recorderToken;
+	backgroundJobNotificationsEnabledInput.checked = jobNotifications;
+	gettingStartedGuidanceEnabledInput.checked = gettingStarted;
+	document.querySelector<HTMLElement>('#help-start')!.hidden = !gettingStarted;
 	const savedDoctorResults = (await styleDoctorLastResults.getValue()) ?? {};
 	previousDoctorResults = savedDoctorResults[currentDoctorView] ?? null;
 	void debugInfo('sidepanel', 'Sidebar state loaded.', {
@@ -1829,14 +1984,135 @@ document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 	button.addEventListener('click', () => {
 		const tab = button.dataset.tab as SidepanelTab;
 		setActiveTab(tab);
-		if (tab === 'settings') void refreshAboutHelp();
-		if (tab === 'userstyle') void refreshControlRoomCompatibility();
-	if (tab === 'doctor') {
-		renderDoctorChecklist();
-		renderSupportedBuilds();
-		setHealthSection(activeHealthSection);
-	}
+		if (tab === 'help') void refreshAboutHelp();
+		if (tab === 'appearance') void refreshControlRoomCompatibility();
+		if (tab === 'help') {
+			renderDoctorChecklist();
+			renderSupportedBuilds();
+			setHealthSection(activeHealthSection);
+		}
 	});
+});
+
+const primaryTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-tab]')];
+document.querySelector<HTMLElement>('.tab-list')?.addEventListener('keydown', (event) => {
+	if (!(event instanceof KeyboardEvent)) return;
+	const current = document.activeElement as HTMLButtonElement | null;
+	const index = current ? primaryTabs.indexOf(current) : -1;
+	if (index < 0) return;
+	let next = index;
+	if (event.key === 'ArrowRight') next = (index + 1) % primaryTabs.length;
+	else if (event.key === 'ArrowLeft') next = (index - 1 + primaryTabs.length) % primaryTabs.length;
+	else if (event.key === 'Home') next = 0;
+	else if (event.key === 'End') next = primaryTabs.length - 1;
+	else return;
+	event.preventDefault();
+	primaryTabs[next].focus();
+	primaryTabs[next].click();
+});
+
+document.querySelector<HTMLButtonElement>('#openFullSettings')?.addEventListener('click', () => {
+	void browser.runtime.openOptionsPage();
+});
+
+type UndoableControl = HTMLInputElement | HTMLSelectElement;
+const priorControlValues = new WeakMap<UndoableControl, string | boolean>();
+const undoNotice = document.querySelector<HTMLElement>('#undoNotice')!;
+const undoSettingButton = document.querySelector<HTMLButtonElement>('#undoSetting')!;
+let undoTimer: ReturnType<typeof setTimeout> | null = null;
+let undoAction: (() => void) | null = null;
+let applyingUndo = false;
+let undoStorageKey = '';
+let ignoreNextUndoStorageChange = false;
+
+function expireUndo(): void {
+	if (undoTimer) clearTimeout(undoTimer);
+	undoTimer = null;
+	undoAction = null;
+	undoStorageKey = '';
+	ignoreNextUndoStorageChange = false;
+	undoNotice.hidden = true;
+}
+
+function readControlValue(control: UndoableControl): string | boolean {
+	return control instanceof HTMLInputElement && control.type === 'checkbox'
+		? control.checked
+		: control.value;
+}
+
+function rememberControlValue(event: Event): void {
+	const control = (event.target as Element | null)?.closest<UndoableControl>('input, select');
+	if (!control || control.type === 'file' || control.id === 'recorderBridgeToken') return;
+	priorControlValues.set(control, readControlValue(control));
+}
+
+document.addEventListener('pointerdown', rememberControlValue, true);
+document.addEventListener('focusin', rememberControlValue, true);
+document.addEventListener('change', (event) => {
+	if (applyingUndo) return;
+	const control = event.target as UndoableControl | null;
+	if (!control || !(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) return;
+	if (control.type === 'file' || control.id === 'extensionLanguage' || control.id === 'recorderBridgeToken') return;
+	const previous = priorControlValues.get(control);
+	if (previous === undefined || previous === readControlValue(control)) return;
+	undoStorageKey = control.id.replace(/^styleOpacity-/, 'styleValue-');
+	ignoreNextUndoStorageChange = true;
+	const row = control.closest<HTMLElement>('.setting-row, .select-row, .color-row');
+	let saved = row?.querySelector<HTMLElement>('.save-state');
+	if (row && !saved) {
+		saved = document.createElement('span');
+		saved.className = 'save-state';
+		row.insertBefore(saved, row.lastElementChild);
+	}
+	if (saved) saved.textContent = t('Saved');
+	undoAction = () => {
+		applyingUndo = true;
+		if (control instanceof HTMLInputElement && control.type === 'checkbox') {
+			control.checked = Boolean(previous);
+		} else {
+			control.value = String(previous);
+		}
+		control.dispatchEvent(new Event('change', { bubbles: true }));
+		applyingUndo = false;
+		priorControlValues.set(control, readControlValue(control));
+		expireUndo();
+	};
+	undoNotice.hidden = false;
+	if (undoTimer) clearTimeout(undoTimer);
+	undoTimer = setTimeout(() => {
+		expireUndo();
+	}, 8000);
+});
+undoSettingButton.addEventListener('click', () => undoAction?.());
+
+browser.storage.onChanged.addListener((changes) => {
+	const change = changes[undoStorageKey];
+	if (!change) return;
+	if (ignoreNextUndoStorageChange) {
+		ignoreNextUndoStorageChange = false;
+		return;
+	}
+	expireUndo();
+});
+
+document.querySelector<HTMLInputElement>('#helpSearch')?.addEventListener('input', (event) => {
+	const query = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase();
+	document.querySelectorAll<HTMLElement>('#aboutHelp [data-help-card]').forEach((card) => {
+		card.hidden = Boolean(query) && !card.textContent?.toLowerCase().includes(query);
+	});
+});
+
+document.querySelector<HTMLButtonElement>('#dismissGettingStarted')?.addEventListener('click', () => {
+	void gettingStartedGuidanceEnabled.setValue(false);
+});
+
+gettingStartedGuidanceEnabled.watch((enabled) => {
+	gettingStartedGuidanceEnabledInput.checked = enabled ?? DEFAULT_GETTING_STARTED_GUIDANCE_ENABLED;
+	document.querySelector<HTMLElement>('#help-start')!.hidden = !gettingStartedGuidanceEnabledInput.checked;
+});
+
+backgroundJobNotificationsEnabled.watch((enabled) => {
+	backgroundJobNotificationsEnabledInput.checked = enabled ?? DEFAULT_BACKGROUND_JOB_NOTIFICATIONS_ENABLED;
 });
 
 stylesInput.addEventListener('change', () => {
@@ -1857,6 +2133,34 @@ soundsInput.addEventListener('change', () => {
 packageUpdateToastEnabledInput.addEventListener('change', () => {
 	// Storage watch in the content script picks this up; no message needed.
 	void packageUpdateToastEnabled.setValue(packageUpdateToastEnabledInput.checked);
+});
+
+backgroundJobNotificationsEnabledInput.addEventListener('change', () => {
+	const requested = backgroundJobNotificationsEnabledInput.checked;
+	const permissionRequest = requested
+		? browser.permissions.request({ permissions: ['notifications'] })
+		: Promise.resolve(false);
+	void permissionRequest.then(async (granted) => {
+		if (requested && !granted) {
+			backgroundJobNotificationsEnabledInput.checked = false;
+			await backgroundJobNotificationsEnabled.setValue(false);
+			expireUndo();
+			setStatus(t('Notification permission was denied. Enable it in the extension permissions and try again.'), 'warn', 'settings');
+			return;
+		}
+		await backgroundJobNotificationsEnabled.setValue(requested);
+	});
+});
+
+gettingStartedGuidanceEnabledInput.addEventListener('change', () => {
+	void gettingStartedGuidanceEnabled.setValue(gettingStartedGuidanceEnabledInput.checked);
+});
+
+browser.permissions.onRemoved.addListener((permissions) => {
+	if (!permissions.permissions?.includes('notifications')) return;
+	backgroundJobNotificationsEnabledInput.checked = false;
+	void backgroundJobNotificationsEnabled.setValue(false);
+	setStatus(t('Notification permission was removed. Background job notifications are off.'), 'warn', 'settings');
 });
 
 variableMetadataEnabledInput.addEventListener('change', () => {
@@ -1985,7 +2289,7 @@ refreshControlRoomVersionButton.addEventListener('click', () => {
 });
 
 function shouldRefreshBuildCheckerForActiveView(): boolean {
-	return activeTab === 'doctor' && activeHealthSection === 'health';
+	return activeTab === 'help' && activeHelpSection === 'compatibility' && !isOptionsSurface;
 }
 
 let buildCheckerRefreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2000,26 +2304,18 @@ function scheduleBuildCheckerRefresh(): void {
 	}, 250);
 }
 
-function scheduleActiveTabRefresh(): void {
-	scheduleBuildCheckerRefresh();
-	scheduleToolsContextRefresh();
-}
-
 browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 	if (message.type !== 'AA_ROUTE_CHANGED') return;
-	if (sender.tab?.active === false) return;
-	scheduleActiveTabRefresh();
-});
-
-browser.tabs.onActivated.addListener(() => {
-	scheduleActiveTabRefresh();
+	if (sender.tab?.id !== undefined) void markToolsTargetRouteChanged(sender.tab.id, message.url);
+	scheduleBuildCheckerRefresh();
 });
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-	if (!changeInfo.url && changeInfo.status !== 'complete') return;
-	void browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-		if (tab?.id === tabId) scheduleActiveTabRefresh();
-	});
+	if (changeInfo.url) void markToolsTargetRouteChanged(tabId, changeInfo.url);
+});
+
+browser.tabs.onRemoved.addListener((tabId) => {
+	void markToolsTargetDisconnected(tabId);
 });
 
 doctorPills.forEach((pill) => {
@@ -2281,6 +2577,7 @@ clearBackgroundUploadButton.addEventListener('click', () => {
 });
 
 resetGradientColorsButton.addEventListener('click', async () => {
+	if (!window.confirm(t('Reset the background and loading gradient colors?'))) return;
 	const fields = STYLE_VALUE_FIELDS.filter((field) =>
 		BACKGROUND_COLOR_KEYS.includes(field.key as (typeof BACKGROUND_COLOR_KEYS)[number])
 	);
@@ -2301,6 +2598,7 @@ resetGradientColorsButton.addEventListener('click', async () => {
 });
 
 restoreUserstyleDefaultsButton.addEventListener('click', async () => {
+	if (!window.confirm(t('Restore all Appearance settings to their defaults?'))) return;
 	stylesInput.checked = DEFAULT_STYLES_ENABLED;
 	forceUnsupportedControlRoomStylesInput.checked =
 		DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES;
@@ -2612,11 +2910,38 @@ feedbackHistory.watch((value) => {
 	renderFeedbackHistory(value ?? []);
 });
 
-sidepanelRequest.watch((value) => {
-	void handleSidepanelRequest(value);
-});
+if (!isOptionsSurface) {
+	sidepanelRequest.watch((value) => {
+		void handleSidepanelRequest(value);
+	});
+}
 
-initializeToolsPanel({ setStatus, addFeedback });
+if (!isOptionsSurface) initializeToolsPanel({ setStatus, addFeedback });
+if (isOptionsSurface) {
+	const openHashTab = (): void => {
+		const anchor = location.hash.slice(1);
+		const helpSection: HelpSection | null =
+			anchor === 'help' || anchor === 'help-start' || anchor === 'help-about' || anchor === 'help-overview'
+				? 'overview'
+				: anchor === 'help-commands'
+					? 'commands'
+					: anchor === 'help-compatibility'
+						? 'compatibility'
+						: anchor === 'help-diagnostics'
+							? 'diagnostics'
+							: null;
+		const tab: SidepanelTab = anchor === 'settings' || anchor.startsWith('settings-')
+			? 'settings'
+			: helpSection
+				? 'help'
+				: 'appearance';
+		setActiveTab(tab, false);
+		if (helpSection) setHelpSection(helpSection, false);
+		if (anchor !== tab) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView());
+	};
+	window.addEventListener('hashchange', openHashTab);
+	openHashTab();
+}
 void loadState();
-void sidepanelRequest.getValue().then(handleSidepanelRequest);
+if (!isOptionsSurface) void sidepanelRequest.getValue().then(handleSidepanelRequest);
 })();

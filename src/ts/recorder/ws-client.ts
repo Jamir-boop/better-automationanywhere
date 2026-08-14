@@ -4,7 +4,13 @@ import {
 	getRecorderBridgePort,
 	getRecorderBridgeToken,
 } from '../settings';
-import { chooseRecorderTab, classifyRecorderError, isMissingRecorderReceiver, unwrapContentResponse } from './protocol';
+import {
+	chooseRecorderTab,
+	classifyRecorderError,
+	isMissingRecorderReceiver,
+	RECORDER_RECONNECT_DELAYS_MS,
+	unwrapContentResponse,
+} from './protocol';
 
 type Envelope = { id: string; type: string; payload?: Record<string, unknown> };
 const CAPTURE_INTERVAL_MS = 550;
@@ -28,6 +34,7 @@ async function activeTab(): Promise<Awaited<ReturnType<typeof browser.tabs.query
 export function startRecorderBridge(): void {
 	let socket: WebSocket | undefined;
 	let reconnectTimer: number | undefined;
+	let reconnectAttempt = 0;
 	let tabId: number | undefined;
 	let lastCaptureAt = 0;
 
@@ -42,10 +49,14 @@ export function startRecorderBridge(): void {
 	};
 	const schedule = () => {
 		if (reconnectTimer) return;
+		const delay = RECORDER_RECONNECT_DELAYS_MS[
+			Math.min(reconnectAttempt, RECORDER_RECONNECT_DELAYS_MS.length - 1)
+		];
+		reconnectAttempt += 1;
 		reconnectTimer = setTimeout(() => {
 			reconnectTimer = undefined;
 			void connect();
-		}, 3000) as unknown as number;
+		}, delay) as unknown as number;
 	};
 	const ensureContentScript = async () => {
 		if (tabId === undefined) throw new Error('No controlled tab.');
@@ -210,11 +221,14 @@ export function startRecorderBridge(): void {
 		const next = new WebSocket(`ws://127.0.0.1:${port || DEFAULT_RECORDER_BRIDGE_PORT}`);
 		socket = next;
 		next.onopen = () => {
-			if (socket === next) send({
-				type: 'hello', token, tabId,
-				extVersion: browser.runtime.getManifest().version,
-				capabilities: import.meta.env.CHROME ? ['aiSteps'] : [],
-			});
+			if (socket === next) {
+				reconnectAttempt = 0;
+				send({
+					type: 'hello', token, tabId,
+					extVersion: browser.runtime.getManifest().version,
+					capabilities: import.meta.env.CHROME ? ['aiSteps'] : [],
+				});
+			}
 		};
 		next.onmessage = (event) => {
 			if (socket !== next) return;
@@ -229,6 +243,7 @@ export function startRecorderBridge(): void {
 	browser.storage.onChanged.addListener((changes, area) => {
 		if (area !== 'local' || !['recorderBridgeEnabled', 'recorderBridgePort', 'recorderBridgeToken'].some((key) => key in changes)) return;
 		close();
+		reconnectAttempt = 0;
 		void connect();
 	});
 	void connect();

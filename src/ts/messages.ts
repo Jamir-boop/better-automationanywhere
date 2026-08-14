@@ -77,6 +77,15 @@ export type ExtensionShortcutsMessage = {
 export type ControlRoomCompatibilityMessage = {
 	type: 'GET_CONTROL_ROOM_COMPATIBILITY';
 	forceRefresh?: boolean;
+	tabId?: number;
+};
+
+export type JobNotificationMessage = {
+	type: 'SHOW_JOB_NOTIFICATION';
+	jobId: string;
+	title: string;
+	message: string;
+	windowId?: number;
 };
 
 export type RouteChangedMessage = {
@@ -89,6 +98,7 @@ export type BackgroundMessage =
 	| AutomationAnywhereApiRequestMessage
 	| ExtensionShortcutsMessage
 	| ControlRoomCompatibilityMessage
+	| JobNotificationMessage
 	| RouteChangedMessage;
 
 export type ContentActionMessage =

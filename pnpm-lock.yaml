@@ -11,6 +11,9 @@ importers:
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
+      lucide:
+        specifier: 1.31.0
+        version: 1.31.0
     devDependencies:
       publish-browser-extension:
         specifier: 4.0.5
@@ -1278,6 +1281,9 @@ packages:
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
+
+  lucide@1.31.0:
+    resolution: {integrity: sha512-iPJC7py8o990ZSmvFZlS+4+bNasP+ANDkD0IeDOGgQZjTm3p85F2Ldut7leM1yhYavr1pmoPfigm9MDHyyCOrw==}
 
   magic-string@0.30.17:
     resolution: {integrity: sha512-sNPKHvyjVf7gyjwS4xGTaW/mCnF8wnjtifKBEhxfZ7E/S8tQ0rssrwGNn6q8JH/ohItJfSQp9mBtQYuTlH5QnA==}
@@ -3157,6 +3163,8 @@ snapshots:
       wrap-ansi: 9.0.0
 
   lru-cache@10.4.3: {}
+
+  lucide@1.31.0: {}
 
   magic-string@0.30.17:
     dependencies:

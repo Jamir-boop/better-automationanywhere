@@ -1,4 +1,5 @@
 import { t } from '@/src/ts/i18n';
+import { icon } from '@/src/ts/icons';
 import {
 	formatJsonText,
 	getActiveTextMatchIndex,
@@ -104,10 +105,10 @@ export function renderJsonWorkbenchSearchTools(idPrefix: string): string {
 				<span>${t('Match case')}</span>
 			</label>
 			<div class="button-grid json-workbench-actions">
-				<button id="${idPrefix}Previous" type="button">${t('Previous')}</button>
-				<button id="${idPrefix}Next" type="button">${t('Next')}</button>
-				<button id="${idPrefix}ReplaceCurrent" type="button">${t('Replace')}</button>
-				<button id="${idPrefix}ReplaceAll" type="button">${t('Replace all')}</button>
+				<button id="${idPrefix}Previous" type="button">${icon('chevron-left')}${t('Previous')}</button>
+				<button id="${idPrefix}Next" type="button">${icon('chevron-right')}${t('Next')}</button>
+				<button id="${idPrefix}ReplaceCurrent" type="button">${icon('replace')}${t('Replace')}</button>
+				<button id="${idPrefix}ReplaceAll" type="button">${icon('replace-all')}${t('Replace all')}</button>
 			</div>
 			<p id="${idPrefix}SearchStatus" class="inline-hint" aria-live="polite"></p>
 		</div>
@@ -119,9 +120,9 @@ export function renderJsonWorkbenchActionButtons(
 	labels: JsonWorkbenchActionLabels = {}
 ): string {
 	return `
-		<button id="${idPrefix}Copy" type="button" title="${t(labels.copyHelp ?? 'Copy textarea JSON to system clipboard.')}">${t(labels.copyLabel ?? 'Copy JSON')}</button>
-		<button id="${idPrefix}Format" type="button" title="${t(labels.formatHelp ?? 'Format textarea JSON.')}">${t(labels.formatLabel ?? 'Format')}</button>
-		<button id="${idPrefix}Export" type="button" title="${t(labels.exportHelp ?? 'Download textarea JSON as a .json file.')}">${t(labels.exportLabel ?? 'Export JSON')}</button>
+		<button id="${idPrefix}Copy" type="button" title="${t(labels.copyHelp ?? 'Copy textarea JSON to system clipboard.')}">${icon('copy')}${t(labels.copyLabel ?? 'Copy JSON')}</button>
+		<button id="${idPrefix}Format" type="button" title="${t(labels.formatHelp ?? 'Format textarea JSON.')}">${icon('braces')}${t(labels.formatLabel ?? 'Format')}</button>
+		<button id="${idPrefix}Export" type="button" title="${t(labels.exportHelp ?? 'Download textarea JSON as a .json file.')}">${icon('download')}${t(labels.exportLabel ?? 'Export JSON')}</button>
 	`;
 }
 

@@ -5,11 +5,12 @@ import {
 	automationAnywhereBlobResponseToBlob,
 	dedupeAutomationAnywhereFiles,
 	extractAutomationAnywherePackages,
-	getActiveAutomationAnywhereContext,
+	getAutomationAnywhereContextForTab,
 	getAutomationAnywhereAuthToken,
 	getAutomationAnywhereFileId,
 	getAutomationAnywhereFileName,
 	getAutomationAnywhereFileType,
+	parseAutomationAnywherePageContext,
 	isAutomationAnywhereFolder,
 	isAutomationAnywhereTaskbot,
 	refreshAutomationAnywhereFolderList,
@@ -21,8 +22,36 @@ import {
 	type AutomationAnywherePackageUsageStatus,
 } from '@/src/ts/automation-anywhere-api';
 import { isAutomationAnywhereUrl } from '@/src/ts/automation-anywhere';
+import {
+	canUseSelectedTarget,
+	formatControlRoomHostname,
+	formatControlRoomPageTitle,
+	getFirstEligibleTarget,
+	getOnlyRoomCurrentEligibleTarget,
+	getSingleControlRoomOrigin,
+	groupAuthenticatedControlRoomTabs,
+	markSelectedTargetDisconnected,
+	markSelectedTargetRouteChanged,
+	type ControlRoomTargetGroup,
+	type SelectedControlRoomTarget,
+} from '@/src/ts/control-room-targets';
 import { findNonClosingMessageBoxes } from '@/src/ts/automation-anywhere-json';
-import { getNonClosingMessageBoxWarningEnabled } from '@/src/ts/settings';
+import {
+	getBackgroundJobNotificationsEnabled,
+	getNonClosingMessageBoxWarningEnabled,
+} from '@/src/ts/settings';
+import {
+	clearToolJobUnread,
+	clearCompletedToolJobs,
+	completeToolJob,
+	getUnreadToolJobCount,
+	createToolJob,
+	prependToolJob,
+	recoverInterruptedToolJobs,
+	requestToolJobStop,
+	type ToolJobRecord,
+} from '@/src/ts/tool-jobs';
+import { browser, storage } from '#imports';
 import {
 	initializeJsonWorkbench,
 	renderJsonWorkbenchActionButtons,
@@ -30,6 +59,11 @@ import {
 	type JsonWorkbench,
 } from './json-workbench';
 import { t } from '@/src/ts/i18n';
+import { icon, type BetterAaIconName } from '@/src/ts/icons';
+import {
+	setSidepanelIconButtonContent,
+	setSidepanelIconContent,
+} from './icons';
 import {
 	createDependencyManifestEntry,
 	createMetadataManifestEntry,
@@ -64,6 +98,8 @@ interface ZipWriter {
 	file(name: string, data: Blob | string): unknown;
 }
 
+class ToolJobStoppedError extends Error {}
+
 interface ToolsRuntime extends ActiveAutomationAnywhereContext {
 	api: AutomationAnywhereApi;
 	capabilities: ToolCapabilities;
@@ -89,6 +125,7 @@ interface InitializeToolsOptions {
 
 interface RenderToolsPanelOptions {
 	universalClipboardHtml?: string;
+	hidden?: boolean;
 }
 
 interface ExportMetadataReference {
@@ -119,15 +156,6 @@ interface ExportTaskbotScan {
 	packages: ExportPackageReference[];
 }
 
-interface ToolRunState {
-	runId: string;
-	title: string;
-	total: number;
-	completed: number;
-	lines: Array<{ message: string; severity: FeedbackSeverity }>;
-	startedAt: number;
-}
-
 const PAGE_LENGTH = 200;
 const PACKAGE_PAGE_LENGTH = 20;
 const PACKAGE_SEARCH_MIN_LENGTH = 2;
@@ -135,6 +163,16 @@ const PACKAGE_SEARCH_DEBOUNCE_MS = 300;
 const EXPORT_BATCH_SIZE = 20;
 const AUTOMATION_ANYWHERE_TASKBOT_TEMPLATE_TYPE = 'application/vnd.aa.taskbot+template';
 const CURRENT_TASKBOT_FALLBACK_NAME = 'Current bot';
+const ALL_TOOL_IDS: readonly ToolId[] = [
+	'universal-clipboard',
+	'copy-files',
+	'update-packages',
+	'export-bots',
+	'download-packages',
+	'package-usage',
+	'taskbot-json',
+	'import-taskbot',
+];
 const EMPTY_TOOL_CAPABILITIES: ToolCapabilities = {
 	universalClipboard: false,
 };
@@ -168,16 +206,42 @@ let lastRawPageLength = 0;
 let copiedFiles: CopiedToolFile[] = [];
 let taskbotJsonFileId: string | null = null;
 let taskbotJsonBaseline: string | null = null;
-let activeToolRun: ToolRunState | null = null;
-let refreshToolsContextTimer: ReturnType<typeof setTimeout> | null = null;
+let activeToolRun: ToolJobRecord | null = null;
 let packageSearchTimer: ReturnType<typeof setTimeout> | null = null;
+let targetGroups: ControlRoomTargetGroup[] = [];
+let selectedTarget: SelectedControlRoomTarget | null = null;
+let selectedRoomOrigin = '';
+let jobHistory: ToolJobRecord[] = [];
+let showingJobs = false;
+let refreshingTargets = false;
+
+const selectedTargetStorage = storage.defineItem<SelectedControlRoomTarget | null>(
+	'session:selectedControlRoomTarget',
+	{ fallback: null }
+);
+const selectedRoomStorage = storage.defineItem<string>('session:selectedControlRoomOrigin', {
+	fallback: '',
+});
+const toolJobHistoryStorage = storage.defineItem<ToolJobRecord[]>(
+	'session:toolJobHistory',
+	{ fallback: [] }
+);
 
 let contextText: HTMLElement;
 let toolsClipboardStatus: HTMLElement;
-let toolsHelpMatrix: HTMLElement;
 let availabilityDot: HTMLElement;
+let availabilityText: HTMLElement;
 let refreshButton: HTMLButtonElement;
 let actionsContainer: HTMLElement;
+let roomSelect: HTMLSelectElement;
+let pageSelect: HTMLSelectElement;
+let toolsWorkspace: HTMLElement;
+let toolsJobsSection: HTMLElement;
+let toolsJobsButton: HTMLButtonElement;
+let toolsJobsBackButton: HTMLButtonElement;
+let toolsJobsBadge: HTMLElement;
+let toolsJobsList: HTMLElement;
+let toolsStopJobButton: HTMLButtonElement;
 let universalClipboardSection: HTMLElement;
 let fileSection: HTMLElement;
 let listTitle: HTMLElement;
@@ -205,11 +269,6 @@ let toolsCopyPackageList: HTMLButtonElement;
 let packageUsageSection: HTMLElement;
 let packageUsageSummary: HTMLElement;
 let packageUsageList: HTMLElement;
-let toolsFinishModal: HTMLElement;
-let toolsFinishTitle: HTMLElement;
-let toolsFinishSummary: HTMLElement;
-let toolsFinishLog: HTMLElement;
-let toolsFinishClose: HTMLButtonElement;
 let taskbotSection: HTMLElement;
 let importTaskbotSection: HTMLElement;
 let importTaskbotFileInput: HTMLInputElement;
@@ -235,37 +294,36 @@ const packageListRefreshes = new Set<string>();
 
 export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): string {
 	return `
-		<section class="tab-panel is-active" role="tabpanel" data-panel="tools">
-			<section class="panel-section">
+		<section id="panel-tools" class="tab-panel${renderOptions.hidden ? '' : ' is-active'}" role="tabpanel" aria-labelledby="tab-tools" tabindex="0" data-panel="tools"${renderOptions.hidden ? ' hidden' : ''}>
+			<section id="toolsOverviewSection" class="panel-section">
 				<div class="section-heading-row">
 					<h2>${t('Tools')}</h2>
 					<span class="tools-refresh-group">
-						<span id="toolsAvailabilityDot" class="tools-availability-dot" data-available="false" role="status" tabindex="0" aria-label="${t('Tools unavailable')}" title="${t('Green = tools available. Red = no tools here.')}"></span>
-						<button id="toolsRefresh" class="icon-button tools-refresh-button" type="button" aria-label="${t('Refresh tools')}" title="${t('Refresh tools')}" data-has-tools="false">
-							<span aria-hidden="true">&#8635;</span>
+						<button id="toolsJobsButton" type="button" hidden>${icon('briefcase-business')}${t('Jobs')} <span id="toolsJobsBadge" class="count-badge" hidden>0</span></button>
+						<button id="toolsRefresh" class="icon-button tools-refresh-button" type="button" aria-label="${t('Refresh Control Rooms and page')}" title="${t('Refresh Control Rooms and page')}" data-has-tools="false">
+							${icon('refresh-cw', false)}
 						</button>
 					</span>
 				</div>
-				<p id="toolsContext" class="tools-context">${t('Open an Automation Anywhere folder, taskbot, or Packages page.')}</p>
-				<p class="inline-hint">${t('Open an Automation Anywhere folder, taskbot, or Packages page, then refresh.')}</p>
+				<div class="tools-target-group">
+					<div class="tools-subheading-row">
+						<strong>${t('Target page')}</strong>
+						<span class="tools-availability" role="status">
+							<span id="toolsAvailabilityDot" class="tools-availability-dot" data-available="false" aria-hidden="true"></span>
+							<span id="toolsAvailabilityText">${t('Not connected')}</span>
+						</span>
+					</div>
+					<div class="tools-target-picker" aria-label="${t('Control Room target')}">
+						<label>${t('Control Room')}<select id="toolsRoomSelect"><option value="">${t('Select a Control Room')}</option></select></label>
+						<label>${t('Page')}<select id="toolsPageSelect" disabled><option value="">${t('Select a page')}</option></select></label>
+					</div>
+					<p id="toolsContext" class="tools-context">${t('Open an Automation Anywhere folder, taskbot, or Packages page.')}</p>
+					<p class="inline-hint">${t('The selected page stays pinned when you switch browser tabs.')}</p>
+				</div>
 				<p id="toolsClipboardStatus" class="tools-clipboard-status" hidden></p>
-				<div id="toolsActions" class="tool-action-grid"></div>
-				<div id="toolsHelpMatrix" class="tools-help-matrix" hidden>
-					<p class="inline-hint">${t('Tools appear when the active tab is on a supported Automation Anywhere page.')}</p>
-					<dl>
-						<div>
-							<dt>${t('Taskbot editor')}</dt>
-							<dd>${t('Universal Clipboard, Taskbot JSON, Update Packages, Export Bots/Files')}</dd>
-						</div>
-						<div>
-							<dt>${t('Folder view')}</dt>
-							<dd>${t('Copy Files, Update Packages, Export Bots/Files, Import Taskbot')}</dd>
-						</div>
-						<div>
-							<dt>${t('Packages page')}</dt>
-							<dd>${t('Download Packages, Package Usage')}</dd>
-						</div>
-					</dl>
+				<div class="tools-actions-group">
+					<strong class="tools-subheading">${t('Available tools')}</strong>
+					<div id="toolsActions" class="tool-action-grid"></div>
 				</div>
 				<div id="toolsProgress" class="tools-progress" hidden aria-live="polite">
 					<div class="tools-progress-meta">
@@ -295,7 +353,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 					</label>
 				</div>
 				<div id="toolsFileList" class="tools-file-list"></div>
-				<button id="toolsLoadMore" type="button" hidden>${t('Load more')}</button>
+				<button id="toolsLoadMore" type="button" hidden>${icon('chevrons-down')}${t('Load more')}</button>
 				<p id="toolsActionHint" class="inline-hint" hidden></p>
 				<div id="toolsExportFormat" class="tools-export-format" role="radiogroup" aria-labelledby="toolsExportFormatLabel" hidden>
 					<span id="toolsExportFormatLabel" class="tools-export-format-label">${t('Export format')}</span>
@@ -311,10 +369,10 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 					</label>
 				</div>
 				<div class="tools-action-bar">
-					<button id="toolsPrimaryAction" type="button" disabled title="${t('Run selected tool action.')}">${t('Run')}</button>
-					<button id="toolsPackageVersions" type="button" hidden>${t('Browse versions')}</button>
+					<button id="toolsPrimaryAction" type="button" disabled title="${t('Run selected tool action.')}">${icon('play')}${t('Run')}</button>
+					<button id="toolsPackageVersions" type="button" hidden>${icon('package-search')}${t('Browse versions')}</button>
 					<span id="toolsPasteActionWrapper">
-						<button id="toolsPasteAction" type="button" hidden title="${t('Paste into this folder. Duplicates are skipped.')}">${t('Paste copied files')}</button>
+						<button id="toolsPasteAction" type="button" hidden title="${t('Paste into this folder. Duplicates are skipped.')}">${icon('clipboard-paste')}${t('Paste copied files')}</button>
 					</span>
 				</div>
 				<div id="packageUsageSection" class="package-usage-section" hidden>
@@ -327,17 +385,9 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				<div id="toolsExportPackageInfo" class="tools-export-package-info" hidden>
 					<div class="tools-export-package-header">
 						<strong class="package-list-label">${t('Packages used:')}</strong>
-						<button id="toolsCopyPackageList" type="button" title="${t('Copy package list to clipboard.')}">${t('Copy')}</button>
+						<button id="toolsCopyPackageList" type="button" title="${t('Copy package list to clipboard.')}">${icon('copy')}${t('Copy')}</button>
 					</div>
 					<div id="toolsPackageListContent" class="package-list-content"></div>
-				</div>
-				<div id="toolsFinishModal" class="tools-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="toolsFinishTitle" hidden>
-					<div class="tools-modal">
-						<h2 id="toolsFinishTitle">${t('Tool finished')}</h2>
-						<p id="toolsFinishSummary"></p>
-						<div id="toolsFinishLog" class="tools-finish-log"></div>
-						<button id="toolsFinishClose" type="button">${t('Close')}</button>
-					</div>
 				</div>
 			</section>
 
@@ -360,7 +410,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 							exportLabel: 'Export JSON',
 							exportHelp: 'Download textarea JSON as a .json file.',
 						})}
-						<button id="taskbotSaveJson" type="button">${t('Import JSON to control room')}</button>
+						<button id="taskbotSaveJson" type="button">${icon('file-up')}${t('Import JSON to control room')}</button>
 					</div>
 				</div>
 			</section>
@@ -372,8 +422,21 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 				<p class="inline-hint">${t('Creates a new taskbot in the current folder from a taskbot JSON file. Existing bots are never overwritten.')}</p>
 				<input id="importTaskbotFile" type="file" aria-label="${t('Taskbot JSON file')}">
 				<div class="button-grid">
-					<button id="importTaskbotRun" type="button" disabled title="${t('Create a new taskbot in this folder from a JSON file.')}">${t('Import to current folder')}</button>
+					<button id="importTaskbotRun" type="button" disabled title="${t('Create a new taskbot in this folder from a JSON file.')}">${icon('file-up')}${t('Import to current folder')}</button>
 				</div>
+			</section>
+
+			<section id="toolsJobsSection" class="panel-section" hidden>
+				<div class="section-heading-row">
+					<h2>${t('Jobs')}</h2>
+					<span class="section-heading-actions">
+						<button id="toolsJobsBack" type="button">${icon('arrow-left')}${t('Back to Tools')}</button>
+						<button id="toolsClearCompleted" type="button">${icon('trash-2')}${t('Clear completed')}</button>
+					</span>
+				</div>
+				<p class="inline-hint">${t('Jobs continue while you use other tabs or extension views. Closing this side panel interrupts them.')}</p>
+				<button id="toolsStopJob" type="button" hidden>${icon('square')}${t('Stop after current item')}</button>
+				<div id="toolsJobsList" class="tools-jobs-list" aria-live="polite"></div>
 			</section>
 
 		</section>
@@ -384,10 +447,19 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	options = initOptions;
 	contextText = getRequiredElement('#toolsContext');
 	toolsClipboardStatus = getRequiredElement('#toolsClipboardStatus');
-	toolsHelpMatrix = getRequiredElement('#toolsHelpMatrix');
 	availabilityDot = getRequiredElement('#toolsAvailabilityDot');
+	availabilityText = getRequiredElement('#toolsAvailabilityText');
 	refreshButton = getRequiredElement<HTMLButtonElement>('#toolsRefresh');
 	actionsContainer = getRequiredElement('#toolsActions');
+	roomSelect = getRequiredElement<HTMLSelectElement>('#toolsRoomSelect');
+	pageSelect = getRequiredElement<HTMLSelectElement>('#toolsPageSelect');
+	toolsWorkspace = getRequiredElement('#panel-tools');
+	toolsJobsSection = getRequiredElement('#toolsJobsSection');
+	toolsJobsButton = getRequiredElement<HTMLButtonElement>('#toolsJobsButton');
+	toolsJobsBackButton = getRequiredElement<HTMLButtonElement>('#toolsJobsBack');
+	toolsJobsBadge = getRequiredElement('#toolsJobsBadge');
+	toolsJobsList = getRequiredElement('#toolsJobsList');
+	toolsStopJobButton = getRequiredElement<HTMLButtonElement>('#toolsStopJob');
 	universalClipboardSection = getRequiredElement('#universalClipboardSection');
 	fileSection = getRequiredElement('#toolsFileSection');
 	listTitle = getRequiredElement('#toolsListTitle');
@@ -415,11 +487,6 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	packageUsageSection = getRequiredElement('#packageUsageSection');
 	packageUsageSummary = getRequiredElement('#packageUsageSummary');
 	packageUsageList = getRequiredElement('#packageUsageList');
-	toolsFinishModal = getRequiredElement('#toolsFinishModal');
-	toolsFinishTitle = getRequiredElement('#toolsFinishTitle');
-	toolsFinishSummary = getRequiredElement('#toolsFinishSummary');
-	toolsFinishLog = getRequiredElement('#toolsFinishLog');
-	toolsFinishClose = getRequiredElement<HTMLButtonElement>('#toolsFinishClose');
 	taskbotSection = getRequiredElement('#taskbotJsonSection');
 	taskbotJson = getRequiredElement<HTMLTextAreaElement>('#taskbotJson');
 	taskbotJsonMeta = getRequiredElement('#taskbotJsonMeta');
@@ -438,8 +505,14 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	});
 
 	refreshButton.addEventListener('click', () => {
-		void refreshToolsContext();
+		void scanControlRooms(true);
 	});
+	roomSelect.addEventListener('change', handleRoomSelection);
+	pageSelect.addEventListener('change', () => void handlePageSelection());
+	toolsJobsButton.addEventListener('click', () => showToolsSubview(true));
+	toolsJobsBackButton.addEventListener('click', () => showToolsSubview(false));
+	toolsStopJobButton.addEventListener('click', requestActiveJobStop);
+	getRequiredElement<HTMLButtonElement>('#toolsClearCompleted').addEventListener('click', clearCompletedJobs);
 	searchInput.addEventListener('input', handleToolsSearchInput);
 	selectAllInput.addEventListener('change', toggleVisibleSelection);
 	primaryActionButton.addEventListener('click', () => {
@@ -459,10 +532,6 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	toolsCopyPackageList.addEventListener('click', () => {
 		void copyExportPackageList();
 	});
-	toolsFinishClose.addEventListener('click', hideToolFinishModal);
-	toolsFinishModal.addEventListener('click', (event) => {
-		if (event.target === toolsFinishModal) hideToolFinishModal();
-	});
 	taskbotJsonSaveButton.addEventListener('click', () => {
 		void saveTaskbotJson();
 	});
@@ -477,7 +546,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	});
 	resetExportFormatToDefault();
 
-	void refreshToolsContext();
+	void initializeToolsSession();
 }
 
 function getRequiredElement<T extends HTMLElement = HTMLElement>(selector: string): T {
@@ -499,13 +568,171 @@ function clearPackageSearchTimer(): void {
 	packageSearchTimer = null;
 }
 
-export function scheduleToolsContextRefresh(): void {
-	if (!options) return;
-	if (refreshToolsContextTimer) clearTimeout(refreshToolsContextTimer);
-	refreshToolsContextTimer = setTimeout(() => {
-		refreshToolsContextTimer = null;
-		void refreshToolsContext();
-	}, 250);
+async function initializeToolsSession(): Promise<void> {
+	selectedTarget = await selectedTargetStorage.getValue();
+	selectedRoomOrigin = (await selectedRoomStorage.getValue()) || selectedTarget?.origin || '';
+	const storedJobs = await toolJobHistoryStorage.getValue();
+	const interruptedIds = new Set(
+		storedJobs.filter((job) => job.status === 'running' || job.status === 'stopping').map((job) => job.id)
+	);
+	jobHistory = recoverInterruptedToolJobs(storedJobs);
+	await toolJobHistoryStorage.setValue(jobHistory);
+	renderJobs();
+	for (const job of jobHistory) {
+		if (interruptedIds.has(job.id)) void notifyJob(job);
+	}
+	await scanControlRooms();
+}
+
+async function scanControlRooms(manual = false): Promise<void> {
+	if (activeToolRun || refreshingTargets) return;
+	refreshingTargets = true;
+	refreshButton.disabled = true;
+	refreshButton.setAttribute('aria-busy', 'true');
+	updateAvailabilityDot(false, t('Checking connections...'));
+	contextText.textContent = t('Checking signed-in Control Rooms in this window...');
+	try {
+		const tabs = await browser.tabs.query({ currentWindow: true });
+		const currentTabId = tabs.find((tab) => tab.active)?.id;
+		const candidates = await Promise.all(tabs.map(async (tab) => {
+			if (tab.id === undefined || tab.windowId === undefined || !tab.url || !isAutomationAnywhereUrl(tab.url)) return null;
+			let authenticated = false;
+			try {
+				await getAutomationAnywhereAuthToken(tab.id);
+				authenticated = true;
+			} catch {
+				// Logged-out pages remain excluded; credentials are never retained.
+			}
+			return {
+				tabId: tab.id,
+				windowId: tab.windowId,
+				url: tab.url,
+				title: tab.title,
+				authenticated,
+				context: parseAutomationAnywherePageContext(tab.url),
+			};
+		}));
+		targetGroups = groupAuthenticatedControlRoomTabs(candidates.filter((candidate) => candidate !== null));
+		const singleRoomOrigin = getSingleControlRoomOrigin(targetGroups);
+		if (singleRoomOrigin) selectedRoomOrigin = singleRoomOrigin;
+		else if (!targetGroups.some((group) => group.origin === selectedRoomOrigin)) selectedRoomOrigin = '';
+		if (selectedTarget) {
+			const currentPage = targetGroups
+				.find((group) => group.origin === selectedTarget?.origin)
+				?.pages.find((page) => page.tabId === selectedTarget?.tabId);
+			if (!currentPage?.eligible) {
+				selectedTarget = { ...selectedTarget, disconnected: true };
+			} else if (manual && !selectedTarget.disconnected) {
+				selectedTarget = {
+					...selectedTarget,
+					url: currentPage.url,
+					disconnected: false,
+					stale: false,
+				};
+			} else if (!selectedTarget.disconnected && currentPage.url !== selectedTarget.url) {
+				selectedTarget = markSelectedTargetRouteChanged(selectedTarget, currentPage.tabId, currentPage.url);
+			}
+		}
+		if (manual && selectedTarget?.disconnected) {
+			selectedTarget =
+				getOnlyRoomCurrentEligibleTarget(targetGroups, currentTabId) ?? selectedTarget;
+		}
+		if (!selectedTarget) {
+			selectedTarget = getFirstEligibleTarget(targetGroups);
+		}
+		if (selectedTarget && !selectedTarget.disconnected) {
+			selectedRoomOrigin = selectedTarget.origin;
+		}
+		await selectedTargetStorage.setValue(selectedTarget);
+		await selectedRoomStorage.setValue(selectedRoomOrigin);
+		renderTargetSelectors();
+		await refreshToolsContext();
+	} finally {
+		refreshingTargets = false;
+		refreshButton.removeAttribute('aria-busy');
+		updateTargetLocks();
+	}
+}
+
+function renderTargetSelectors(): void {
+	roomSelect.textContent = '';
+	roomSelect.append(new Option(t('Select a Control Room'), ''));
+	for (const group of targetGroups) {
+		roomSelect.append(
+			new Option(`${formatControlRoomHostname(group.hostname)} (${group.pages.length})`, group.origin)
+		);
+	}
+	roomSelect.value = targetGroups.some((group) => group.origin === selectedRoomOrigin)
+		? selectedRoomOrigin
+		: '';
+	pageSelect.textContent = '';
+	pageSelect.append(new Option(t('Select a page'), ''));
+	const group = targetGroups.find((item) => item.origin === roomSelect.value);
+	for (const page of group?.pages ?? []) {
+		const option = new Option(formatControlRoomPageTitle(page.title), String(page.tabId));
+		option.disabled = !page.eligible;
+		if (!page.eligible) option.textContent += ` — ${t('Unsupported page')}`;
+		pageSelect.append(option);
+	}
+	pageSelect.value = selectedTarget && group?.pages.some((page) => page.tabId === selectedTarget?.tabId)
+		? String(selectedTarget.tabId)
+		: '';
+	updateTargetLocks();
+}
+
+function updateTargetLocks(): void {
+	const locked = Boolean(activeToolRun);
+	roomSelect.disabled = locked || targetGroups.length === 0;
+	pageSelect.disabled = locked || !roomSelect.value;
+	refreshButton.disabled = locked || refreshingTargets;
+}
+
+function handleRoomSelection(): void {
+	if (activeToolRun) return;
+	selectedRoomOrigin = roomSelect.value;
+	selectedTarget = null;
+	void selectedTargetStorage.setValue(null);
+	void selectedRoomStorage.setValue(selectedRoomOrigin);
+	renderTargetSelectors();
+	contextText.textContent = roomSelect.value ? t('Select a page.') : t('Select a Control Room.');
+}
+
+async function handlePageSelection(): Promise<void> {
+	if (activeToolRun) return;
+	const group = targetGroups.find((item) => item.origin === roomSelect.value);
+	const page = group?.pages.find((item) => String(item.tabId) === pageSelect.value && item.eligible);
+	selectedRoomOrigin = group?.origin ?? '';
+	selectedTarget = page ? { origin: group!.origin, tabId: page.tabId, url: page.url, stale: false, disconnected: false } : null;
+	await selectedTargetStorage.setValue(selectedTarget);
+	await selectedRoomStorage.setValue(selectedRoomOrigin);
+	renderTargetSelectors();
+	await refreshToolsContext();
+}
+
+export async function markToolsTargetRouteChanged(tabId: number, url: string): Promise<void> {
+	if (!selectedTarget) return;
+	const next = markSelectedTargetRouteChanged(selectedTarget, tabId, url);
+	if (next === selectedTarget) return;
+	selectedTarget = next;
+	await selectedTargetStorage.setValue(next);
+	if (!activeToolRun) runtime = null;
+	contextText.textContent = t('The selected page changed. Select Refresh to continue.');
+	renderTargetSelectors();
+}
+
+export async function markToolsTargetDisconnected(tabId: number): Promise<void> {
+	if (!selectedTarget) return;
+	const next = markSelectedTargetDisconnected(selectedTarget, tabId);
+	if (next === selectedTarget) return;
+	selectedTarget = next;
+	await selectedTargetStorage.setValue(next);
+	if (!activeToolRun) runtime = null;
+	contextText.textContent = t('The selected page is disconnected. Select Refresh to reconnect or choose another page.');
+	renderTargetSelectors();
+}
+
+export function getSelectedToolsTargetTabId(): number | undefined {
+	return canUseSelectedTarget(selectedTarget) ? selectedTarget!.tabId : undefined;
 }
 
 function updateCopiedFilesStatus(): void {
@@ -680,6 +907,7 @@ async function copyExportPackageList(): Promise<void> {
 
 function addRunLine(message: string, severity: FeedbackSeverity = 'info'): void {
 	activeToolRun?.lines.push({ message, severity });
+	if (activeToolRun) jobHistory = prependToolJob(jobHistory, activeToolRun);
 }
 
 function appendToolLog(
@@ -693,7 +921,7 @@ function appendToolLog(
 		'tools',
 		message,
 		{
-			...(activeToolRun ? { runId: activeToolRun.runId } : {}),
+			...(activeToolRun ? { runId: activeToolRun.id } : {}),
 			...(currentTool ? { tool: currentTool } : {}),
 			...details,
 		},
@@ -717,58 +945,23 @@ function setToolProgress(completed: number, total: number, message: string): voi
 	if (activeToolRun) {
 		activeToolRun.completed = completed;
 		activeToolRun.total = total;
+		jobHistory = prependToolJob(jobHistory, activeToolRun);
+		void persistJobs();
 	}
 }
 
 function startToolRun(title: string, total: number, message: string): void {
-	activeToolRun = {
-		runId: crypto.randomUUID(),
-		title,
-		total,
-		completed: 0,
-		lines: [],
-		startedAt: Date.now(),
-	};
+	if (activeToolRun || !runtime) throw new Error(t('Another job is already running.'));
+	activeToolRun = createToolJob(crypto.randomUUID(), title, total, {
+		controlRoom: runtime.context.hostname,
+		pageTitle: targetGroups.flatMap((group) => group.pages).find((page) => page.tabId === runtime?.tabId)?.title ?? getContextLabel(runtime.context),
+		tabId: runtime.tabId,
+	});
+	jobHistory = prependToolJob(jobHistory, activeToolRun);
+	void persistJobs();
+	setJobLock(true);
 	setToolProgress(0, total, message);
 	appendToolLog(message);
-}
-
-function hideToolFinishModal(): void {
-	toolsFinishModal.hidden = true;
-}
-
-function showToolFinishModal(
-	run: ToolRunState,
-	summary: string,
-	severity: FeedbackSeverity
-): void {
-	toolsFinishTitle.textContent =
-		severity === 'error'
-			? t('{title} failed', { title: run.title })
-			: severity === 'warn'
-				? t('{title} finished with warnings', { title: run.title })
-				: t('{title} finished', { title: run.title });
-	const seconds = Math.max(0, Math.round((Date.now() - run.startedAt) / 1000));
-	toolsFinishSummary.textContent = t('{summary} Duration: {seconds}s.', {
-		summary,
-		seconds,
-	});
-	toolsFinishLog.textContent = '';
-	if (!run.lines.length) {
-		const empty = document.createElement('p');
-		empty.className = 'tools-finish-empty';
-		empty.textContent = t('No actions recorded.');
-		toolsFinishLog.appendChild(empty);
-	} else {
-		for (const line of run.lines) {
-			const row = document.createElement('div');
-			row.className = `tools-finish-line tools-finish-${line.severity}`;
-			row.textContent = `${line.severity.toUpperCase()} - ${line.message}`;
-			toolsFinishLog.appendChild(row);
-		}
-	}
-	toolsFinishModal.hidden = false;
-	requestAnimationFrame(() => toolsFinishClose.focus());
 }
 
 function finishToolRun(
@@ -778,24 +971,164 @@ function finishToolRun(
 	const run = activeToolRun;
 	if (!run) return;
 	addRunLine(summary, severity);
-	setToolProgress(run.total, run.total, summary);
+	const status = run.stopRequested
+		? 'stopped'
+		: severity === 'error'
+			? 'failed'
+			: severity === 'warn'
+				? 'warning'
+				: 'completed';
+	const completed = status === 'stopped' ? run.completed : run.total;
+	setToolProgress(completed, run.total, summary);
+	const finished = completeToolJob(run, status, summary);
+	if (showingJobs) finished.unread = false;
+	jobHistory = prependToolJob(jobHistory, finished);
 	activeToolRun = null;
+	void persistJobs();
+	setJobLock(false);
+	if (!canUseSelectedTarget(selectedTarget)) void refreshToolsContext();
 	void options.addFeedback(
 		severity,
 		'tools',
 		t('{title} run finished.', { title: run.title }),
 		{
-			runId: run.runId,
+			runId: run.id,
 			tool: currentTool,
-			title: run.title,
-			total: run.total,
-			completed: run.completed,
-			durationMs: Date.now() - run.startedAt,
+			title: finished.title,
+			total: finished.total,
+			completed: finished.completed,
+			durationMs: (finished.finishedAt ?? Date.now()) - finished.startedAt,
 			summary,
 		},
 		{ keepDetails: true, debugOnly: severity === 'info' }
 	);
-	showToolFinishModal(run, summary, severity);
+	void notifyJob(finished);
+}
+
+async function persistJobs(): Promise<void> {
+	await toolJobHistoryStorage.setValue(jobHistory);
+	renderJobs();
+}
+
+function setJobLock(locked: boolean): void {
+	for (const button of toolsWorkspace.querySelectorAll<HTMLButtonElement>('button')) {
+		if (
+			button === toolsJobsButton ||
+			button === toolsJobsBackButton ||
+			button === toolsStopJobButton
+		) continue;
+		button.disabled = locked;
+	}
+	toolsStopJobButton.hidden = !locked;
+	toolsStopJobButton.disabled = false;
+	setSidepanelIconButtonContent(toolsStopJobButton, 'square', t('Stop after current item'));
+	updateTargetLocks();
+}
+
+function requestActiveJobStop(): void {
+	if (!activeToolRun) return;
+	activeToolRun = requestToolJobStop(activeToolRun);
+	jobHistory = prependToolJob(jobHistory, activeToolRun);
+	toolsStopJobButton.disabled = true;
+	setSidepanelIconButtonContent(toolsStopJobButton, 'circle-stop', t('Stopping after current item...'));
+	void persistJobs();
+}
+
+function finishStoppedJob(): boolean {
+	if (!activeToolRun?.stopRequested) return false;
+	finishToolRun(t('Stopped after the current item. Completed work remains and is listed in the job log.'), 'warn');
+	return true;
+}
+
+function showToolsSubview(jobs: boolean): void {
+	showingJobs = jobs;
+	toolsJobsSection.hidden = !jobs;
+	for (const section of toolsWorkspace.querySelectorAll<HTMLElement>(':scope > .panel-section')) {
+		if (section === toolsJobsSection || section.id === 'toolsOverviewSection') continue;
+		if (jobs) section.hidden = true;
+	}
+	if (!jobs) setSelectedToolPanel(currentTool);
+	if (jobs) {
+		jobHistory = clearToolJobUnread(jobHistory);
+		void persistJobs();
+	}
+	renderJobs();
+}
+
+export function openToolsJobs(): void {
+	showToolsSubview(true);
+}
+
+function renderJobs(): void {
+	if (!toolsJobsList) return;
+	const unread = getUnreadToolJobCount(jobHistory);
+	toolsJobsButton.hidden = !(showingJobs || Boolean(activeToolRun) || unread > 0);
+	toolsJobsBadge.textContent = String(unread);
+	toolsJobsBadge.hidden = unread === 0;
+	document.querySelector<HTMLElement>('#jobsTabBadge')?.toggleAttribute('hidden', unread === 0);
+	const topBadge = document.querySelector<HTMLElement>('#jobsTabBadge');
+	if (topBadge) topBadge.textContent = String(unread);
+	toolsJobsList.textContent = '';
+	if (!jobHistory.length) {
+		const empty = document.createElement('p');
+		empty.className = 'inline-hint';
+		empty.textContent = t('No jobs yet.');
+		toolsJobsList.append(empty);
+		return;
+	}
+	for (const job of jobHistory) {
+		const card = document.createElement('article');
+		card.className = 'tool-job-card';
+		const title = document.createElement('div');
+		title.className = 'tool-job-title';
+		const statusIcon = document.createElement('span');
+		statusIcon.className = `tool-job-status tool-job-status-${job.status}`;
+		setSidepanelIconContent(
+			statusIcon,
+			job.status === 'completed'
+				? 'circle-check-big'
+				: job.status === 'warning'
+					? 'triangle-alert'
+					: job.status === 'running'
+						? 'activity'
+						: job.status === 'stopping' || job.status === 'stopped'
+							? 'circle-stop'
+							: 'circle-x'
+		);
+		const heading = document.createElement('strong');
+		heading.textContent = job.title;
+		title.append(statusIcon, heading);
+		const meta = document.createElement('small');
+		meta.textContent = `${job.controlRoom} · ${job.status} · ${job.completed}/${job.total}`;
+		const summary = document.createElement('p');
+		summary.textContent = job.summary || t('In progress');
+		const details = document.createElement('details');
+		const detailsSummary = document.createElement('summary');
+		detailsSummary.textContent = t('Details');
+		const log = document.createElement('pre');
+		log.textContent = job.lines.map((line) => `${line.severity.toUpperCase()} ${line.message}`).join('\n');
+		details.append(detailsSummary, log);
+		card.append(title, meta, summary, details);
+		toolsJobsList.append(card);
+	}
+}
+
+function clearCompletedJobs(): void {
+	jobHistory = clearCompletedToolJobs(jobHistory);
+	void persistJobs();
+}
+
+async function notifyJob(job: ToolJobRecord): Promise<void> {
+	if (!(await getBackgroundJobNotificationsEnabled())) return;
+	const duration = Math.max(0, Math.round(((job.finishedAt ?? Date.now()) - job.startedAt) / 1000));
+	const windowId = targetGroups.flatMap((group) => group.pages).find((page) => page.tabId === job.tabId)?.windowId;
+	void browser.runtime.sendMessage({
+		type: 'SHOW_JOB_NOTIFICATION',
+		jobId: job.id,
+		title: job.title,
+		message: `${job.controlRoom} · ${job.status} · ${duration}s · ${job.completed}/${job.total}`,
+		windowId,
+	});
 }
 
 function setBusy(button: HTMLButtonElement, busy: boolean, label?: string): void {
@@ -803,20 +1136,10 @@ function setBusy(button: HTMLButtonElement, busy: boolean, label?: string): void
 	if (label) button.textContent = label;
 }
 
-function updateAvailabilityDot(hasTools: boolean): void {
+function updateAvailabilityDot(hasTools: boolean, unavailableLabel = t('Not connected')): void {
 	availabilityDot.dataset.available = String(hasTools);
-	availabilityDot.setAttribute(
-		'aria-label',
-		hasTools
-			? t('Tools available on current page')
-			: t('No tools available on current page')
-	);
+	availabilityText.textContent = hasTools ? t('Ready') : unavailableLabel;
 	refreshButton.dataset.hasTools = String(hasTools);
-}
-
-function setToolsHelpMatrixVisible(visible: boolean): void {
-	toolsHelpMatrix.hidden = !visible;
-	toolsHelpMatrix.setAttribute('aria-hidden', String(!visible));
 }
 
 function isFolderTool(
@@ -867,17 +1190,39 @@ async function refreshToolsContext(): Promise<void> {
 	taskbotJsonBaseline = null;
 	updateCopiedFilesStatus();
 	updateAvailabilityDot(false);
-	setToolsHelpMatrixVisible(false);
 
 	try {
-		const active = await getActiveAutomationAnywhereContext();
+		if (!canUseSelectedTarget(selectedTarget)) {
+			runtime = null;
+			currentTool = null;
+			updateAvailabilityDot(
+				false,
+				selectedTarget?.disconnected
+					? t('Disconnected')
+					: selectedTarget?.stale
+						? t('Refresh required')
+						: targetGroups.length === 0
+							? t('No signed-in Control Room')
+							: t('Select a supported page')
+			);
+			contextText.textContent = selectedTarget?.disconnected
+				? t('The selected page is disconnected. Select Refresh to reconnect or choose another page.')
+				: selectedTarget?.stale
+					? t('The selected page changed. Select Refresh to continue.')
+					: targetGroups.length === 0
+						? t('No signed-in Control Rooms found in this window. Open one, then select Refresh.')
+						: t('No supported page is open in this Control Room.');
+			renderActionButtons();
+			return;
+		}
+		const active = await getAutomationAnywhereContextForTab(selectedTarget!.tabId);
 		if (!active || active.context.pageType === 'unsupported') {
 			runtime = null;
 			currentTool = null;
+			updateAvailabilityDot(false, t('Unsupported page'));
 			contextText.textContent = getUnsupportedToolsContextText(active);
 			setSelectedToolPanel(null);
 			renderActionButtons();
-			setToolsHelpMatrixVisible(true);
 			void options.addFeedback(
 				'info',
 				'tools',
@@ -887,14 +1232,22 @@ async function refreshToolsContext(): Promise<void> {
 							pageType: active.context.pageType,
 							host: active.context.hostname,
 						}
-					: { reason: 'no-active-tab' },
+					: { reason: 'selected-tab-unavailable' },
 				{ keepDetails: true, debugOnly: true }
 			);
 			return;
 		}
 
 		const capabilities = await getToolCapabilities(active.tabId);
-		const authToken = await getAutomationAnywhereAuthToken(active.tabId);
+		let authToken: string;
+		try {
+			authToken = await getAutomationAnywhereAuthToken(active.tabId);
+		} catch {
+			selectedTarget = { ...selectedTarget!, disconnected: true };
+			await selectedTargetStorage.setValue(selectedTarget);
+			renderTargetSelectors();
+			throw new Error(t('The selected page is logged out. Sign in, then select Refresh.'));
+		}
 		runtime = {
 			...active,
 			api: new AutomationAnywhereApi(active.context.baseUrl, authToken),
@@ -918,7 +1271,6 @@ async function refreshToolsContext(): Promise<void> {
 			{ keepDetails: true, debugOnly: true }
 		);
 		updateAvailabilityDot(tools.length > 0);
-		setToolsHelpMatrixVisible(tools.length === 0);
 		updatePackagesDot = false;
 
 		if (isFolderContext(active.context)) {
@@ -955,6 +1307,7 @@ async function refreshToolsContext(): Promise<void> {
 	} catch (error) {
 		runtime = null;
 		currentTool = null;
+		updateAvailabilityDot(false, t('Connection failed'));
 		setSelectedToolPanel(null);
 		contextText.textContent =
 			error instanceof Error ? error.message : t('Tools context failed.');
@@ -1121,6 +1474,16 @@ function getToolLabel(tool: ToolId): string {
 	return t('Taskbot JSON');
 }
 
+function getToolIcon(tool: ToolId): BetterAaIconName {
+	if (tool === 'universal-clipboard') return 'clipboard-paste';
+	if (tool === 'copy-files') return 'clipboard-copy';
+	if (tool === 'update-packages') return 'package-check';
+	if (tool === 'export-bots' || tool === 'download-packages') return 'download';
+	if (tool === 'package-usage') return 'scan-search';
+	if (tool === 'import-taskbot') return 'file-up';
+	return 'file-json';
+}
+
 function getToolActionHelp(tool: ToolId): string {
 	if (tool === 'universal-clipboard') return t('Use saved AA clipboard slots.');
 	if (tool === 'copy-files') return t('Copy file references inside this extension.');
@@ -1221,15 +1584,16 @@ async function refreshUpdatePackagesDot(activeRuntime: ToolsRuntime): Promise<vo
 function renderActionButtons(): void {
 	const context = runtime?.context;
 	actionsContainer.textContent = '';
-	if (!context) return;
+	actionsContainer.dataset.available = String(Boolean(context));
 
-	for (const tool of getAvailableTools(context)) {
+	for (const tool of context ? getAvailableTools(context) : ALL_TOOL_IDS) {
 		const button = document.createElement('button');
 		button.type = 'button';
-		button.textContent = getToolLabel(tool);
+		setSidepanelIconButtonContent(button, getToolIcon(tool), getToolLabel(tool));
 		button.dataset.toolAction = tool;
 		button.className = tool === currentTool ? 'is-active tool-action-button' : 'tool-action-button';
 		button.title = getToolActionHelp(tool);
+		button.disabled = !context;
 		button.addEventListener('click', () => {
 			void selectTool(tool);
 		});
@@ -1985,24 +2349,26 @@ function updateActionBar(): void {
 	primaryActionButton.hidden = packageDetailsUsageMode;
 	primaryActionButton.disabled =
 		currentTool === 'package-usage' ? !usagePackage && !packageDetailsName : count === 0;
-	if (currentTool === 'copy-files') primaryActionButton.textContent = t('Copy {count} file(s)', { count });
+	if (currentTool === 'copy-files') {
+		setSidepanelIconButtonContent(primaryActionButton, 'clipboard-copy', t('Copy {count} file(s)', { count }));
+	}
 	if (currentTool === 'update-packages') {
-		primaryActionButton.textContent = isCurrentTaskbotPackageSelectionMode()
+		setSidepanelIconButtonContent(primaryActionButton, 'package-check', isCurrentTaskbotPackageSelectionMode()
 			? t('Update {count} package(s)', { count })
 			: currentTaskbotMode
 			? t('Update current bot')
-			: t('Update {count} bot(s)', { count });
+			: t('Update {count} bot(s)', { count }));
 	}
 	if (currentTool === 'export-bots') {
-		primaryActionButton.textContent = currentTaskbotMode
+		setSidepanelIconButtonContent(primaryActionButton, 'download', currentTaskbotMode
 			? t('Export current bot')
-			: t('Export {count} file(s)', { count });
+			: t('Export {count} file(s)', { count }));
 	}
 	if (currentTool === 'download-packages') {
-		primaryActionButton.textContent = t('Download {count} package(s)', { count });
+		setSidepanelIconButtonContent(primaryActionButton, 'download', t('Download {count} package(s)', { count }));
 	}
 	if (currentTool === 'package-usage') {
-		primaryActionButton.textContent = t('View usage');
+		setSidepanelIconButtonContent(primaryActionButton, 'scan-search', t('View usage'));
 	}
 	primaryActionButton.title = getPrimaryActionHelp(currentTool);
 	packageVersionsButton.hidden =
@@ -2010,9 +2376,11 @@ function updateActionBar(): void {
 	packageVersionsButton.disabled =
 		packageListLoading ||
 		(!packageVersionDrilldownMode && getSelectedPackages().length !== 1);
-	packageVersionsButton.textContent = packageVersionDrilldownMode
-		? t('Back to packages')
-		: t('Browse versions');
+	setSidepanelIconButtonContent(
+		packageVersionsButton,
+		packageVersionDrilldownMode ? 'arrow-left' : 'package-search',
+		packageVersionDrilldownMode ? t('Back to packages') : t('Browse versions')
+	);
 	packageVersionsButton.title = packageVersionDrilldownMode
 		? t('Return to the package list.')
 		: t('Browse all available versions of the selected package.');
@@ -2025,9 +2393,11 @@ function updateActionBar(): void {
 	pasteActionWrapper.hidden = !canPaste;
 	pasteActionButton.hidden = !canPaste;
 	pasteActionButton.disabled = !canPaste;
-	pasteActionButton.textContent = t('Paste {count} copied file(s)', {
-		count: copiedFiles.length,
-	});
+	setSidepanelIconButtonContent(
+		pasteActionButton,
+		'clipboard-paste',
+		t('Paste {count} copied file(s)', { count: copiedFiles.length })
+	);
 
 	loadMoreButton.hidden =
 		currentTaskbotMode ||
@@ -2195,7 +2565,7 @@ function appendPackageUsageRow(
 
 	const copyButton = document.createElement('button');
 	copyButton.type = 'button';
-	copyButton.textContent = t('Copy path');
+	setSidepanelIconButtonContent(copyButton, 'copy', t('Copy path'));
 	copyButton.addEventListener('click', () => {
 		void copyPackageUsagePath(row);
 	});
@@ -2240,6 +2610,7 @@ async function loadPackageUsage(
 	packageUsagePackageKey = packageKey;
 	resetToolProgress();
 	renderPackageUsageResults();
+	startToolRun(t('Package Usage'), 1, t('Scanning package usage...'));
 
 	try {
 		let offset = 0;
@@ -2253,6 +2624,8 @@ async function loadPackageUsage(
 			const rawList = response.list ?? [];
 			packageUsageItems.push(...rawList);
 			offset += rawList.length;
+			setToolProgress(offset, Math.max(offset, getResponseTotal(response) ?? offset), t('Loaded {count} usage row(s).', { count: offset }));
+			if (finishStoppedJob()) return;
 			if (
 				!hasMoreAutomationAnywherePackageUsage(
 					offset,
@@ -2264,20 +2637,21 @@ async function loadPackageUsage(
 		}
 		packageUsageLoading = false;
 		renderPackageUsageResults();
-		setToolStatus(t('{count} usage row(s) loaded.', { count: packageUsageItems.length }));
+		const summary = t('{count} usage row(s) loaded.', { count: packageUsageItems.length });
+		setToolStatus(summary);
+		finishToolRun(summary);
 	} catch (error) {
 		if (runtime !== activeRuntime || currentTool !== selectedTool) return;
 		packageUsageLoading = false;
 		renderPackageUsageResults();
 		const message = error instanceof Error ? error.message : t('Package usage failed.');
-		setToolStatus(
-			message.startsWith('403 ')
+		const recovery = message.startsWith('403 ')
 				? t('Manage packages permission required.')
 				: isPackageStatusEnumError(message)
 					? t('Package status filter failed. Refresh packages and try again.')
-				: message,
-			'error'
-		);
+					: message;
+		setToolStatus(recovery, 'error');
+		finishToolRun(recovery, 'error');
 	} finally {
 		if (runtime === activeRuntime && currentTool === selectedTool) {
 			setBusy(primaryActionButton, false);
@@ -2317,7 +2691,6 @@ function copySelectedFiles(): void {
 			hostname: context.hostname,
 		});
 	}
-	hideToolFinishModal();
 	toolsProgress.hidden = true;
 	updateCopiedFilesStatus();
 	const summary = t('{count} file(s) in clipboard. Open target folder to paste.', {
@@ -2379,6 +2752,7 @@ async function pasteCopiedFiles(): Promise<void> {
 						total: copiedFiles.length,
 					})
 				);
+				if (finishStoppedJob()) return;
 				continue;
 			}
 			try {
@@ -2404,6 +2778,7 @@ async function pasteCopiedFiles(): Promise<void> {
 					total: copiedFiles.length,
 				})
 			);
+			if (finishStoppedJob()) return;
 		}
 
 		await refreshAutomationAnywhereFolderList(activeRuntime.tabId);
@@ -2572,6 +2947,7 @@ async function updateSelectedPackages(): Promise<void> {
 						count: index + 1,
 						total: bots.length,
 					}));
+					if (finishStoppedJob()) return;
 					continue;
 				}
 				await activeRuntime.api.updateBotContent(fileId, result.content);
@@ -2594,6 +2970,7 @@ async function updateSelectedPackages(): Promise<void> {
 				count: index + 1,
 				total: bots.length,
 			}));
+			if (finishStoppedJob()) return;
 		}
 
 		if (updated > 0 && taskbotTabId !== undefined) {
@@ -2641,6 +3018,10 @@ async function exportSelectedBots(): Promise<void> {
 			try {
 				await exportSelectedFilesAsZip(activeRuntime, files);
 			} catch (error) {
+				if (error instanceof ToolJobStoppedError) {
+					finishStoppedJob();
+					return;
+				}
 				const message = getErrorMessage(error);
 				appendToolLog(t('ZIP export failed: {message}', { message }), 'error');
 				setToolStatus(t('ZIP export failed. Falling back to separate files.'), 'warn');
@@ -2705,6 +3086,7 @@ async function exportSelectedFilesSeparately(
 			count: index + 1,
 			total: files.length,
 		}));
+		if (finishStoppedJob()) return;
 		if (index < files.length - 1) await delay(300);
 	}
 	const summary = t('Export files done. Exported {exported}, failed {failed}.', {
@@ -2738,6 +3120,7 @@ async function exportSelectedFilesAsZip(
 	} else {
 		appendToolLog(t('No taskbots selected. Skipping dependency lookup.'));
 	}
+	if (activeToolRun?.stopRequested) throw new ToolJobStoppedError();
 
 	const exportItems = dedupeAutomationAnywhereFiles([...selectedFiles, ...dependencyItems]);
 	if (!exportItems.length) throw new Error(t('No files found.'));
@@ -2770,6 +3153,7 @@ async function exportSelectedFilesAsZip(
 	);
 	const fileBlobs = await downloadExportFiles(activeRuntime, exportItems, selectedIds);
 	const metadataBlobs = await downloadMetadataFiles(activeRuntime, metadataReferences);
+	if (activeToolRun?.stopRequested) throw new ToolJobStoppedError();
 	setToolProgress(3, 5, t('Creating ZIP...'));
 	appendToolLog(t('Creating ZIP...'));
 	const archive = await createExportArchive(
@@ -2784,6 +3168,7 @@ async function exportSelectedFilesAsZip(
 		}
 	);
 	setToolProgress(4, 5, t('Download ready.'));
+	if (activeToolRun?.stopRequested) throw new ToolJobStoppedError();
 	const fileName = `better-aa-export-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
 	downloadBlob(archive, fileName);
 	appendToolLog(t('Downloaded: {fileName}', { fileName }));
@@ -2846,6 +3231,7 @@ async function downloadSelectedPackages(): Promise<void> {
 				count: index + 1,
 				total: packages.length,
 			}));
+			if (finishStoppedJob()) return;
 			if (index < packages.length - 1) await delay(300);
 		}
 
@@ -3050,6 +3436,7 @@ async function importTaskbotFromFile(): Promise<void> {
 
 	const baseName = getImportTaskbotBaseName(file.name);
 	setBusy(importTaskbotRunButton, true, t('Importing...'));
+	startToolRun(t('Import Taskbot'), 1, t('Importing Taskbot...'));
 	try {
 		const existingNames = await loadFolderFileNames(activeRuntime, folderId);
 		const finalName = pickAvailableTaskbotName(baseName, existingNames);
@@ -3057,11 +3444,12 @@ async function importTaskbotFromFile(): Promise<void> {
 		await activeRuntime.api.updateBotContent(created.id, parsed);
 		await refreshAutomationAnywhereFolderList(activeRuntime.tabId);
 		importTaskbotFileInput.value = '';
-		setToolStatus(
+		const summary =
 			finalName === baseName
 				? t('Imported {name}.', { name: finalName })
-				: t('Name taken. Imported as {name}.', { name: finalName })
-		);
+				: t('Name taken. Imported as {name}.', { name: finalName });
+		setToolStatus(summary);
+		finishToolRun(summary);
 		void options.addFeedback(
 			'info',
 			'tools',
@@ -3076,7 +3464,9 @@ async function importTaskbotFromFile(): Promise<void> {
 			{ keepDetails: true, debugOnly: true }
 		);
 	} catch (error) {
-		setToolStatus(error instanceof Error ? error.message : t('Import failed.'), 'error');
+		const message = error instanceof Error ? error.message : t('Import failed.');
+		setToolStatus(message, 'error');
+		finishToolRun(message, 'error');
 		void options.addFeedback(
 			'error',
 			'tools',
@@ -3160,6 +3550,7 @@ async function scanTaskbotExportContent(
 				total: taskbots.length,
 			})
 		);
+		if (activeToolRun?.stopRequested) throw new ToolJobStoppedError();
 	}
 	return {
 		metadataReferences,
@@ -3220,6 +3611,7 @@ async function downloadExportFiles(
 				total: items.length,
 			})
 		);
+		if (activeToolRun?.stopRequested) throw new ToolJobStoppedError();
 	}
 	return blobs;
 }
@@ -3263,6 +3655,7 @@ async function downloadMetadataFiles(
 				total: references.length,
 			})
 		);
+		if (activeToolRun?.stopRequested) throw new ToolJobStoppedError();
 	}
 	return blobs;
 }

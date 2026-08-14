@@ -1,5 +1,6 @@
 import { isTaskEditorUrl } from './automation-anywhere';
 import { t } from './i18n';
+import { setContentIconButton } from './content-icons';
 import {
 	DEFAULT_BOT_EXECUTION_MODAL_POSITION,
 	normalizeBotExecutionModalPosition,
@@ -132,12 +133,7 @@ function createControl(action: BotModalControl, label: string): HTMLElement {
 	button.setAttribute('aria-label', label);
 	button.title = label;
 
-	const icon = document.createElement('span');
-	icon.className = 'better-aa-bot-modal-control-icon';
-	icon.setAttribute('aria-hidden', 'true');
-	icon.textContent = action === 'minimize' ? '\u2212' : '\u25A1';
-
-	button.append(icon);
+	setContentIconButton(button, action === 'minimize' ? 'minimize-2' : 'maximize-2');
 	wrapper.append(button);
 	wireControl(wrapper);
 	return wrapper;
