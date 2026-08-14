@@ -60,6 +60,17 @@ export async function addFeedback(
 	options: FeedbackOptions = {}
 ): Promise<void> {
 	const debugEnabled = await isDebugEnabled();
+	await storeFeedback(debugEnabled, level, source, message, details, options);
+}
+
+async function storeFeedback(
+	debugEnabled: boolean,
+	level: FeedbackSeverity,
+	source: string,
+	message: string,
+	details?: Record<string, unknown>,
+	options: FeedbackOptions = {}
+): Promise<void> {
 	if (!shouldStoreFeedback(debugEnabled, options)) return;
 	const event = createFeedbackEvent({
 		id: crypto.randomUUID(),
@@ -97,7 +108,7 @@ export async function debugLog(
 	}
 
 	if (options.feedback && level !== 'debug') {
-		await addFeedback(level, source, message, details, {
+		await storeFeedback(debugEnabled, level, source, message, details, {
 			keepDetails: options.keepDetails,
 			debugOnly: options.debugOnly,
 		});

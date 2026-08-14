@@ -31,7 +31,7 @@ Selector source of truth:
   - Setting/id: `AUTOMATION_ANYWHERE_MATCHES`
   - Selectors: route/url based
   - Validate: open a supported Control Room page; use SPA navigation, clicks, and shortcuts; confirm sidebar button, styles, palette controls, and tools initialize without recurring UI polling.
-  - Expected: no console errors or permanent one-second/five-second UI timers; route classes and injected UI update when moving between folder/taskbot/text pages.
+  - Expected: no console errors or permanent one-second/five-second UI timers; route signals in the same animation frame coalesce into one lifecycle update, and route classes and injected UI update when moving between folder/taskbot/text pages.
   - Status: active
   - Delete condition: never delete unless extension host matching changes.
 
@@ -87,7 +87,7 @@ Selector source of truth:
 	- Setting/id: browser `options_ui`; routes `#appearance`, `#settings`, `#help`
 	- Selectors: extension-owned IDs only
 	- Validate: open from the browser extension details page and **Open full settings**; inspect all three routes in Chrome and Firefox at 200% zoom and a narrow viewport; change settings in both surfaces.
-	- Expected: one centered 760–840px configuration column reuses the side-panel markup, handlers, and storage wiring; stable routes and Help section anchors open the correct primary tab and subtab; Tools and live Diagnostics are not available; global changes synchronize across open extension surfaces.
+  - Expected: one centered 760–840px configuration column reuses the side-panel markup, handlers, and storage wiring; stable routes and Help section anchors open the correct primary tab and subtab; Tools and its tab listeners load only in the side panel, while Tools and live Diagnostics are not available in Options; global changes synchronize across open extension surfaces.
 	- Status: active
 	- Delete condition: browser options support is removed.
 
@@ -188,8 +188,8 @@ Selector source of truth:
   - Assets: `public/sounds/*.mp3`; MP3 avoids Firefox/Linux exposing WAV files as unsupported `audio/vnd.wave` media.
   - Setting/id: `local:soundsEnabled`
   - Selectors: `run-button`, `error-modal`, `error-badge-icon`, `done-modal`, `done-badge-icon`
-  - Validate: on Firefox/Linux, enable Sounds; click Run; complete one bot and trigger one bot error; confirm all tones play without media errors and no navigation timer remains active.
-  - Expected: Run starts immediately while its tone plays; changed modal nodes are inspected without full-document rescans, and done/error tones play once per result.
+  - Validate: on Firefox/Linux, enable Sounds before and after entering a TaskBot; click Run; complete one bot and trigger one bot error; confirm all tones play without media errors and no retry or navigation timer remains active.
+  - Expected: Run starts immediately while its tone plays; the initial scan wires the current Run button, changed nodes wire later Run buttons and inspect result badges without full-document rescans, and done/error tones play once per result.
   - Status: active
   - Delete condition: sound setting removed.
 

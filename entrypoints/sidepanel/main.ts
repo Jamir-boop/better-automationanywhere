@@ -5,15 +5,6 @@ import {
 	renderJsonWorkbenchSearchTools,
 	type JsonWorkbench,
 } from './json-workbench';
-import {
-	getSelectedToolsTargetTabId,
-	handleToolsTabActivated,
-	initializeToolsPanel,
-	markToolsTargetDisconnected,
-	markToolsTargetRouteChanged,
-	openToolsJobs,
-	renderToolsPanel,
-} from './tools';
 import { getCommandHelp, renderHelpHtml } from '@/src/ts/help';
 import {
 	setActiveLanguagePreference,
@@ -197,6 +188,8 @@ void (async () => {
 setActiveLanguagePreference(
 	await getExtensionLanguage().catch(() => DEFAULT_EXTENSION_LANGUAGE)
 );
+
+const tools = isOptionsSurface ? null : await import('./tools');
 
 const extensionVersion = browser.runtime.getManifest().version;
 const defaultLoadingImageCss = `url("${browser.runtime.getURL('media/loading.gif' as any)}")`;
@@ -618,10 +611,10 @@ replaceChildrenFromHtml(app, `
 	</nav>
 
 	<main>
-		${renderToolsPanel({
+		${tools?.renderToolsPanel({
 			universalClipboardHtml: renderUniversalClipboardSection(),
 			hidden: isOptionsSurface,
-		})}
+		}) ?? ''}
 
 		<section id="panel-appearance" class="tab-panel${isOptionsSurface ? ' is-active' : ''}" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0" data-panel="appearance"${isOptionsSurface ? '' : ' hidden'}>
 			<section class="panel-section">
@@ -1068,7 +1061,7 @@ async function sendBackgroundMessage(message: BackgroundMessage): Promise<void> 
 async function sendActiveTabMessage(
 	message: ContentActionMessage
 ): Promise<ContentActionResponse> {
-	const tabId = getSelectedToolsTargetTabId();
+	const tabId = tools?.getSelectedToolsTargetTabId();
 	if (!tabId) return { ok: false, error: t('Select a connected Control Room page first.') };
 
 	try {
@@ -1093,7 +1086,7 @@ async function refreshControlRoomCompatibility(forceRefresh = false): Promise<vo
 		const response = (await browser.runtime.sendMessage({
 			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
 			forceRefresh,
-			tabId: getSelectedToolsTargetTabId(),
+			tabId: tools?.getSelectedToolsTargetTabId(),
 		})) as ControlRoomCompatibilityResponse | undefined;
 		if (requestId !== controlRoomCompatibilityRequestId) return;
 		if (!response?.ok) {
@@ -1590,7 +1583,7 @@ async function handleSidepanelRequest(
 		setHealthSection(activeHealthSection);
 	}
 	if (request.focus === 'actionJson') focusActionJsonTextarea();
-	if (request.focus === 'jobs') openToolsJobs();
+	if (request.focus === 'jobs') tools?.openToolsJobs();
 	if (request.focus === 'diagnostics') {
 		setHelpSection('diagnostics');
 		setHealthSection('health');
@@ -2307,8 +2300,8 @@ function scheduleBuildCheckerRefresh(): void {
 
 browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 	if (message.type !== 'AA_ROUTE_CHANGED') return;
-	if (sender.tab?.id !== undefined) {
-		void markToolsTargetRouteChanged(
+	if (tools && sender.tab?.id !== undefined) {
+		void tools.markToolsTargetRouteChanged(
 			sender.tab.id,
 			message.url,
 			sender.tab.windowId,
@@ -2318,19 +2311,21 @@ browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 	scheduleBuildCheckerRefresh();
 });
 
-browser.tabs.onActivated.addListener(({ tabId, windowId }) => {
-	void handleToolsTabActivated(tabId, windowId);
-});
+if (tools) {
+	browser.tabs.onActivated.addListener(({ tabId, windowId }) => {
+		void tools.handleToolsTabActivated(tabId, windowId);
+	});
 
-browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-	if (changeInfo.url) {
-		void markToolsTargetRouteChanged(tabId, changeInfo.url, tab.windowId, tab.active);
-	}
-});
+	browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+		if (changeInfo.url) {
+			void tools.markToolsTargetRouteChanged(tabId, changeInfo.url, tab.windowId, tab.active);
+		}
+	});
 
-browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
-	void markToolsTargetDisconnected(tabId, removeInfo.windowId);
-});
+	browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
+		void tools.markToolsTargetDisconnected(tabId, removeInfo.windowId);
+	});
+}
 
 doctorPills.forEach((pill) => {
 	pill.addEventListener('click', async () => {
@@ -2930,7 +2925,7 @@ if (!isOptionsSurface) {
 	});
 }
 
-if (!isOptionsSurface) initializeToolsPanel({ setStatus, addFeedback });
+tools?.initializeToolsPanel({ setStatus, addFeedback });
 if (isOptionsSurface) {
 	const openHashTab = (): void => {
 		const anchor = location.hash.slice(1);

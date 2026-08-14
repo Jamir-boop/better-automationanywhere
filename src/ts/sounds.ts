@@ -115,11 +115,17 @@ function observeBadges(): void {
 		if (!enabled || !shouldRun()) return;
 		for (const mutation of mutationsList) {
 			if (mutation.type === 'attributes') {
-				if (mutation.target instanceof Element) checkForResultBadges(mutation.target);
+				if (mutation.target instanceof Element) {
+					checkForResultBadges(mutation.target);
+					wireRunButtons(mutation.target);
+				}
 				continue;
 			}
 			for (const node of mutation.addedNodes) {
-				if (node instanceof Element) checkForResultBadges(node);
+				if (node instanceof Element) {
+					checkForResultBadges(node);
+					wireRunButtons(node);
+				}
 			}
 		}
 	});
@@ -144,15 +150,11 @@ function wireRunButton(runButton: HTMLButtonElement): void {
 	);
 }
 
-function captureRunButton(attempts = 5): void {
-	const runButton = document.querySelector<HTMLButtonElement>(RUN_BUTTON_SELECTOR);
-	if (runButton) {
-		wireRunButton(runButton);
-		return;
+function wireRunButtons(root: ParentNode = document): void {
+	if (root instanceof HTMLButtonElement && root.matches(RUN_BUTTON_SELECTOR)) {
+		wireRunButton(root);
 	}
-	if (attempts > 0) {
-		window.setTimeout(() => captureRunButton(attempts - 1), 3000);
-	}
+	root.querySelectorAll<HTMLButtonElement>(RUN_BUTTON_SELECTOR).forEach(wireRunButton);
 }
 
 function stopObserver(): void {
@@ -167,7 +169,7 @@ export function refreshSounds(): void {
 	}
 	observeBadges();
 	checkForResultBadges();
-	captureRunButton(5);
+	wireRunButtons();
 }
 
 export function setSoundsEnabled(value: boolean): void {

@@ -210,8 +210,12 @@ function getPageContextLogDetails(): Record<string, unknown> {
 function watchRouteChanges(): void {
 	let lastRouteUrl = location.href;
 	let lastRouteContext = parseAutomationAnywherePageContext(location.href);
+	let updateScheduled = false;
 	const update = () => {
+		if (updateScheduled) return;
+		updateScheduled = true;
 		requestAnimationFrame(() => {
+			updateScheduled = false;
 			applyRouteClasses();
 			if (location.href === lastRouteUrl) return;
 			lastRouteUrl = location.href;
