@@ -7,6 +7,7 @@ import {
 } from './json-workbench';
 import {
 	getSelectedToolsTargetTabId,
+	handleToolsTabActivated,
 	initializeToolsPanel,
 	markToolsTargetDisconnected,
 	markToolsTargetRouteChanged,
@@ -2306,16 +2307,29 @@ function scheduleBuildCheckerRefresh(): void {
 
 browser.runtime.onMessage.addListener((message: RuntimeMessage, sender) => {
 	if (message.type !== 'AA_ROUTE_CHANGED') return;
-	if (sender.tab?.id !== undefined) void markToolsTargetRouteChanged(sender.tab.id, message.url);
+	if (sender.tab?.id !== undefined) {
+		void markToolsTargetRouteChanged(
+			sender.tab.id,
+			message.url,
+			sender.tab.windowId,
+			sender.tab.active
+		);
+	}
 	scheduleBuildCheckerRefresh();
 });
 
-browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-	if (changeInfo.url) void markToolsTargetRouteChanged(tabId, changeInfo.url);
+browser.tabs.onActivated.addListener(({ tabId, windowId }) => {
+	void handleToolsTabActivated(tabId, windowId);
 });
 
-browser.tabs.onRemoved.addListener((tabId) => {
-	void markToolsTargetDisconnected(tabId);
+browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+	if (changeInfo.url) {
+		void markToolsTargetRouteChanged(tabId, changeInfo.url, tab.windowId, tab.active);
+	}
+});
+
+browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
+	void markToolsTargetDisconnected(tabId, removeInfo.windowId);
 });
 
 doctorPills.forEach((pill) => {

@@ -91,20 +91,37 @@ export function groupAuthenticatedControlRoomTabs(
 export function getFirstEligibleTarget(
 	groups: readonly ControlRoomTargetGroup[]
 ): SelectedControlRoomTarget | null {
-	if (groups.length !== 1) return null;
-	const page = groups[0].pages.find((candidate) => candidate.eligible);
-	return page ? createSelectedTarget(groups[0], page) : null;
+	return groups.length === 1 ? getPreferredRoomTarget(groups[0]) : null;
+}
+
+export function getEligibleTargetForTab(
+	groups: readonly ControlRoomTargetGroup[],
+	tabId: number | undefined
+): SelectedControlRoomTarget | null {
+	if (tabId === undefined) return null;
+	for (const group of groups) {
+		const page = group.pages.find((candidate) => candidate.eligible && candidate.tabId === tabId);
+		if (page) return createSelectedTarget(group, page);
+	}
+	return null;
+}
+
+export function getPreferredRoomTarget(
+	group: ControlRoomTargetGroup | undefined,
+	currentTabId?: number
+): SelectedControlRoomTarget | null {
+	if (!group) return null;
+	const page = group.pages.find(
+		(candidate) => candidate.eligible && candidate.tabId === currentTabId
+	) ?? group.pages.find((candidate) => candidate.eligible);
+	return page ? createSelectedTarget(group, page) : null;
 }
 
 export function getOnlyRoomCurrentEligibleTarget(
 	groups: readonly ControlRoomTargetGroup[],
 	currentTabId: number | undefined
 ): SelectedControlRoomTarget | null {
-	if (groups.length !== 1) return null;
-	const current = groups[0].pages.find(
-		(page) => page.eligible && page.tabId === currentTabId
-	);
-	return current ? createSelectedTarget(groups[0], current) : null;
+	return groups.length === 1 ? getEligibleTargetForTab(groups, currentTabId) : null;
 }
 
 function createSelectedTarget(

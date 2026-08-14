@@ -64,10 +64,10 @@ Selector source of truth:
 
 - [ ] Route change watcher
 	- Source: `entrypoints/content.ts`, `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/tools.ts`
-	- Setting/id: `AA_ROUTE_CHANGED`, `session:selectedControlRoomTarget`
+	- Setting/id: `AA_ROUTE_CHANGED`, `session:toolsWindowSelection:{windowId}`; active-tab following is user-approved always on.
 	- Selectors: route/url based
-	- Validate: select a Tools page, navigate it without full reload, then switch unrelated browser tabs.
-	- Expected: the selected page becomes stale and new actions stay disabled until the round **Refresh** control accepts its current eligible route; browser-tab activation never changes a healthy selected target, results, or job progress.
+	- Validate: select a Tools page, navigate it without full reload, activate supported and unsupported tabs, switch another browser window, then repeat while a job runs.
+	- Expected: an idle selected page accepts an eligible route and reloads its tools automatically; supported authenticated active tabs in the side panel's window select their room and page, while unrelated, logged-out, unsupported, and other-window tabs leave the last valid target unchanged. A running job keeps its captured target and applies the latest eligible activation after completion.
   - Status: active
   - Delete condition: WXT route/content lifecycle replaces manual watcher.
 
@@ -93,10 +93,10 @@ Selector source of truth:
 
 - [ ] Tools tab
 	- Source: `entrypoints/sidepanel/tools.ts`, `src/ts/control-room-targets.ts`
-	- Setting/id: `data-panel="tools"`, `session:selectedControlRoomTarget`
+	- Setting/id: `data-panel="tools"`, `session:toolsWindowSelection:{windowId}`; active-tab following is user-approved always on.
 	- Selectors: internal sidepanel only
 	- Validate: open Tools with signed-in Control Rooms in the current window, including eligible and unsupported pages; repeat with another browser window and unrelated sites; switch active tabs; change route; close and log out of the selected page; use the round Refresh control.
-	- Expected: selectors share one full-width row with extra width for Page and use the 36px secondary-control height; authenticated pages group by hostname; the only authenticated Control Room is selected automatically and, when it has no pinned page, its first eligible page is selected automatically. Selector labels omit a trailing `.my.automationanywhere.digital`, and TaskBot page labels omit `| Edit Task Bot` plus the browser-title suffix, while stored origins and full page titles remain unchanged; only Folder, TaskBot, and Packages pages are selectable. A healthy target stays session-pinned. When no room or supported page is available, every tool remains visible but disabled under a clear target status. Refresh rescans rooms, revalidates login, accepts a selected eligible route change, and can recover a lost target to the current eligible page only when one authenticated room remains.
+	- Expected: selectors share one full-width row with extra width for Page and use the 36px secondary-control height; authenticated pages group by hostname. On open and idle tab activation, a supported authenticated active page selects its Control Room and page. Selecting a room chooses its active eligible page or its first eligible page and immediately refreshes Tools; manual page selection also refreshes immediately. Each browser window stores an independent target. Selector labels omit a trailing `.my.automationanywhere.digital`, and TaskBot page labels omit `| Edit Task Bot` plus the browser-title suffix, while stored origins and full page titles remain unchanged; only Folder, TaskBot, and Packages pages are selectable. When no room or supported page is available, every tool remains visible but disabled under a clear target status. Refresh is a recovery command for login changes, missed events, and connection errors rather than a normal navigation step.
   - Status: active
   - Delete condition: tools panel replaced.
 
@@ -476,10 +476,10 @@ Selector source of truth:
 
 - [ ] Tool context detection
 	- Source: `entrypoints/sidepanel/tools.ts`, `src/ts/control-room-targets.ts`, `src/ts/automation-anywhere-api.ts`
-	- Setting/id: `session:selectedControlRoomTarget`, `session:selectedControlRoomOrigin`
+	- Setting/id: `session:toolsWindowSelection:{windowId}`
   - Selectors: route/url based and task editor capability selector
 	- Validate: authenticated and logged-out AA tabs, unrelated sites, another browser window, unsupported AA route, private/public folder, private/public taskbot, packages page, and package detail page.
-	- Expected: only current-window authenticated AA pages appear; correct tools follow the pinned selected page and capabilities; active-tab changes have no effect.
+	- Expected: only authenticated AA pages from the side panel's window appear; correct tools and both selectors follow its active supported page when idle. Unsupported, logged-out, unrelated, and other-window activations do not replace a valid target.
   - Status: active
   - Delete condition: tools panel removed.
 

@@ -26,13 +26,16 @@ import {
 	canUseSelectedTarget,
 	formatControlRoomHostname,
 	formatControlRoomPageTitle,
+	getEligibleTargetForTab,
 	getFirstEligibleTarget,
 	getOnlyRoomCurrentEligibleTarget,
+	getPreferredRoomTarget,
 	getSingleControlRoomOrigin,
 	groupAuthenticatedControlRoomTabs,
 	markSelectedTargetDisconnected,
 	markSelectedTargetRouteChanged,
 	type ControlRoomTargetGroup,
+	type ControlRoomTabCandidate,
 	type SelectedControlRoomTarget,
 } from '@/src/ts/control-room-targets';
 import { findNonClosingMessageBoxes } from '@/src/ts/automation-anywhere-json';
@@ -128,6 +131,11 @@ interface RenderToolsPanelOptions {
 	hidden?: boolean;
 }
 
+interface ToolsWindowSelection {
+	target: SelectedControlRoomTarget | null;
+	roomOrigin: string;
+}
+
 interface ExportMetadataReference {
 	fileId: string;
 	botPath: string;
@@ -214,14 +222,18 @@ let selectedRoomOrigin = '';
 let jobHistory: ToolJobRecord[] = [];
 let showingJobs = false;
 let refreshingTargets = false;
+let toolsWindowId: number | undefined;
+let pendingActiveTabId: number | null = null;
+let targetSyncGeneration = 0;
+let contextRefreshGeneration = 0;
 
-const selectedTargetStorage = storage.defineItem<SelectedControlRoomTarget | null>(
-	'session:selectedControlRoomTarget',
-	{ fallback: null }
-);
-const selectedRoomStorage = storage.defineItem<string>('session:selectedControlRoomOrigin', {
-	fallback: '',
-});
+function getWindowSelectionStorage(windowId: number) {
+	return storage.defineItem<ToolsWindowSelection>(`session:toolsWindowSelection:${windowId}`, {
+		fallback: { target: null, roomOrigin: '' },
+	});
+}
+
+let windowSelectionStorage: ReturnType<typeof getWindowSelectionStorage> | null = null;
 const toolJobHistoryStorage = storage.defineItem<ToolJobRecord[]>(
 	'session:toolJobHistory',
 	{ fallback: [] }
@@ -318,7 +330,7 @@ export function renderToolsPanel(renderOptions: RenderToolsPanelOptions = {}): s
 						<label>${t('Page')}<select id="toolsPageSelect" disabled><option value="">${t('Select a page')}</option></select></label>
 					</div>
 					<p id="toolsContext" class="tools-context">${t('Open an Automation Anywhere folder, taskbot, or Packages page.')}</p>
-					<p class="inline-hint">${t('The selected page stays pinned when you switch browser tabs.')}</p>
+					<p class="inline-hint">${t('The target follows supported AA tabs while no job is running.')}</p>
 				</div>
 				<p id="toolsClipboardStatus" class="tools-clipboard-status" hidden></p>
 				<div class="tools-actions-group">
@@ -507,7 +519,7 @@ export function initializeToolsPanel(initOptions: InitializeToolsOptions): void 
 	refreshButton.addEventListener('click', () => {
 		void scanControlRooms(true);
 	});
-	roomSelect.addEventListener('change', handleRoomSelection);
+	roomSelect.addEventListener('change', () => void handleRoomSelection());
 	pageSelect.addEventListener('change', () => void handlePageSelection());
 	toolsJobsButton.addEventListener('click', () => showToolsSubview(true));
 	toolsJobsBackButton.addEventListener('click', () => showToolsSubview(false));
@@ -568,9 +580,21 @@ function clearPackageSearchTimer(): void {
 	packageSearchTimer = null;
 }
 
+async function persistWindowSelection(): Promise<void> {
+	await windowSelectionStorage?.setValue({
+		target: selectedTarget,
+		roomOrigin: selectedRoomOrigin,
+	});
+}
+
 async function initializeToolsSession(): Promise<void> {
-	selectedTarget = await selectedTargetStorage.getValue();
-	selectedRoomOrigin = (await selectedRoomStorage.getValue()) || selectedTarget?.origin || '';
+	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+	toolsWindowId = activeTab?.windowId ?? (await browser.windows.getCurrent()).id;
+	if (toolsWindowId === undefined) throw new Error(t('Current browser window is unavailable.'));
+	windowSelectionStorage = getWindowSelectionStorage(toolsWindowId);
+	const savedSelection = await windowSelectionStorage.getValue();
+	selectedTarget = savedSelection.target;
+	selectedRoomOrigin = savedSelection.roomOrigin || selectedTarget?.origin || '';
 	const storedJobs = await toolJobHistoryStorage.getValue();
 	const interruptedIds = new Set(
 		storedJobs.filter((job) => job.status === 'running' || job.status === 'stopping').map((job) => job.id)
@@ -613,6 +637,7 @@ async function scanControlRooms(manual = false): Promise<void> {
 			};
 		}));
 		targetGroups = groupAuthenticatedControlRoomTabs(candidates.filter((candidate) => candidate !== null));
+		const activeTarget = getEligibleTargetForTab(targetGroups, currentTabId);
 		const singleRoomOrigin = getSingleControlRoomOrigin(targetGroups);
 		if (singleRoomOrigin) selectedRoomOrigin = singleRoomOrigin;
 		else if (!targetGroups.some((group) => group.origin === selectedRoomOrigin)) selectedRoomOrigin = '';
@@ -633,7 +658,9 @@ async function scanControlRooms(manual = false): Promise<void> {
 				selectedTarget = markSelectedTargetRouteChanged(selectedTarget, currentPage.tabId, currentPage.url);
 			}
 		}
-		if (manual && selectedTarget?.disconnected) {
+		if (activeTarget) {
+			selectedTarget = activeTarget;
+		} else if (manual && selectedTarget?.disconnected) {
 			selectedTarget =
 				getOnlyRoomCurrentEligibleTarget(targetGroups, currentTabId) ?? selectedTarget;
 		}
@@ -643,8 +670,7 @@ async function scanControlRooms(manual = false): Promise<void> {
 		if (selectedTarget && !selectedTarget.disconnected) {
 			selectedRoomOrigin = selectedTarget.origin;
 		}
-		await selectedTargetStorage.setValue(selectedTarget);
-		await selectedRoomStorage.setValue(selectedRoomOrigin);
+		await persistWindowSelection();
 		renderTargetSelectors();
 		await refreshToolsContext();
 	} finally {
@@ -687,14 +713,18 @@ function updateTargetLocks(): void {
 	refreshButton.disabled = locked || refreshingTargets;
 }
 
-function handleRoomSelection(): void {
+async function getCurrentWindowActiveTabId(): Promise<number | undefined> {
+	return (await browser.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+}
+
+async function handleRoomSelection(): Promise<void> {
 	if (activeToolRun) return;
 	selectedRoomOrigin = roomSelect.value;
-	selectedTarget = null;
-	void selectedTargetStorage.setValue(null);
-	void selectedRoomStorage.setValue(selectedRoomOrigin);
+	const group = targetGroups.find((item) => item.origin === selectedRoomOrigin);
+	selectedTarget = getPreferredRoomTarget(group, await getCurrentWindowActiveTabId());
+	await persistWindowSelection();
 	renderTargetSelectors();
-	contextText.textContent = roomSelect.value ? t('Select a page.') : t('Select a Control Room.');
+	await refreshToolsContext();
 }
 
 async function handlePageSelection(): Promise<void> {
@@ -702,33 +732,134 @@ async function handlePageSelection(): Promise<void> {
 	const group = targetGroups.find((item) => item.origin === roomSelect.value);
 	const page = group?.pages.find((item) => String(item.tabId) === pageSelect.value && item.eligible);
 	selectedRoomOrigin = group?.origin ?? '';
-	selectedTarget = page ? { origin: group!.origin, tabId: page.tabId, url: page.url, stale: false, disconnected: false } : null;
-	await selectedTargetStorage.setValue(selectedTarget);
-	await selectedRoomStorage.setValue(selectedRoomOrigin);
+	selectedTarget = page
+		? { origin: group!.origin, tabId: page.tabId, url: page.url, stale: false, disconnected: false }
+		: getPreferredRoomTarget(group, await getCurrentWindowActiveTabId());
+	await persistWindowSelection();
 	renderTargetSelectors();
 	await refreshToolsContext();
 }
 
-export async function markToolsTargetRouteChanged(tabId: number, url: string): Promise<void> {
-	if (!selectedTarget) return;
-	const next = markSelectedTargetRouteChanged(selectedTarget, tabId, url);
-	if (next === selectedTarget) return;
-	selectedTarget = next;
-	await selectedTargetStorage.setValue(next);
-	if (!activeToolRun) runtime = null;
-	contextText.textContent = t('The selected page changed. Select Refresh to continue.');
-	renderTargetSelectors();
+function upsertAuthenticatedTargetTab(
+	tabId: number,
+	windowId: number,
+	url: string,
+	title: string | undefined,
+	context: AutomationAnywherePageContext
+): void {
+	const candidates: ControlRoomTabCandidate[] = targetGroups.flatMap((group) =>
+		group.pages.map((page) => ({
+			tabId: page.tabId,
+			windowId: page.windowId,
+			url: page.url,
+			title: page.title,
+			authenticated: true,
+			context: page.context,
+		}))
+	);
+	candidates.push({ tabId, windowId, url, title, authenticated: true, context });
+	targetGroups = groupAuthenticatedControlRoomTabs(
+		candidates.filter((candidate, index) =>
+			candidate.tabId !== tabId || index === candidates.length - 1
+		)
+	);
 }
 
-export async function markToolsTargetDisconnected(tabId: number): Promise<void> {
-	if (!selectedTarget) return;
-	const next = markSelectedTargetDisconnected(selectedTarget, tabId);
-	if (next === selectedTarget) return;
-	selectedTarget = next;
-	await selectedTargetStorage.setValue(next);
-	if (!activeToolRun) runtime = null;
-	contextText.textContent = t('The selected page is disconnected. Select Refresh to reconnect or choose another page.');
+async function disableSelectedTarget(tabId: number, url: string, disconnected: boolean): Promise<void> {
+	if (selectedTarget?.tabId !== tabId) return;
+	selectedTarget = disconnected
+		? markSelectedTargetDisconnected(selectedTarget, tabId)
+		: markSelectedTargetRouteChanged(selectedTarget, tabId, url);
+	await persistWindowSelection();
 	renderTargetSelectors();
+	if (activeToolRun) return;
+	runtime = null;
+	await refreshToolsContext();
+}
+
+async function syncToolsTargetToTab(tabId: number, expectedUrl?: string): Promise<void> {
+	const generation = ++targetSyncGeneration;
+	let tab: Awaited<ReturnType<typeof browser.tabs.get>>;
+	try {
+		tab = await browser.tabs.get(tabId);
+	} catch {
+		return;
+	}
+	if (generation !== targetSyncGeneration || tab.windowId !== toolsWindowId) return;
+	const url = expectedUrl ?? tab.url;
+	if (!url || !isAutomationAnywhereUrl(url)) {
+		await disableSelectedTarget(tabId, url ?? '', false);
+		return;
+	}
+	const context = parseAutomationAnywherePageContext(url);
+	if (context.pageType === 'unsupported') {
+		await disableSelectedTarget(tabId, url, false);
+		return;
+	}
+
+	let authToken: string;
+	try {
+		authToken = await getAutomationAnywhereAuthToken(tabId);
+	} catch {
+		await disableSelectedTarget(tabId, url, true);
+		return;
+	}
+	if (generation !== targetSyncGeneration) return;
+	upsertAuthenticatedTargetTab(tabId, tab.windowId, url, tab.title, context);
+	const next = getEligibleTargetForTab(targetGroups, tabId);
+	if (!next) return;
+	selectedTarget = next;
+	selectedRoomOrigin = next.origin;
+	await persistWindowSelection();
+	if (generation !== targetSyncGeneration) return;
+	renderTargetSelectors();
+	await refreshToolsContext(authToken);
+}
+
+export async function handleToolsTabActivated(tabId: number, windowId: number): Promise<void> {
+	if (windowId !== toolsWindowId) return;
+	if (activeToolRun) {
+		pendingActiveTabId = tabId;
+		return;
+	}
+	await syncToolsTargetToTab(tabId);
+}
+
+export async function markToolsTargetRouteChanged(
+	tabId: number,
+	url: string,
+	windowId?: number,
+	isActive = false
+): Promise<void> {
+	if (windowId !== undefined && windowId !== toolsWindowId) return;
+	if (selectedTarget?.tabId !== tabId && !isActive) return;
+	if (activeToolRun) {
+		pendingActiveTabId = tabId;
+		if (selectedTarget?.tabId === tabId) {
+			selectedTarget = markSelectedTargetRouteChanged(selectedTarget, tabId, url);
+			await persistWindowSelection();
+			renderTargetSelectors();
+		}
+		return;
+	}
+	await syncToolsTargetToTab(tabId, url);
+}
+
+export async function markToolsTargetDisconnected(tabId: number, windowId?: number): Promise<void> {
+	if (windowId !== undefined && windowId !== toolsWindowId) return;
+	targetGroups = targetGroups
+		.map((group) => ({ ...group, pages: group.pages.filter((page) => page.tabId !== tabId) }))
+		.filter((group) => group.pages.length > 0);
+	if (selectedTarget?.tabId !== tabId) {
+		renderTargetSelectors();
+		return;
+	}
+	selectedTarget = markSelectedTargetDisconnected(selectedTarget, tabId);
+	await persistWindowSelection();
+	renderTargetSelectors();
+	if (activeToolRun) return;
+	runtime = null;
+	await refreshToolsContext();
 }
 
 export function getSelectedToolsTargetTabId(): number | undefined {
@@ -986,7 +1117,10 @@ function finishToolRun(
 	activeToolRun = null;
 	void persistJobs();
 	setJobLock(false);
-	if (!canUseSelectedTarget(selectedTarget)) void refreshToolsContext();
+	const pendingTabId = pendingActiveTabId;
+	pendingActiveTabId = null;
+	if (pendingTabId !== null) void syncToolsTargetToTab(pendingTabId);
+	else if (!canUseSelectedTarget(selectedTarget)) void refreshToolsContext();
 	void options.addFeedback(
 		severity,
 		'tools',
@@ -1173,7 +1307,19 @@ function setSelectedToolPanel(tool: ToolId | null): void {
 	setExportFormatVisible(tool === 'export-bots');
 }
 
-async function refreshToolsContext(): Promise<void> {
+function isCurrentContextRefresh(
+	generation: number,
+	target: SelectedControlRoomTarget
+): boolean {
+	return generation === contextRefreshGeneration &&
+		selectedTarget?.tabId === target.tabId &&
+		selectedTarget.url === target.url &&
+		canUseSelectedTarget(selectedTarget);
+}
+
+async function refreshToolsContext(validatedAuthToken?: string): Promise<void> {
+	const refreshGeneration = ++contextRefreshGeneration;
+	const target = selectedTarget;
 	clearPackageSearchTimer();
 	packageLoadGeneration += 1;
 	packageSessionExpired = false;
@@ -1192,7 +1338,7 @@ async function refreshToolsContext(): Promise<void> {
 	updateAvailabilityDot(false);
 
 	try {
-		if (!canUseSelectedTarget(selectedTarget)) {
+		if (!target || !canUseSelectedTarget(target)) {
 			runtime = null;
 			currentTool = null;
 			updateAvailabilityDot(
@@ -1200,7 +1346,7 @@ async function refreshToolsContext(): Promise<void> {
 				selectedTarget?.disconnected
 					? t('Disconnected')
 					: selectedTarget?.stale
-						? t('Refresh required')
+						? t('Unsupported page')
 						: targetGroups.length === 0
 							? t('No signed-in Control Room')
 							: t('Select a supported page')
@@ -1208,14 +1354,15 @@ async function refreshToolsContext(): Promise<void> {
 			contextText.textContent = selectedTarget?.disconnected
 				? t('The selected page is disconnected. Select Refresh to reconnect or choose another page.')
 				: selectedTarget?.stale
-					? t('The selected page changed. Select Refresh to continue.')
+					? t('The selected page is unsupported. Open a Folder, TaskBot, or Packages page.')
 					: targetGroups.length === 0
 						? t('No signed-in Control Rooms found in this window. Open one, then select Refresh.')
 						: t('No supported page is open in this Control Room.');
 			renderActionButtons();
 			return;
 		}
-		const active = await getAutomationAnywhereContextForTab(selectedTarget!.tabId);
+		const active = await getAutomationAnywhereContextForTab(target.tabId);
+		if (!isCurrentContextRefresh(refreshGeneration, target)) return;
 		if (!active || active.context.pageType === 'unsupported') {
 			runtime = null;
 			currentTool = null;
@@ -1239,15 +1386,18 @@ async function refreshToolsContext(): Promise<void> {
 		}
 
 		const capabilities = await getToolCapabilities(active.tabId);
-		let authToken: string;
+		if (!isCurrentContextRefresh(refreshGeneration, target)) return;
+		let authToken = validatedAuthToken;
 		try {
-			authToken = await getAutomationAnywhereAuthToken(active.tabId);
+			authToken ??= await getAutomationAnywhereAuthToken(active.tabId);
 		} catch {
-			selectedTarget = { ...selectedTarget!, disconnected: true };
-			await selectedTargetStorage.setValue(selectedTarget);
+			if (!isCurrentContextRefresh(refreshGeneration, target)) return;
+			selectedTarget = { ...target, disconnected: true };
+			await persistWindowSelection();
 			renderTargetSelectors();
 			throw new Error(t('The selected page is logged out. Sign in, then select Refresh.'));
 		}
+		if (!isCurrentContextRefresh(refreshGeneration, target)) return;
 		runtime = {
 			...active,
 			api: new AutomationAnywhereApi(active.context.baseUrl, authToken),
@@ -1305,10 +1455,12 @@ async function refreshToolsContext(): Promise<void> {
 		setSelectedToolPanel(null);
 		renderActionButtons();
 	} catch (error) {
+		if (refreshGeneration !== contextRefreshGeneration) return;
 		runtime = null;
 		currentTool = null;
 		updateAvailabilityDot(false, t('Connection failed'));
 		setSelectedToolPanel(null);
+		renderActionButtons();
 		contextText.textContent =
 			error instanceof Error ? error.message : t('Tools context failed.');
 		setToolStatus(contextText.textContent, 'error');

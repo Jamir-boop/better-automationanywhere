@@ -60,17 +60,17 @@ const ES: Record<string, string> = {
 	'Ready': 'Listo',
 	'Checking connections...': 'Revisando conexiones...',
 	'Disconnected': 'Desconectado',
-	'Refresh required': 'Se requiere actualizar',
 	'No signed-in Control Room': 'No hay Control Room con sesion',
 	'Select a supported page': 'Selecciona una pagina compatible',
 	'Connection failed': 'Fallo la conexion',
+	'Current browser window is unavailable.': 'La ventana actual del navegador no esta disponible.',
 	'Page': 'Pagina',
 	'Select a Control Room': 'Selecciona un Control Room',
 	'Select a page': 'Selecciona una pagina',
 	'Refresh Control Rooms and page': 'Actualizar Control Rooms y pagina',
 	'Unsupported page': 'Pagina no compatible',
-	'The selected page stays pinned when you switch browser tabs.':
-		'La pagina seleccionada permanece fija cuando cambias de pestana.',
+	'The target follows supported AA tabs while no job is running.':
+		'El destino sigue las pestanas compatibles de AA cuando no hay trabajos en curso.',
 	'Jobs continue while you use other tabs or extension views. Closing this side panel interrupts them.':
 		'Los trabajos continuan al usar otras pestanas o vistas. Cerrar el panel lateral los interrumpe.',
 	'Clear completed': 'Limpiar completados',
@@ -87,8 +87,8 @@ const ES: Record<string, string> = {
 		'No se encontraron Control Rooms con sesion en esta ventana. Abre uno y selecciona Actualizar.',
 	'No supported page is open in this Control Room.':
 		'No hay una pagina compatible abierta en este Control Room.',
-	'The selected page changed. Select Refresh to continue.':
-		'La pagina seleccionada cambio. Selecciona Actualizar para continuar.',
+	'The selected page is unsupported. Open a Folder, TaskBot, or Packages page.':
+		'La pagina seleccionada no es compatible. Abre una carpeta, TaskBot o pagina de Paquetes.',
 	'The selected page is disconnected. Select Refresh to reconnect or choose another page.':
 		'La pagina seleccionada esta desconectada. Selecciona Actualizar para reconectar o elige otra pagina.',
 	'Select a connected Control Room page first.': 'Selecciona primero una pagina de Control Room conectada.',

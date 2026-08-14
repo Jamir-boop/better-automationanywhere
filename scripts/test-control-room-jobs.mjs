@@ -51,6 +51,10 @@ const secondEligible = {
 };
 const multiPageGroups = [{ ...groups[0], pages: [...groups[0].pages, secondEligible] }];
 assert.equal(targets.getFirstEligibleTarget(multiPageGroups).tabId, 1);
+assert.equal(targets.getEligibleTargetForTab(multiPageGroups, 3).tabId, 3);
+assert.equal(targets.getEligibleTargetForTab(multiPageGroups, 2), null);
+assert.equal(targets.getPreferredRoomTarget(multiPageGroups[0], 3).tabId, 3);
+assert.equal(targets.getPreferredRoomTarget(multiPageGroups[0]).tabId, 1);
 assert.equal(targets.getOnlyRoomCurrentEligibleTarget(multiPageGroups, 3).tabId, 3);
 assert.equal(targets.getOnlyRoomCurrentEligibleTarget(multiPageGroups, 2), null);
 const multipleRooms = [...groups, { ...groups[0], origin: 'https://three.example.com' }];
@@ -93,7 +97,7 @@ const [toolsSource, toolsStyle, mainSource, backgroundSource, configSource, opti
 	readSource('entrypoints', 'options', 'index.html'),
 	readSource('entrypoints', 'options', 'main.ts'),
 ]);
-assert.ok(toolsSource.includes("'session:selectedControlRoomTarget'"));
+assert.ok(toolsSource.includes('session:toolsWindowSelection:${windowId}'));
 assert.ok(toolsSource.includes("browser.tabs.query({ currentWindow: true })"));
 assert.ok(toolsSource.includes('tabs.find((tab) => tab.active)?.id'));
 assert.ok(toolsSource.includes('getAutomationAnywhereAuthToken(tab.id)'));
@@ -106,6 +110,8 @@ assert.ok(toolsSource.includes("startToolRun(t('Import Taskbot')"));
 assert.ok(toolsSource.includes('Completed work remains and is listed in the job log.'));
 assert.ok(toolsSource.includes('getOnlyRoomCurrentEligibleTarget(targetGroups, currentTabId)'));
 assert.ok(toolsSource.includes('getFirstEligibleTarget(targetGroups)'));
+assert.ok(toolsSource.includes('getEligibleTargetForTab(targetGroups, tabId)'));
+assert.ok(toolsSource.includes('getPreferredRoomTarget(group, await getCurrentWindowActiveTabId())'));
 assert.ok(toolsSource.includes('getSingleControlRoomOrigin(targetGroups)'));
 assert.ok(toolsSource.includes('formatControlRoomPageTitle(page.title)'));
 assert.ok(toolsSource.includes('context ? getAvailableTools(context) : ALL_TOOL_IDS'));
@@ -118,6 +124,8 @@ assert.ok(!toolsSource.includes('toolsRefreshPage'));
 assert.ok(toolsSource.includes('toolsJobsButton.hidden = !(showingJobs || Boolean(activeToolRun) || unread > 0)'));
 assert.ok(toolsSource.includes("toolsJobsBackButton.addEventListener('click', () => showToolsSubview(false))"));
 assert.ok(toolsSource.includes('The selected page is logged out. Sign in, then select Refresh.'));
+assert.ok(toolsSource.includes('await syncToolsTargetToTab(tabId)'));
+assert.ok(toolsSource.includes('await refreshToolsContext(authToken)'));
 assert.ok(toolsStyle.includes('grid-template-columns: repeat(2, minmax(0, 1fr))'));
 assert.match(
 	toolsStyle,
@@ -127,7 +135,8 @@ assert.match(
 assert.ok(toolsStyle.includes('grid-template-columns: minmax(0, 2fr) minmax(0, 3fr)'));
 assert.ok(mainSource.includes("aria-controls=\"panel-appearance\""));
 assert.ok(mainSource.includes("event.key === 'Home'"));
-assert.ok(!mainSource.includes('browser.tabs.onActivated'));
+assert.ok(mainSource.includes('browser.tabs.onActivated'));
+assert.ok(mainSource.includes('handleToolsTabActivated(tabId, windowId)'));
 assert.ok(mainSource.includes("request.focus === 'jobs'"));
 assert.ok(mainSource.includes('browser.permissions.request'));
 assert.ok(mainSource.includes("'appearance-taskbot-editor'"));

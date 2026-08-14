@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.37.4           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.38.0           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -63,7 +63,7 @@ https://github.com/Jamir-boop/better-automationanywhere/assets/73477811/f7c6eec2
 
 ### Control Room tools
 
-The side panel scans signed-in Automation Anywhere pages in the current browser window when Tools opens. Control Room and Page share one compact row. If the current tab is the only eligible page in the only authenticated Control Room, it is selected automatically. That target stays pinned when browser tabs change. The round **Refresh** control rescans connections, revalidates login, and accepts the selected page's current eligible route. If a target is lost, Refresh may recover to the current eligible page only when one authenticated Control Room remains.
+The side panel scans signed-in Automation Anywhere pages in its browser window when Tools opens. Control Room and Page share one compact row. When no job is running, activating a supported signed-in AA tab automatically selects its Control Room and page; route changes refresh the available tools. Selecting a Control Room chooses its active eligible page or its first eligible page. Unrelated, logged-out, and unsupported tabs leave the last valid target unchanged. Each browser window keeps its own target. The round **Refresh** control remains available for login changes, missed browser events, and connection recovery.
 
 Long Tools operations run as panel-scoped background jobs. Jobs keep running while you switch browser tabs or use Appearance, Settings, and Help. The Jobs action appears only for running or unread work and stays visible while Jobs is open. The latest ten jobs, progress, stop state, and per-item logs remain in session storage. Closing or reloading the side panel interrupts a running job. Optional completion notifications are off by default and request the browser's `notifications` permission only when enabled.
 
