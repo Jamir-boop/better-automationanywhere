@@ -590,6 +590,7 @@ replaceChildrenFromHtml(app, `
 	<header class="panel-header">
 		<div>
 			<h1>${t('Better AA Developer Experience')}</h1>
+			<p class="header-author">Jamir</p>
 		</div>
 		<div class="header-controls">
 			<span class="version-chip">${extensionVersion}</span>

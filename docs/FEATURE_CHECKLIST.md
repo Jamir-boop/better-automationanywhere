@@ -87,7 +87,7 @@ Selector source of truth:
 	- Setting/id: browser `options_ui`; routes `#appearance`, `#settings`, `#help`
 	- Selectors: extension-owned IDs only
 	- Validate: open from the browser extension details page and **Open full settings**; inspect all three routes in Chrome and Firefox at 200% zoom and a narrow viewport; change settings in both surfaces.
-  - Expected: one centered 760–840px configuration column reuses the side-panel markup, handlers, and storage wiring; stable routes and Help section anchors open the correct primary tab and subtab; Tools and its tab listeners load only in the side panel, while Tools and live Diagnostics are not available in Options; global changes synchronize across open extension surfaces.
+  - Expected: one centered 760–840px configuration column reuses the side-panel markup, handlers, and storage wiring; Jamir appears below the extension title, and the About contact actions fill equal 50/50 columns; stable routes and Help section anchors open the correct primary tab and subtab; Tools and its tab listeners load only in the side panel, while Tools and live Diagnostics are not available in Options; global changes synchronize across open extension surfaces.
 	- Status: active
 	- Delete condition: browser options support is removed.
 

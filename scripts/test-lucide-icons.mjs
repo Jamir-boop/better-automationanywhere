@@ -34,6 +34,7 @@ assert.ok(main.includes("icon('settings')"));
 assert.ok(main.includes("icon('circle-help')"));
 assert.ok(main.includes("icon('git-fork', false)"));
 assert.ok(main.includes("icon('mail', false)"));
+assert.ok(main.includes('<p class="header-author">Jamir</p>'));
 assert.ok(sidepanelIcons.includes('GitFork'));
 assert.ok(sidepanelIcons.includes('Mail'));
 assert.equal(
@@ -54,5 +55,15 @@ assert.ok(botModal.includes("'maximize-2'"));
 assert.ok(sidepanelStyle.includes('.better-aa-icon'));
 assert.ok(sidepanelStyle.includes('fill: none !important'));
 assert.ok(sidepanelStyle.includes("&[open] > summary .better-aa-icon"));
+assert.match(
+	sidepanelStyle,
+	/\.creator-contact-list\s+display: grid\s+grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+	'Creator contact actions use equal-width columns'
+);
+assert.match(
+	sidepanelStyle,
+	/\.creator-contact\s+display: inline-flex[\s\S]*?width: 100%\s+height: 44px/,
+	'Creator contact actions fill their columns'
+);
 
 console.log('Lucide icon integration tests passed.');
