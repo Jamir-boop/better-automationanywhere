@@ -17,6 +17,11 @@ assert.ok(
 	selectorRegistrySource.includes('export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS'),
 	'selector registry check export exists'
 );
+assert.match(
+	selectorRegistrySource,
+	/export const BOT_MODAL_SELECTOR =\s*'\[data-modal-id="taskbot-action-loading"\], \[data-modal-id="taskbot-action-run-now"\]';/,
+	'bot modal selector covers loading and running states'
+);
 assert.ok(
 	styleDoctorSource.includes('AUTOMATION_ANYWHERE_SELECTOR_CHECKS.map'),
 	'Style Doctor derives CHECKS from selector registry'
@@ -89,7 +94,6 @@ const taskbotTransientIds = [
 	'bot-modal',
 	'bot-modal-controls',
 	'bot-modal-dialog',
-	'bot-modal-running-indicator',
 	'error-modal',
 	'done-modal',
 ];

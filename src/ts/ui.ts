@@ -14,6 +14,7 @@ import {
 } from './automation-anywhere-selectors';
 
 const NOTIFICATION_MIN_DURATION_MS = 8000;
+const PATHFINDER_COLLAPSE_WAIT_TIMEOUT_MS = 10_000;
 const DISABLED_PATHFINDER_EXPANDER_ATTR = 'data-better-aa-disabled-expander';
 const ORIGINAL_PATHFINDER_EXPANDER_TITLE_ATTR =
 	'data-better-aa-original-title';
@@ -25,6 +26,10 @@ const PATHFINDER_EXPANDER_DISABLED_MESSAGE =
 let customEditorPaletteButtonsEnabled = true;
 let pathFinderSlimSidebarEnabled = false;
 let pathFinderExpanderGuardInstalled = false;
+let pathFinderCollapseObserver: MutationObserver | null = null;
+let pathFinderCollapseObserverRoot: Node | null = null;
+let pathFinderCollapseObserverTimer: ReturnType<typeof setTimeout> | null = null;
+let pathFinderCollapseWaitExpired = false;
 let allowPathFinderExpanderClick = false;
 let customEditorPaletteButtonsHoverRecoveryInstalled = false;
 
@@ -162,14 +167,80 @@ function installPathFinderExpanderGuard(): void {
 	pathFinderExpanderGuardInstalled = true;
 }
 
+function stopPathFinderCollapseObserver(): void {
+	pathFinderCollapseObserver?.disconnect();
+	pathFinderCollapseObserver = null;
+	pathFinderCollapseObserverRoot = null;
+	if (pathFinderCollapseObserverTimer) {
+		clearTimeout(pathFinderCollapseObserverTimer);
+		pathFinderCollapseObserverTimer = null;
+	}
+}
+
+function observePathFinderCollapseRoot(root: Node, scoped: boolean): void {
+	pathFinderCollapseObserver?.disconnect();
+	pathFinderCollapseObserver?.observe(root, {
+		childList: true,
+		subtree: true,
+		...(scoped
+			? {
+					attributes: true,
+					attributeFilter: ['class', 'aria-expanded'],
+				}
+			: {}),
+	});
+	pathFinderCollapseObserverRoot = root;
+}
+
+function syncWaitingPathFinderCollapseControl(): void {
+	if (!pathFinderSlimSidebarEnabled) {
+		stopPathFinderCollapseObserver();
+		return;
+	}
+
+	const navigation = document.querySelector(MAIN_NAVIGATION_SELECTOR);
+	if (navigation && pathFinderCollapseObserverRoot !== navigation) {
+		observePathFinderCollapseRoot(navigation, true);
+	}
+	if (
+		!document.querySelector(PATHFINDER_COLLAPSED_SELECTOR) &&
+		!document.querySelector(PATHFINDER_COLLAPSE_BUTTON_SELECTOR)
+	) {
+		return;
+	}
+
+	stopPathFinderCollapseObserver();
+	syncPathFinderSlimSidebar(true);
+}
+
+function waitForPathFinderCollapseControl(): void {
+	if (pathFinderCollapseObserver || pathFinderCollapseWaitExpired) return;
+	pathFinderCollapseObserver = new MutationObserver(syncWaitingPathFinderCollapseControl);
+	pathFinderCollapseObserverTimer = setTimeout(() => {
+		pathFinderCollapseWaitExpired = true;
+		stopPathFinderCollapseObserver();
+	}, PATHFINDER_COLLAPSE_WAIT_TIMEOUT_MS);
+	const navigation = document.querySelector(MAIN_NAVIGATION_SELECTOR);
+	observePathFinderCollapseRoot(navigation ?? document.documentElement, Boolean(navigation));
+}
+
 export function syncPathFinderSlimSidebar(enabled: boolean): void {
+	const enabling = enabled && !pathFinderSlimSidebarEnabled;
 	pathFinderSlimSidebarEnabled = enabled;
 	installPathFinderExpanderGuard();
 	if (!enabled) {
+		pathFinderCollapseWaitExpired = false;
+		stopPathFinderCollapseObserver();
 		syncPathFinderExpanderDisabledState(false);
 		return;
 	}
-	removeInlineWidth();
+	if (enabling) pathFinderCollapseWaitExpired = false;
+	if (!removeInlineWidth()) {
+		waitForPathFinderCollapseControl();
+		return;
+	}
+	pathFinderCollapseWaitExpired = false;
+	stopPathFinderCollapseObserver();
 	syncPathFinderExpanderDisabledState(true);
 	setTimeout(() => syncPathFinderExpanderDisabledState(true), 600);
 }
@@ -229,12 +300,12 @@ export function insertCustomEditorPaletteButtons(): void {
 	}
 }
 
-export function removeInlineWidth(): void {
+export function removeInlineWidth(): boolean {
 	const nav = document.querySelector<HTMLElement>(MAIN_NAVIGATION_SELECTOR);
 	const pathfinderCollapsed = document.querySelector(PATHFINDER_COLLAPSED_SELECTOR);
 	if (pathfinderCollapsed) {
 		nav?.style.removeProperty('width');
-		return;
+		return true;
 	}
 	const collapseButton = document.querySelector<HTMLElement>(
 		PATHFINDER_COLLAPSE_BUTTON_SELECTOR
@@ -249,10 +320,12 @@ export function removeInlineWidth(): void {
 		setTimeout(() => {
 			nav?.style.removeProperty('width');
 		}, 500);
+		return true;
 	} else {
 		void debugWarn('selector', 'Collapse button not found.', {
 			selector: PATHFINDER_COLLAPSE_BUTTON_SELECTOR,
 		}, { feedback: true });
+		return false;
 	}
 }
 

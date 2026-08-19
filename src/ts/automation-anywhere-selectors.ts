@@ -112,19 +112,17 @@ export const NATIVE_TOAST_SELECTOR = '[data-path="Toast"]';
 export const CODE_INPUT_SELECTOR = '[data-path="CodeInput"]';
 export const SHARED_COPY_BUTTON_SELECTOR = '.aa-icon-action-clipboard-copy--shared';
 export const SHARED_PASTE_BUTTON_SELECTOR = '.aa-icon-action-clipboard-paste--shared';
-export const BOT_MODAL_SELECTOR = '[data-modal-id="taskbot-action-run-now"]';
+export const BOT_MODAL_SELECTOR =
+	'[data-modal-id="taskbot-action-loading"], [data-modal-id="taskbot-action-run-now"]';
 export const DIALOG_SELECTOR = '[role="dialog"]';
 export const ALERT_CONTROLS_SELECTOR = '.alert__controls';
 export const MESSAGE_CONTROLS_SELECTOR = '.message__controls';
 export const MESSAGE_HEADER_SELECTOR = '.message__header';
-export const MESSAGE_TITLE_SELECTOR = '.message__title';
 export const MESSAGE_TITLE_CONTAINER_SELECTOR = '.message__title-container';
 export const BOT_MODAL_CONTROLS_SELECTOR =
 	'.alert__controls, .message__controls, .message__title-container';
 export const BOT_MODAL_DIALOG_SELECTOR =
-	'[data-modal-id="taskbot-action-run-now"] [role="dialog"], [role="dialog"] [data-modal-id="taskbot-action-run-now"]';
-export const BOT_MODAL_RUNNING_INDICATOR_SELECTOR =
-	'.devicechannelmodal, .rio-spinner--variant_WORKING';
+	'[data-modal-id="taskbot-action-loading"] [role="dialog"], [role="dialog"] [data-modal-id="taskbot-action-loading"], [data-modal-id="taskbot-action-run-now"] [role="dialog"], [role="dialog"] [data-modal-id="taskbot-action-run-now"]';
 export const MODAL_BACKDROP_SELECTOR = '.modal-backdrop';
 export const ERROR_MODAL_SELECTOR = '.modal--theme_error';
 export const ERROR_BADGE_ICON_SELECTOR =
@@ -516,53 +514,40 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		id: 'bot-modal',
 		view: 'taskbot-editor',
 		group: 'taskbot-transient',
-		label: 'Running bot modal',
+		label: 'Bot execution modal',
 		feature: 'Minimize running bot window',
 		selector: BOT_MODAL_SELECTOR,
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		status: 'active',
 		requires: 'bot-modal',
-		triggerHint: 'Click Run on a taskbot to trigger the running bot modal.',
+		triggerHint: 'Click Run on a taskbot to trigger the loading and running modal states.',
 	},
 	{
 		id: 'bot-modal-controls',
 		view: 'taskbot-editor',
 		group: 'taskbot-transient',
-		label: 'Running bot modal controls',
+		label: 'Bot execution modal controls',
 		feature: 'Minimize running bot window',
 		selector: BOT_MODAL_CONTROLS_SELECTOR,
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		status: 'active',
 		requires: 'bot-modal',
-		triggerHint: 'Click Run on a taskbot to trigger the running bot modal.',
+		triggerHint: 'Click Run on a taskbot to trigger the loading and running modal states.',
 	},
 	{
 		id: 'bot-modal-dialog',
 		view: 'taskbot-editor',
 		group: 'taskbot-transient',
-		label: 'Running bot dialog',
+		label: 'Bot execution dialog',
 		feature: 'Minimize running bot window',
 		selector: BOT_MODAL_DIALOG_SELECTOR,
 		source: 'src/ts/bot-execution-modal.ts',
 		severity: 'transient',
 		status: 'active',
 		requires: 'bot-modal',
-		triggerHint: 'Click Run on a taskbot to trigger the running bot modal.',
-	},
-	{
-		id: 'bot-modal-running-indicator',
-		view: 'taskbot-editor',
-		group: 'taskbot-transient',
-		label: 'Running indicator',
-		feature: 'Minimize running bot window',
-		selector: BOT_MODAL_RUNNING_INDICATOR_SELECTOR,
-		source: 'src/ts/bot-execution-modal.ts',
-		severity: 'transient',
-		status: 'active',
-		requires: 'bot-modal',
-		triggerHint: 'Click Run on a taskbot to trigger the running indicator.',
+		triggerHint: 'Click Run on a taskbot to trigger the loading and running modal states.',
 	},
 	{
 		id: 'error-modal',

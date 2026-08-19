@@ -19,8 +19,6 @@ const ES: Record<string, string> = {
 	Appearance: 'Apariencia',
 	Jobs: 'Trabajos',
 	'Diagnostics': 'Diagnosticos',
-	'Open full settings': 'Abrir ajustes completos',
-	'Full settings': 'Ajustes completos',
 	Overview: 'Resumen',
 	Commands: 'Comandos',
 	Compatibility: 'Compatibilidad',
@@ -46,10 +44,8 @@ const ES: Record<string, string> = {
 	'Dismiss': 'Descartar',
 	'Search help': 'Buscar ayuda',
 	'Supported builds': 'Versiones compatibles',
-	'Live diagnostics require the side panel.': 'Los diagnosticos en vivo requieren el panel lateral.',
 	'Live diagnostics inspect Control Room state and never modify it.':
 		'Los diagnosticos en vivo revisan el estado de Control Room y nunca lo modifican.',
-	'Live compatibility requires the side panel.': 'La compatibilidad en vivo requiere el panel lateral.',
 	'Saved': 'Guardado',
 	'Undo': 'Deshacer',
 	'Setting saved.': 'Ajuste guardado.',
@@ -104,8 +100,6 @@ const ES: Record<string, string> = {
 	'Move and share actions': 'Mover y compartir acciones',
 	'The selected page is logged out. Sign in, then select Refresh.':
 		'La pagina seleccionada cerro sesion. Inicia sesion y selecciona Actualizar.',
-	'Customize the interface in Appearance, review global behavior in Settings, and use the side panel for Tools and live Diagnostics.':
-		'Personaliza la interfaz en Apariencia, revisa el comportamiento global en Ajustes y usa el panel lateral para Herramientas y Diagnosticos en vivo.',
 	'Scanning package usage...': 'Buscando uso de paquetes...',
 	'Stopped after the current item. Completed work remains and is listed in the job log.':
 		'Se detuvo despues del elemento actual. El trabajo completado permanece en el registro.',

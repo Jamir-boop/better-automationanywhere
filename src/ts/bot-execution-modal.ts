@@ -2,19 +2,22 @@ import { isTaskEditorUrl } from './automation-anywhere';
 import { t } from './i18n';
 import { setContentIconButton } from './content-icons';
 import {
+	findBackdropNear,
+	findBotExecutionModalControlHost,
+	findBotExecutionModalDialog,
+} from './bot-execution-modal-dom';
+import {
 	DEFAULT_BOT_EXECUTION_MODAL_POSITION,
 	normalizeBotExecutionModalPosition,
 	type BotExecutionModalPosition,
 } from './settings';
 import {
 	ALERT_CONTROLS_SELECTOR,
-	BOT_MODAL_RUNNING_INDICATOR_SELECTOR,
 	BOT_MODAL_SELECTOR,
 	DIALOG_SELECTOR,
 	MESSAGE_CONTROLS_SELECTOR,
 	MESSAGE_HEADER_SELECTOR,
 	MESSAGE_TITLE_CONTAINER_SELECTOR,
-	MESSAGE_TITLE_SELECTOR,
 	MODAL_BACKDROP_SELECTOR,
 } from './automation-anywhere-selectors';
 
@@ -29,6 +32,12 @@ const MINIMIZED_CLASS = 'better-aa-bot-modal-is-minimized';
 const BACKDROP_MINIMIZED_CLASS = 'better-aa-bot-modal-backdrop-is-minimized';
 const CONTROL_CLASS = 'better-aa-bot-modal-control';
 const SYNC_DEBOUNCE_MS = 50;
+const CONTROL_HOST_SELECTORS = [
+	MESSAGE_HEADER_SELECTOR,
+	MESSAGE_TITLE_CONTAINER_SELECTOR,
+	ALERT_CONTROLS_SELECTOR,
+	MESSAGE_CONTROLS_SELECTOR,
+] as const;
 
 type BotModalControl = 'minimize' | 'maximize';
 
@@ -48,70 +57,16 @@ let position: BotExecutionModalPosition = DEFAULT_BOT_EXECUTION_MODAL_POSITION;
 const recordsByDialog = new WeakMap<HTMLElement, BotModalRecord>();
 const activeRecords = new Set<BotModalRecord>();
 
-function findBackdropNear(element: HTMLElement): HTMLElement | null {
-	const previousSibling = element.previousElementSibling;
-	if (
-		previousSibling instanceof HTMLElement &&
-		previousSibling.matches(MODAL_BACKDROP_SELECTOR)
-	) {
-		return previousSibling;
-	}
-
-	const nextSibling = element.nextElementSibling;
-	if (nextSibling instanceof HTMLElement && nextSibling.matches(MODAL_BACKDROP_SELECTOR)) {
-		return nextSibling;
-	}
-
-	const parent = element.parentElement;
-	if (!parent) return null;
-	const children = Array.from(parent.children);
-	const elementIndex = children.indexOf(element);
-	if (elementIndex < 0) return null;
-
-	for (let index = elementIndex - 1; index >= 0; index -= 1) {
-		const child = children[index];
-		if (child instanceof HTMLElement && child.matches(MODAL_BACKDROP_SELECTOR)) {
-			return child;
-		}
-	}
-
-	for (const child of children.slice(elementIndex + 1)) {
-		if (child instanceof HTMLElement && child.matches(MODAL_BACKDROP_SELECTOR)) {
-			return child;
-		}
-	}
-	return null;
-}
-
 function getDialog(modal: HTMLElement): HTMLElement | null {
-	return (
-		modal.closest<HTMLElement>(DIALOG_SELECTOR) ??
-		modal.querySelector<HTMLElement>(DIALOG_SELECTOR)
-	);
+	return findBotExecutionModalDialog(modal, DIALOG_SELECTOR);
 }
 
 function getControlHost(modal: HTMLElement): HTMLElement | null {
-	return (
-		modal.querySelector<HTMLElement>(MESSAGE_HEADER_SELECTOR) ??
-		modal.querySelector<HTMLElement>(MESSAGE_TITLE_CONTAINER_SELECTOR) ??
-		modal.querySelector<HTMLElement>(ALERT_CONTROLS_SELECTOR) ??
-		modal.querySelector<HTMLElement>(MESSAGE_CONTROLS_SELECTOR)
-	);
-}
-
-function hasBotExecutionTitle(modal: HTMLElement): boolean {
-	const title = modal.querySelector<HTMLElement>(MESSAGE_TITLE_SELECTOR);
-	const text = title?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-	return text.startsWith('Deploying to your computer') || text.startsWith('Running bot');
+	return findBotExecutionModalControlHost(modal, CONTROL_HOST_SELECTORS);
 }
 
 function isBotExecutionModal(modal: HTMLElement): boolean {
-	return (
-		modal.matches(BOT_MODAL_SELECTOR) &&
-		Boolean(getControlHost(modal)) &&
-		(hasBotExecutionTitle(modal) ||
-			Boolean(modal.querySelector(BOT_MODAL_RUNNING_INDICATOR_SELECTOR)))
-	);
+	return modal.matches(BOT_MODAL_SELECTOR) && Boolean(getControlHost(modal));
 }
 
 function getTargetModals(): HTMLElement[] {
@@ -194,7 +149,9 @@ function ensureControls(record: BotModalRecord): void {
 function getOrCreateRecord(modal: HTMLElement): BotModalRecord | null {
 	const dialog = getDialog(modal);
 	if (!dialog) return null;
-	const backdrop = findBackdropNear(dialog) ?? findBackdropNear(modal);
+	const backdrop =
+		findBackdropNear(dialog, MODAL_BACKDROP_SELECTOR) ??
+		findBackdropNear(modal, MODAL_BACKDROP_SELECTOR);
 	if (!backdrop) return null;
 
 	const existingRecord = recordsByDialog.get(dialog);

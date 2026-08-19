@@ -1689,8 +1689,7 @@ button
 
 .tab-button,
 .tools-action-bar button,
-.button-grid button,
-#openFullSettings
+.button-grid button
 	min-height: 44px
 
 button:focus-visible,
@@ -1700,18 +1699,6 @@ textarea:focus-visible,
 summary:focus-visible
 	outline: 2px solid var(--accent)
 	outline-offset: 2px
-
-html[data-surface='options']
-	body
-		min-width: 0
-
-	#app
-		width: min(100% - 32px, 800px)
-		margin-inline: auto
-		padding-block: 24px 48px
-
-	.header-controls #openFullSettings
-		display: none
 
 @media (max-width: 440px)
 	.tab-list,

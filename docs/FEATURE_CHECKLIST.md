@@ -77,19 +77,10 @@ Selector source of truth:
 	- Source: `src/ts/icons.ts`, `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/tools.ts`, `src/ts/ui.ts`, `src/ts/bot-execution-modal.ts`
 	- Setting/id: none; user-requested always-on visual language. `lucide` is pinned and only named icons are bundled.
 	- Selectors: extension-owned `.better-aa-icon` and `data-lucide`; no Automation Anywhere external selector.
-	- Validate: inspect the side panel, full options routes, launcher, TaskBot palette controls, notification close control, and minimized bot window in Chrome and Firefox at normal and 200% zoom; use keyboard focus on icon-only controls.
+	- Validate: inspect the side panel, launcher, TaskBot palette controls, notification close control, and minimized bot window in Chrome and Firefox at normal and 200% zoom; use keyboard focus on icon-only controls.
 	- Expected: icons support visible labels where space permits; icon-only buttons keep an accessible button name and target size; dynamic labels retain their icon; SVG strokes use `currentColor` without filled paths; no remote icon asset or full icon catalog is bundled.
 	- Status: active
 	- Delete condition: the extension visual language no longer uses icons or Lucide is replaced.
-
-- [ ] Full configuration options page
-	- Source: `entrypoints/options/index.html`, `entrypoints/options/main.ts`, `entrypoints/sidepanel/main.ts`, `wxt.config.ts`
-	- Setting/id: browser `options_ui`; routes `#appearance`, `#settings`, `#help`
-	- Selectors: extension-owned IDs only
-	- Validate: open from the browser extension details page and **Open full settings**; inspect all three routes in Chrome and Firefox at 200% zoom and a narrow viewport; change settings in both surfaces.
-  - Expected: one centered 760–840px configuration column reuses the side-panel markup, handlers, and storage wiring; Jamir appears below the extension title, and the About contact actions fill equal 50/50 columns; stable routes and Help section anchors open the correct primary tab and subtab; Tools and its tab listeners load only in the side panel, while Tools and live Diagnostics are not available in Options; global changes synchronize across open extension surfaces.
-	- Status: active
-	- Delete condition: browser options support is removed.
 
 - [ ] Tools tab
 	- Source: `entrypoints/sidepanel/tools.ts`, `src/ts/control-room-targets.ts`
@@ -113,8 +104,8 @@ Selector source of truth:
   - Source: `entrypoints/sidepanel/main.ts`, `src/ts/help.ts`
   - Setting/id: language, shortcuts, debug, suggestions, keep alive, supported builds
   - Selectors: internal sidepanel only
-	- Validate: use the four primary ARIA tabs and the Help subtabs with mouse and Left/Right/Home/End; inspect Help at narrow width and 200% zoom; verify `#help-start`, `#help-about`, `#help-commands`, `#help-compatibility`, and `#help-diagnostics`; expand settings groups; search Help; dismiss Start here; change one simple setting and use the eight-second Undo; confirm its checkbox or select stays right-aligned in Firefox; change the same setting in another open extension surface; confirm color and Appearance resets.
-	- Expected: General is the only initially open settings group; primary and Help tabs have roving `tabindex` and linked panels; Help separates Overview, Commands, Compatibility, and Diagnostics, with only the active panel in reading/focus order and a two-column tab grid below 440px; About identifies Jamir, states the confirmed creator mission, shows the current version, and provides accessible 44px GitHub and email icon actions; Saved appears before the changed control without moving its right edge; one latest eligible change is undoable and expires after a same-setting external change; language, uploads, recorder token, and resets have no Undo; reset dialogs name the affected settings.
+	- Validate: use the four primary ARIA tabs and the Help subtabs with mouse and Left/Right/Home/End; inspect Help at narrow width and 200% zoom; expand settings groups; search Help; dismiss Start here; change one simple setting and use the eight-second Undo; confirm its checkbox or select stays right-aligned in Firefox; change the same setting from a side panel in another window; confirm color and Appearance resets.
+	- Expected: the side panel is the only configuration interface and source of truth. General is the only initially open settings group; primary and Help tabs have roving `tabindex` and linked panels; Help separates Overview, Commands, Compatibility, and Diagnostics, with only the active panel in reading/focus order and a two-column tab grid below 440px; About identifies Jamir, states the confirmed creator mission, shows the current version, and provides accessible 44px GitHub and email icon actions; Saved appears before the changed control without moving its right edge; one latest eligible change is undoable and expires after a same-setting external change; language, uploads, recorder token, and resets have no Undo; reset dialogs name the affected settings.
   - Status: active
   - Delete condition: settings surface replaced.
 
@@ -123,7 +114,7 @@ Selector source of truth:
   - Setting/id: `RUN_STYLE_DOCTOR_CHECK`
   - Selectors: `AUTOMATION_ANYWHERE_SELECTOR_CHECKS`
   - Validate: switch UI Health, API Health, and Debug Logs sub-tabs; run General, Taskbot Editor, Folder Navigation checks under UI Health.
-	- Expected: Diagnostics appears only under side-panel Help; UI Health, API Health, and logs render. The options page explains that live diagnostics require the side panel.
+	- Expected: Diagnostics appears only under side-panel Help; UI Health, API Health, and logs render.
   - Status: active
   - Delete condition: external validation moves elsewhere.
 
@@ -221,11 +212,11 @@ Selector source of truth:
   - Delete condition: tabs no longer exist.
 
 - [ ] Minimize running bot window
-  - Source: `src/ts/bot-execution-modal.ts`, `src/styl/botExecutionModal.styl`
+  - Source: `src/ts/bot-execution-modal.ts`, `src/ts/bot-execution-modal-dom.ts`, `src/styl/botExecutionModal.styl`
   - Setting/id: `minimizeBotModal`, `botExecutionModalPosition`
-  - Selectors: `bot-modal`, `bot-modal-controls`, `bot-modal-dialog`, `bot-modal-running-indicator`
-  - Validate: run taskbot, minimize/maximize modal, test all four positions.
-  - Expected: modal minimizes without trapping page; aria-modal restored on maximize.
+  - Selectors: `bot-modal`, `bot-modal-controls`, `bot-modal-dialog`
+  - Validate: run a taskbot and confirm the `taskbot-action-loading` modal receives Minimize before the `taskbot-action-run-now` state appears; minimize/maximize both states and test all four positions.
+  - Expected: loading and running modal states can minimize without trapping the page; aria-modal is restored on maximize and controls remain present when the modal ID or content changes. `scripts/test-bot-execution-modal.mjs` covers the shared dialog, backdrop, control host, and ID transition with a DOM fixture.
   - Status: active
   - Delete condition: running bot modal markup changes beyond repair.
 
@@ -251,8 +242,8 @@ Selector source of truth:
   - Source: `src/ts/ui.ts`, `src/styl/rootSidebarAutoHide.styl`
   - Setting/id: `pathFinder`
   - Selectors: `main-navigation`, `pathfinder-expander`, `pathfinder-collapsed`
-  - Validate: enable, hover sidebar, try expander click.
-  - Expected: sidebar collapses until hover; expander guarded while feature enabled.
+  - Validate: enable and refresh while the pointer is over the expanded sidebar; hover the collapsed sidebar; try the expander click.
+  - Expected: startup hover styling remains inactive until Pathfinder reports its collapsed state; a temporary observer narrows to Pathfinder, watches child, `class`, and `aria-expanded` changes, and disconnects after collapse, disablement, or ten seconds; the collapsed sidebar is 10px idle and 48px on hover without oscillation; the expander remains guarded while the feature is enabled.
   - Status: active
   - Delete condition: Pathfinder removed or replaced.
 
@@ -652,9 +643,9 @@ Selector source of truth:
 
 - [ ] Settings disclosure indicators
   - Source: `entrypoints/sidepanel/main.ts`, `entrypoints/sidepanel/style.styl`
-  - Setting/id: none; shared side-panel and options-page presentation
+  - Setting/id: none; side-panel presentation
   - Selectors: `.settings-group > summary`, `.settings-group[open] > summary .better-aa-icon`
-  - Validate: open and close each Settings group and Appearance compatibility override in both extension surfaces.
+  - Validate: open and close each Settings group and Appearance compatibility override in the side panel.
   - Expected: a right-facing chevron is visible when collapsed and rotates down with amber emphasis when expanded.
   - Status: active
   - Delete condition: native disclosure markers become visually consistent across supported Chrome and Firefox builds.

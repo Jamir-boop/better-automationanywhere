@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { importTsModule, root } from './lib/ts-module-loader.mjs';
 
@@ -21,15 +21,17 @@ for (let index = 0; ; index += 1) {
 assert.equal(attempts, 8);
 
 const readSource = (...parts) => readFile(join(root, ...parts), 'utf8');
-const [recorder, content, clipboard, initialize, sounds, sidepanel, options, debug] = await Promise.all([
+const [recorder, content, clipboard, initialize, sounds, sidepanel, ui, slimSidebarStyle, debug, botExecutionModal] = await Promise.all([
 	readSource('src', 'ts', 'recorder', 'ws-client.ts'),
 	readSource('entrypoints', 'content.ts'),
 	readSource('src', 'ts', 'clipboard.ts'),
 	readSource('src', 'ts', 'initialize.ts'),
 	readSource('src', 'ts', 'sounds.ts'),
 	readSource('entrypoints', 'sidepanel', 'main.ts'),
-	readSource('entrypoints', 'options', 'main.ts'),
+	readSource('src', 'ts', 'ui.ts'),
+	readSource('src', 'styl', 'rootSidebarAutoHide.styl'),
 	readSource('src', 'ts', 'debug.ts'),
+	readSource('src', 'ts', 'bot-execution-modal.ts'),
 ]);
 
 assert.ok(recorder.includes('RECORDER_RECONNECT_DELAYS_MS'));
@@ -50,9 +52,25 @@ assert.ok(!sounds.includes('setTimeout('));
 assert.ok(sounds.includes("attributeFilter: ['class']"));
 assert.ok(sounds.includes('mutation.addedNodes'));
 assert.ok(sounds.includes('wireRunButtons(node)'));
-assert.ok(options.includes("import '../sidepanel/main'"));
+await assert.rejects(access(join(root, 'entrypoints', 'options', 'main.ts')), { code: 'ENOENT' });
 assert.ok(sidepanel.includes("await import('./tools')"));
 assert.ok(!sidepanel.includes("from './tools'"));
+assert.ok(slimSidebarStyle.includes('.main-layout__navigation:has(.pathfinder--is_collapsed):hover'));
+assert.ok(!slimSidebarStyle.includes('\n.main-layout__navigation:hover'));
+assert.ok(ui.includes('pathFinderCollapseObserver = new MutationObserver'));
+assert.ok(ui.includes('pathFinderCollapseObserver?.disconnect()'));
+assert.ok(ui.includes('syncPathFinderSlimSidebar(true)'));
+assert.ok(ui.includes("attributeFilter: ['class', 'aria-expanded']"));
+assert.ok(ui.includes('PATHFINDER_COLLAPSE_WAIT_TIMEOUT_MS'));
+assert.ok(ui.includes('observePathFinderCollapseRoot(navigation ?? document.documentElement'));
+assert.ok(ui.includes('clearTimeout(pathFinderCollapseObserverTimer)'));
+assert.match(
+	botExecutionModal,
+	/return modal\.matches\(BOT_MODAL_SELECTOR\) && Boolean\(getControlHost\(modal\)\);/,
+	'the first Run modal is accepted before its title or spinner updates'
+);
+assert.ok(!botExecutionModal.includes('hasBotExecutionTitle'));
+assert.ok(!botExecutionModal.includes('BOT_MODAL_RUNNING_INDICATOR_SELECTOR'));
 const debugLogSource = debug.slice(
 	debug.indexOf('export async function debugLog'),
 	debug.indexOf('export function debugInfo')

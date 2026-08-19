@@ -42,10 +42,6 @@ export default defineConfig({
 				: ['menus']),
 		],
 		optional_permissions: ['notifications'],
-		options_ui: {
-			page: 'options/index.html',
-			open_in_tab: true,
-		},
 		host_permissions: browser === 'chrome' ? ['<all_urls>'] : automationAnywhereMatches,
 		web_accessible_resources:
 			browser === 'chrome'

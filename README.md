@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.38.3           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.38.8           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -211,13 +211,13 @@ Examples:
 3. Press `Alt + P`.
 4. Type command name.
 5. Press `Enter`.
-6. Use extension options to enable or disable specific UI improvements.
+6. Use Appearance in the side panel to enable or disable specific UI improvements.
 
 ------
 
 ## Configuration
 
-Open the extension side panel from the toolbar or configured shortcut. Use **Open full settings** for the full-page Appearance, Settings, and Help view. Stable routes are `#appearance`, `#settings`, and `#help`; live Diagnostics stay in the side panel.
+Open the extension side panel from the toolbar or configured shortcut. The side panel is the only configuration interface and source of truth for Appearance, Settings, Help, and live Diagnostics.
 
 - **Settings:** global shortcuts, sounds, suggestions, keep-alive, browser context menu, package and MessageBox notices, optional background-job notifications, getting-started guidance, chunked clipboard paste, language, and integrations.
 - **UI Improvements:** master style switch, individual feature toggles, colors, and loading background.

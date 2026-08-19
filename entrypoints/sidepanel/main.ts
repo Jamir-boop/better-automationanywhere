@@ -182,14 +182,13 @@ import {
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root.');
-const isOptionsSurface = document.documentElement.dataset.surface === 'options';
 
 void (async () => {
 setActiveLanguagePreference(
 	await getExtensionLanguage().catch(() => DEFAULT_EXTENSION_LANGUAGE)
 );
 
-const tools = isOptionsSurface ? null : await import('./tools');
+const tools = await import('./tools');
 
 const extensionVersion = browser.runtime.getManifest().version;
 const defaultLoadingImageCss = `url("${browser.runtime.getURL('media/loading.gif' as any)}")`;
@@ -594,7 +593,6 @@ replaceChildrenFromHtml(app, `
 		</div>
 		<div class="header-controls">
 			<span class="version-chip">${extensionVersion}</span>
-			${isOptionsSurface ? '' : `<button id="openFullSettings" type="button">${icon('external-link')}${t('Open full settings')}</button>`}
 		</div>
 	</header>
 
@@ -605,19 +603,19 @@ replaceChildrenFromHtml(app, `
 	</div>
 
 	<nav class="tab-list" role="tablist" aria-label="${t('Sidebar sections')}">
-		${isOptionsSurface ? '' : `<button id="tab-tools" class="tab-button is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-tools" tabindex="0" data-tab="tools">${icon('toolbox')}${t('Tools')} <span id="jobsTabBadge" class="nav-badge" hidden></span></button>`}
-		<button id="tab-appearance" class="tab-button${isOptionsSurface ? ' is-active' : ''}" type="button" role="tab" aria-selected="${String(isOptionsSurface)}" aria-controls="panel-appearance" tabindex="${isOptionsSurface ? '0' : '-1'}" data-tab="appearance">${icon('palette')}${t('Appearance')}</button>
+		<button id="tab-tools" class="tab-button is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-tools" tabindex="0" data-tab="tools">${icon('toolbox')}${t('Tools')} <span id="jobsTabBadge" class="nav-badge" hidden></span></button>
+		<button id="tab-appearance" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-appearance" tabindex="-1" data-tab="appearance">${icon('palette')}${t('Appearance')}</button>
 		<button id="tab-settings" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1" data-tab="settings">${icon('settings')}${t('Settings')}</button>
 		<button id="tab-help" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-help" tabindex="-1" data-tab="help">${icon('circle-help')}${t('Help')}</button>
 	</nav>
 
 	<main>
-		${tools?.renderToolsPanel({
+		${tools.renderToolsPanel({
 			universalClipboardHtml: renderUniversalClipboardSection(),
-			hidden: isOptionsSurface,
-		}) ?? ''}
+			hidden: false,
+		})}
 
-		<section id="panel-appearance" class="tab-panel${isOptionsSurface ? ' is-active' : ''}" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0" data-panel="appearance"${isOptionsSurface ? '' : ' hidden'}>
+		<section id="panel-appearance" class="tab-panel" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0" data-panel="appearance" hidden>
 			<section class="panel-section">
 				<div class="section-heading-row">
 					<h2>${t('Appearance')}</h2>
@@ -663,9 +661,7 @@ replaceChildrenFromHtml(app, `
 			<div id="help-panel-overview" class="help-subpanel" role="tabpanel" aria-labelledby="help-tab-overview" tabindex="0" data-help-subpanel="overview">
 				<section id="help-start" class="panel-section getting-started-card">
 					<div class="section-heading-row"><h2>${t('Start here')}</h2><button id="dismissGettingStarted" type="button">${icon('x')}${t('Dismiss')}</button></div>
-					<p>${isOptionsSurface
-						? t('Customize the interface in Appearance, review global behavior in Settings, and use the side panel for Tools and live Diagnostics.')
-						: t('Choose a Control Room in Tools, customize the interface in Appearance, and review global behavior in Settings.')}</p>
+					<p>${t('Choose a Control Room in Tools, customize the interface in Appearance, and review global behavior in Settings.')}</p>
 				</section>
 				<section id="help-about" class="panel-section creator-panel">
 					<div class="creator-heading-row">
@@ -709,10 +705,10 @@ replaceChildrenFromHtml(app, `
 			<div id="help-panel-diagnostics" class="help-subpanel" role="tabpanel" aria-labelledby="help-tab-diagnostics" tabindex="0" data-help-subpanel="diagnostics" hidden>
 				<section id="help-diagnostics" class="panel-section diagnostics-heading">
 					<div class="section-heading-row"><h2>${t('Diagnostics')}</h2><label class="debug-toggle"><span>${t('Debug Mode')}</span><input id="debugEnabled" type="checkbox"></label></div>
-					<p class="inline-hint">${isOptionsSurface ? t('Open the side panel to run live Control Room diagnostics.') : t('Live diagnostics inspect Control Room state and never modify it.')}</p>
+					<p class="inline-hint">${t('Live diagnostics inspect Control Room state and never modify it.')}</p>
 				</section>
 
-		<div id="diagnosticsContent" class="doctor-panel"${isOptionsSurface ? ' hidden' : ''}>
+		<div id="diagnosticsContent" class="doctor-panel">
 			<div class="health-subtabs" role="tablist" aria-label="${t('Health sections')}">
 				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="health">${icon('stethoscope')}${t('UI Health')}</button>
 				<button class="health-subtab" type="button" role="tab" aria-selected="false" data-health-section="api">${icon('activity')}${t('API Health')}</button>
@@ -887,7 +883,7 @@ let currentDoctorView: DoctorCheckGroup = 'general';
 let currentDoctorResults: StyleDoctorCheckResult[] = [];
 let previousDoctorResults: StyleDoctorCheckResult[] | null = null;
 let doctorRunning = false;
-let activeTab: SidepanelTab = isOptionsSurface ? 'appearance' : 'tools';
+let activeTab: SidepanelTab = 'tools';
 
 function showStatusMessage(message: string, severity: FeedbackSeverity = 'info'): void {
 	if (currentDebugEnabled && activeTab === 'help') {
@@ -914,12 +910,11 @@ function setStatus(
 
 function updateDebugVisibility(): void {
 	const diagnostics = document.querySelector<HTMLElement>('#diagnosticsContent');
-	if (diagnostics) diagnostics.hidden = isOptionsSurface || !currentDebugEnabled;
+	if (diagnostics) diagnostics.hidden = !currentDebugEnabled;
 	if (
 		currentDebugEnabled &&
 		activeTab === 'help' &&
-		activeHelpSection === 'diagnostics' &&
-		!isOptionsSurface
+		activeHelpSection === 'diagnostics'
 	) {
 		setHealthSection(activeHealthSection);
 	} else {
@@ -1024,13 +1019,13 @@ function formatFeedbackForAi(events: DebugEvent[]): string {
 }
 
 function updateStatusVisibility(): void {
-	const shouldHide = currentDebugEnabled && activeTab === 'help' && !isOptionsSurface;
+	const shouldHide = currentDebugEnabled && activeTab === 'help';
 	status.hidden = shouldHide;
 	status.setAttribute('aria-hidden', String(shouldHide));
 	if (shouldHide) status.textContent = '';
 }
 
-function setActiveTab(tab: SidepanelTab, updateHash = true): void {
+function setActiveTab(tab: SidepanelTab): void {
 	activeTab = tab;
 	document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
 		const active = button.dataset.tab === tab;
@@ -1046,12 +1041,10 @@ function setActiveTab(tab: SidepanelTab, updateHash = true): void {
 	if (
 		tab === 'help' &&
 		activeHelpSection === 'diagnostics' &&
-		currentDebugEnabled &&
-		!isOptionsSurface
+		currentDebugEnabled
 	) {
 		setHealthSection(activeHealthSection);
 	}
-	if (isOptionsSurface && updateHash) history.replaceState(null, '', `#${tab}`);
 	updateStatusVisibility();
 }
 
@@ -1062,7 +1055,7 @@ async function sendBackgroundMessage(message: BackgroundMessage): Promise<void> 
 async function sendActiveTabMessage(
 	message: ContentActionMessage
 ): Promise<ContentActionResponse> {
-	const tabId = tools?.getSelectedToolsTargetTabId();
+	const tabId = tools.getSelectedToolsTargetTabId();
 	if (!tabId) return { ok: false, error: t('Select a connected Control Room page first.') };
 
 	try {
@@ -1077,17 +1070,13 @@ async function sendActiveTabMessage(
 }
 
 async function refreshControlRoomCompatibility(forceRefresh = false): Promise<void> {
-	if (isOptionsSurface) {
-		controlRoomVersionState.textContent = t('Live compatibility requires the side panel.');
-		return;
-	}
 	const requestId = ++controlRoomCompatibilityRequestId;
 	controlRoomVersionState.textContent = t('Checking version...');
 	try {
 		const response = (await browser.runtime.sendMessage({
 			type: 'GET_CONTROL_ROOM_COMPATIBILITY',
 			forceRefresh,
-			tabId: tools?.getSelectedToolsTargetTabId(),
+			tabId: tools.getSelectedToolsTargetTabId(),
 		})) as ControlRoomCompatibilityResponse | undefined;
 		if (requestId !== controlRoomCompatibilityRequestId) return;
 		if (!response?.ok) {
@@ -1184,14 +1173,7 @@ const helpSubpanels = document.querySelectorAll<HTMLElement>('[data-help-subpane
 const healthSubtabs = document.querySelectorAll<HTMLButtonElement>('[data-health-section]');
 const healthSubpanels = document.querySelectorAll<HTMLElement>('[data-health-subpanel]');
 
-const HELP_SECTION_ANCHORS: Record<HelpSection, string> = {
-	overview: 'help-start',
-	commands: 'help-commands',
-	compatibility: 'help-compatibility',
-	diagnostics: 'help-diagnostics',
-};
-
-function setHelpSection(section: HelpSection, updateHash = true): void {
+function setHelpSection(section: HelpSection): void {
 	activeHelpSection = section;
 	helpSubtabs.forEach((button) => {
 		const active = button.dataset.helpSection === section;
@@ -1202,13 +1184,10 @@ function setHelpSection(section: HelpSection, updateHash = true): void {
 	helpSubpanels.forEach((panel) => {
 		panel.hidden = panel.dataset.helpSubpanel !== section;
 	});
-	if (section === 'diagnostics' && currentDebugEnabled && !isOptionsSurface) {
+	if (section === 'diagnostics' && currentDebugEnabled) {
 		setHealthSection(activeHealthSection);
 	}
 	if (section === 'compatibility') renderSupportedBuilds();
-	if (isOptionsSurface && updateHash) {
-		history.replaceState(null, '', `#${HELP_SECTION_ANCHORS[section]}`);
-	}
 }
 
 helpSubtabs.forEach((button) => {
@@ -1584,7 +1563,7 @@ async function handleSidepanelRequest(
 		setHealthSection(activeHealthSection);
 	}
 	if (request.focus === 'actionJson') focusActionJsonTextarea();
-	if (request.focus === 'jobs') tools?.openToolsJobs();
+	if (request.focus === 'jobs') tools.openToolsJobs();
 	if (request.focus === 'diagnostics') {
 		setHelpSection('diagnostics');
 		setHealthSection('health');
@@ -2006,10 +1985,6 @@ document.querySelector<HTMLElement>('.tab-list')?.addEventListener('keydown', (e
 	primaryTabs[next].click();
 });
 
-document.querySelector<HTMLButtonElement>('#openFullSettings')?.addEventListener('click', () => {
-	void browser.runtime.openOptionsPage();
-});
-
 type UndoableControl = HTMLInputElement | HTMLSelectElement;
 const priorControlValues = new WeakMap<UndoableControl, string | boolean>();
 const undoNotice = document.querySelector<HTMLElement>('#undoNotice')!;
@@ -2284,7 +2259,7 @@ refreshControlRoomVersionButton.addEventListener('click', () => {
 });
 
 function shouldRefreshBuildCheckerForActiveView(): boolean {
-	return activeTab === 'help' && activeHelpSection === 'compatibility' && !isOptionsSurface;
+	return activeTab === 'help' && activeHelpSection === 'compatibility';
 }
 
 let buildCheckerRefreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2920,38 +2895,11 @@ feedbackHistory.watch((value) => {
 	renderFeedbackHistory(value ?? []);
 });
 
-if (!isOptionsSurface) {
-	sidepanelRequest.watch((value) => {
-		void handleSidepanelRequest(value);
-	});
-}
+sidepanelRequest.watch((value) => {
+	void handleSidepanelRequest(value);
+});
 
-tools?.initializeToolsPanel({ setStatus, addFeedback });
-if (isOptionsSurface) {
-	const openHashTab = (): void => {
-		const anchor = location.hash.slice(1);
-		const helpSection: HelpSection | null =
-			anchor === 'help' || anchor === 'help-start' || anchor === 'help-about' || anchor === 'help-overview'
-				? 'overview'
-				: anchor === 'help-commands'
-					? 'commands'
-					: anchor === 'help-compatibility'
-						? 'compatibility'
-						: anchor === 'help-diagnostics'
-							? 'diagnostics'
-							: null;
-		const tab: SidepanelTab = anchor === 'settings' || anchor.startsWith('settings-')
-			? 'settings'
-			: helpSection
-				? 'help'
-				: 'appearance';
-		setActiveTab(tab, false);
-		if (helpSection) setHelpSection(helpSection, false);
-		if (anchor !== tab) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView());
-	};
-	window.addEventListener('hashchange', openHashTab);
-	openHashTab();
-}
+tools.initializeToolsPanel({ setStatus, addFeedback });
 void loadState();
-if (!isOptionsSurface) void sidepanelRequest.getValue().then(handleSidepanelRequest);
+void sidepanelRequest.getValue().then(handleSidepanelRequest);
 })();

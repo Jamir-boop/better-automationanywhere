@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { importTsModule, root } from './lib/ts-module-loader.mjs';
 
@@ -88,14 +88,12 @@ assert.equal(jobs.clearCompletedToolJobs([current, jobs.createToolJob('active', 
 })]).length, 1);
 
 const readSource = (...parts) => readFile(join(root, ...parts), 'utf8');
-const [toolsSource, toolsStyle, mainSource, backgroundSource, configSource, optionsHtml, optionsMain] = await Promise.all([
+const [toolsSource, toolsStyle, mainSource, backgroundSource, configSource] = await Promise.all([
 	readSource('entrypoints', 'sidepanel', 'tools.ts'),
 	readSource('entrypoints', 'sidepanel', 'style.styl'),
 	readSource('entrypoints', 'sidepanel', 'main.ts'),
 	readSource('entrypoints', 'background.ts'),
 	readSource('wxt.config.ts'),
-	readSource('entrypoints', 'options', 'index.html'),
-	readSource('entrypoints', 'options', 'main.ts'),
 ]);
 assert.ok(toolsSource.includes('session:toolsWindowSelection:${windowId}'));
 assert.ok(toolsSource.includes("browser.tabs.query({ currentWindow: true })"));
@@ -157,14 +155,17 @@ assert.ok(mainSource.includes('aria-controls="help-panel-commands"'));
 assert.ok(mainSource.includes('aria-controls="help-panel-compatibility"'));
 assert.ok(mainSource.includes('aria-controls="help-panel-diagnostics"'));
 assert.ok(mainSource.includes("document.querySelector<HTMLElement>('.help-subtabs')?.addEventListener('keydown'"));
-assert.ok(mainSource.includes("anchor === 'help-start' || anchor === 'help-about'"));
 assert.ok(mainSource.includes('row.insertBefore(saved, row.lastElementChild)'));
 assert.ok(!mainSource.includes('row.appendChild(saved)'));
 assert.ok(backgroundSource.includes('notifications.onClicked'));
 assert.ok(backgroundSource.includes("focus: 'jobs'"));
 assert.ok(backgroundSource.includes('permissions.onRemoved'));
 assert.ok(configSource.includes("optional_permissions: ['notifications']"));
-assert.ok(optionsHtml.includes('manifest.open-in-tab'));
-assert.ok(optionsMain.includes("import '../sidepanel/main'"));
+assert.ok(!configSource.includes('options_ui'));
+assert.ok(!mainSource.includes('isOptionsSurface'));
+assert.ok(!mainSource.includes('openFullSettings'));
+assert.ok(!mainSource.includes('openOptionsPage'));
+await assert.rejects(access(join(root, 'entrypoints', 'options', 'index.html')), { code: 'ENOENT' });
+await assert.rejects(access(join(root, 'entrypoints', 'options', 'main.ts')), { code: 'ENOENT' });
 
 console.log('Control Room selection and jobs tests passed.');
