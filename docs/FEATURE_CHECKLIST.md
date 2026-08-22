@@ -44,12 +44,12 @@ Selector source of truth:
   - Status: active
   - Delete condition: message type removed from all callers.
 
-- [ ] Version 1.40 default-on settings migration
+- [ ] Default-on settings migrations
   - Source: `src/ts/settings.ts`, `entrypoints/background.ts`
-  - Setting/id: internal `local:defaultOnSettingsMigration140Applied` marker
+  - Setting/id: internal `local:defaultOnSettingsMigration140Applied` and `local:minimizeBotModalMigration1401Applied` markers
   - Selectors: none
-  - Validate: upgrade a profile where Loading animation, Notify outdated packages, Warn about non-closing message boxes, and Scrollable folders are off; then turn them off again and restart the browser.
-  - Expected: the upgrade enables all four settings once, records the marker only after all writes succeed, and respects later user changes. New profiles use the same default-on values. UI Improvements remains the master control for visual features.
+  - Validate: upgrade a pre-1.40 profile where Loading animation, Notify outdated packages, Warn about non-closing message boxes, and Scrollable folders are off; upgrade a 1.40 profile where Minimize running bot window is off; then turn all migrated settings off again and restart the browser.
+  - Expected: 1.40 enables its four settings once, 1.40.1 independently enables Minimize running bot window once, each marker is recorded only after its writes succeed, and later user changes remain respected. New profiles use the same default-on values. UI Improvements remains the master control for visual features.
   - Status: active
   - Delete condition: supported upgrade paths can no longer originate before 1.40.
 
@@ -231,7 +231,7 @@ Selector source of truth:
 
 - [ ] Minimize running bot window
   - Source: `src/ts/bot-execution-modal.ts`, `src/ts/bot-execution-modal-dom.ts`, `src/styl/botExecutionModal.styl`
-  - Setting/id: `minimizeBotModal`, `botExecutionModalPosition`
+  - Setting/id: `minimizeBotModal` (default on; existing off values are enabled once by the 1.40.1 migration), `botExecutionModalPosition`
   - Selectors: `bot-modal`, `bot-modal-controls`, `bot-modal-dialog`
   - Validate: run a taskbot and confirm the `taskbot-action-loading` modal receives Minimize before the `taskbot-action-run-now` state appears; minimize/maximize both states and test all four positions.
   - Expected: loading and running modal states can minimize without trapping the page; aria-modal is restored on maximize and controls remain present when the modal ID or content changes. `scripts/test-bot-execution-modal.mjs` covers the shared dialog, backdrop, control host, and ID transition with a DOM fixture.

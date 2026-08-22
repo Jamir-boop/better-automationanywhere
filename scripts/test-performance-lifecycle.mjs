@@ -97,9 +97,12 @@ assert.ok(settings.includes('DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED = t
 assert.match(settings, /key: 'makeSidebarScrollable'[\s\S]*?defaultValue: true/);
 assert.match(settings, /key: 'loadingCat'[\s\S]*?defaultValue: true/);
 assert.match(settings, /key: 'moveDraggableCursor'[\s\S]*?defaultValue: true/);
+assert.match(settings, /key: 'minimizeBotModal'[\s\S]*?defaultValue: true/);
 assert.ok(settings.includes("'local:defaultOnSettingsMigration140Applied'"));
+assert.ok(settings.includes("'local:minimizeBotModalMigration1401Applied'"));
 assert.ok(settings.includes('styleFeatureItems.makeSidebarScrollable.setValue(true)'));
 assert.ok(settings.includes('styleFeatureItems.loadingCat.setValue(true)'));
+assert.ok(settings.includes('styleFeatureItems.minimizeBotModal.setValue(true)'));
 assert.ok(background.includes('applyDefaultOnSettingsMigration()'));
 assert.ok(content.includes("feature.key === 'moveDraggableCursor'"));
 assert.ok(indexStyle.includes('[draggable="true"]'));

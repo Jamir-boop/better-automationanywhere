@@ -54,6 +54,9 @@ export const nonClosingMessageBoxWarningEnabled = storage.defineItem<boolean>(
 const defaultOnSettingsMigration140Applied = storage.defineItem<boolean>(
 	'local:defaultOnSettingsMigration140Applied'
 );
+const minimizeBotModalMigration1401Applied = storage.defineItem<boolean>(
+	'local:minimizeBotModalMigration1401Applied'
+);
 export const browserContextMenuEnabled = storage.defineItem<boolean>(
 	'local:browserContextMenuEnabled'
 );
@@ -199,7 +202,7 @@ export const STYLE_FEATURES = [
 		label: 'Minimize running bot window',
 		description: 'Add Minimize and Maximize controls to the running bot window.',
 		className: 'better-aa-minimize-bot-modal',
-		defaultValue: false,
+		defaultValue: true,
 	},
 	{
 		key: 'makeSidebarScrollable',
@@ -255,14 +258,18 @@ export const styleFeatureItems = STYLE_FEATURES.reduce(
 );
 
 export async function applyDefaultOnSettingsMigration(): Promise<void> {
-	if (await defaultOnSettingsMigration140Applied.getValue()) return;
-	await Promise.all([
-		packageUpdateToastEnabled.setValue(true),
-		nonClosingMessageBoxWarningEnabled.setValue(true),
-		styleFeatureItems.makeSidebarScrollable.setValue(true),
-		styleFeatureItems.loadingCat.setValue(true),
-	]);
-	await defaultOnSettingsMigration140Applied.setValue(true);
+	if (!(await defaultOnSettingsMigration140Applied.getValue())) {
+		await Promise.all([
+			packageUpdateToastEnabled.setValue(true),
+			nonClosingMessageBoxWarningEnabled.setValue(true),
+			styleFeatureItems.makeSidebarScrollable.setValue(true),
+			styleFeatureItems.loadingCat.setValue(true),
+		]);
+		await defaultOnSettingsMigration140Applied.setValue(true);
+	}
+	if (await minimizeBotModalMigration1401Applied.getValue()) return;
+	await styleFeatureItems.minimizeBotModal.setValue(true);
+	await minimizeBotModalMigration1401Applied.setValue(true);
 }
 
 export const STYLE_VALUE_FIELDS = [
