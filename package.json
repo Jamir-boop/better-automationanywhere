@@ -2,7 +2,7 @@
   "name": "better-automationanywhere-dx",
   "description": "Better AA Developer Experience for Automation Anywhere",
   "private": true,
-  "version": "1.38.8",
+  "version": "1.40.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -19,6 +19,7 @@
     "test:background-colors": "node scripts/test-background-colors.mjs",
     "test:debug": "node scripts/test-debug.mjs",
     "test:variable-metadata": "node scripts/test-variable-metadata.mjs",
+    "test:better-comments-indicator": "node scripts/test-better-comments-indicator.mjs",
     "test:taskbot-tools": "node scripts/test-taskbot-tools.mjs",
     "test:api-health": "node scripts/test-api-health.mjs",
     "test:recorder-protocol": "node scripts/test-recorder-protocol.mjs",
@@ -27,7 +28,7 @@
     "test:control-room-jobs": "node scripts/test-control-room-jobs.mjs",
     "test:lucide-icons": "node scripts/test-lucide-icons.mjs",
     "test:firefox-sidebar": "node scripts/test-firefox-sidebar.mjs",
-    "check:maintenance": "tsc --noEmit && node scripts/test-style-doctor.mjs && node scripts/test-control-room-version.mjs && node scripts/test-background-colors.mjs && node scripts/test-debug.mjs && node scripts/test-variable-metadata.mjs && node scripts/test-taskbot-tools.mjs && node scripts/test-api-health.mjs && node scripts/test-recorder-protocol.mjs && node scripts/test-performance-lifecycle.mjs && node scripts/test-bot-execution-modal.mjs && node scripts/test-control-room-jobs.mjs && node scripts/test-lucide-icons.mjs && node scripts/test-firefox-sidebar.mjs && wxt build && wxt build -b firefox",
+    "check:maintenance": "tsc --noEmit && node scripts/test-style-doctor.mjs && node scripts/test-control-room-version.mjs && node scripts/test-background-colors.mjs && node scripts/test-debug.mjs && node scripts/test-variable-metadata.mjs && node scripts/test-better-comments-indicator.mjs && node scripts/test-taskbot-tools.mjs && node scripts/test-api-health.mjs && node scripts/test-recorder-protocol.mjs && node scripts/test-performance-lifecycle.mjs && node scripts/test-bot-execution-modal.mjs && node scripts/test-control-room-jobs.mjs && node scripts/test-lucide-icons.mjs && node scripts/test-firefox-sidebar.mjs && wxt build && wxt build -b firefox",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

@@ -46,7 +46,7 @@ assert.ok(!main.includes('<svg'));
 assert.ok(tools.includes('function getToolIcon'));
 assert.ok(tools.includes("icon('refresh-cw', false)"));
 assert.ok(workbench.includes("icon('replace-all')"));
-assert.ok(content.includes("setContentIconButton(button, 'panel-right-open'"));
+assert.ok(content.includes("setContentIcon(button, 'panel-right-open'"));
 assert.ok(ui.includes("'variable'"));
 assert.ok(ui.includes("'workflow'"));
 assert.ok(ui.includes("'zap'"));

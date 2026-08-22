@@ -1,7 +1,7 @@
 import * as commands from './commands';
 import { debugWarn } from './debug';
 import { t } from './i18n';
-import { setContentIconButton } from './content-icons';
+import { setContentIcon } from './content-icons';
 import type { BetterAaIconName } from './icons';
 import {
 	ACTIVE_EDITOR_PALETTE_LABEL_SELECTOR,
@@ -251,7 +251,7 @@ export function updateCustomEditorPaletteButtonLabels(): void {
 		.forEach((button) => {
 			const label = button.dataset.aaLabel;
 			if (!label) return;
-			setContentIconButton(button, EDITOR_PALETTE_ICONS[label], t(label));
+			setContentIcon(button, EDITOR_PALETTE_ICONS[label], t(label));
 		});
 }
 
@@ -266,7 +266,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	const variableButton = document.createElement('button');
 	variableButton.className = 'customActionVariableButton';
 	variableButton.dataset.aaLabel = 'Variables';
-	setContentIconButton(variableButton, 'variable', t('Variables'));
+	setContentIcon(variableButton, 'variable', t('Variables'));
 	variableButton.onclick = () => {
 		void commands.showVariables();
 		updateActiveButton();
@@ -275,7 +275,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	const actionButton = document.createElement('button');
 	actionButton.className = 'customActionVariableButton';
 	actionButton.dataset.aaLabel = 'Actions';
-	setContentIconButton(actionButton, 'workflow', t('Actions'));
+	setContentIcon(actionButton, 'workflow', t('Actions'));
 	actionButton.onclick = () => {
 		void commands.showActions();
 		updateActiveButton();
@@ -284,7 +284,7 @@ export function insertCustomEditorPaletteButtons(): void {
 	const triggerButton = document.createElement('button');
 	triggerButton.className = 'customActionVariableButton';
 	triggerButton.dataset.aaLabel = 'Triggers';
-	setContentIconButton(triggerButton, 'zap', t('Triggers'));
+	setContentIcon(triggerButton, 'zap', t('Triggers'));
 	triggerButton.onclick = () => {
 		commands.showTriggers();
 		updateActiveButton();
@@ -406,7 +406,7 @@ export function showNotification(
 	closeButton.setAttribute('aria-label', t('Close notification'));
 	closeButton.title = t('Close notification');
 	closeButton.className = 'toast-close';
-	setContentIconButton(closeButton, 'x');
+	setContentIcon(closeButton, 'x');
 	toast.append(content, closeButton);
 	toastWrapper.appendChild(toast);
 

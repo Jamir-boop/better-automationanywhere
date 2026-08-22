@@ -24,6 +24,7 @@ export type BetterAaIconName =
 	| 'keyboard'
 	| 'list-tree'
 	| 'mail'
+	| 'message-square'
 	| 'maximize-2'
 	| 'minimize-2'
 	| 'package-check'

@@ -22,12 +22,21 @@ import {
 	SHARED_COPY_BUTTON_SELECTOR,
 	SHARED_PASTE_BUTTON_SELECTOR,
 	TASK_EDITOR_CAPABILITY_SELECTOR,
+	TASKBOT_ACTIVE_LIST_TAB_SELECTOR,
+	TASKBOT_CANVAS_LIST_SELECTOR,
+	TASKBOT_NODE_STATUS_SELECTOR,
+	TASKBOT_RENDERED_NODE_SELECTOR,
 	TASKBOT_SAVE_BUTTON_SELECTOR,
 	VARIABLE_LABEL_SELECTOR,
 	VARIABLE_LABEL_TEXT_SELECTOR,
 	VARIABLE_ROW_SELECTOR,
 } from '../src/ts/automation-anywhere-selectors';
-import { findNonClosingMessageBoxes } from '../src/ts/automation-anywhere-json';
+import {
+	extractBetterCommentsHtmlByUid,
+	findNonClosingMessageBoxes,
+	getBetterCommentsHtmlPreview,
+	type BetterCommentsHtmlByUid,
+} from '../src/ts/automation-anywhere-json';
 import {
 	clampBackgroundColorValue,
 	getBackgroundColorRgbChannels,
@@ -72,12 +81,15 @@ import type { ContentActionResponse, RuntimeMessage } from '../src/ts/messages';
 import type { ControlRoomCompatibilityResponse } from '../src/ts/messages';
 import {
 	DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS,
+	DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED,
 	DEFAULT_COMMAND_PALETTE_ENABLED,
 	DEFAULT_FORCE_ENGLISH_LOCALE,
 	DEFAULT_KEEP_ALIVE_ENABLED,
 	DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED,
 	DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED,
 	DEFAULT_VARIABLE_METADATA_ENABLED,
+	betterCommentsIndicatorEnabled,
+	getBetterCommentsIndicatorEnabled,
 	getPackageUpdateToastEnabled,
 	getNonClosingMessageBoxWarningEnabled,
 	getVariableMetadataEnabled,
@@ -124,7 +136,7 @@ import { setRunButtonAnimationEnabled } from '../src/ts/run-button-animation';
 import { setSoundsEnabled } from '../src/ts/sounds';
 import { setSuggestionsEnabled } from '../src/ts/suggestions';
 import { updateCommandPaletteLanguage } from '../src/ts/palette';
-import { setContentIconButton } from '../src/ts/content-icons';
+import { setContentIcon } from '../src/ts/content-icons';
 import {
 	extractVariableMetadataLookup,
 	findVariableMetadata,
@@ -142,21 +154,31 @@ const SCROLLABLE_FOLDERS_CLASS = 'better-aa-make-sidebar-scrollable';
 const BOT_EXECUTION_MODAL_CLASS = 'better-aa-minimize-bot-modal';
 const KEEP_ALIVE_INTERVAL_MS = 60_000;
 const VARIABLE_METADATA_ORIGINAL_TEXT_ATTR = 'data-better-aa-original-text';
+const BETTER_COMMENTS_INDICATOR_CLASS = 'better-aa-better-comments-indicator';
+
+interface TaskbotMetadataAnalysis {
+	variableMetadata: VariableMetadataLookup;
+	betterCommentsHtmlByUid: BetterCommentsHtmlByUid;
+}
 
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
 let activeRunButtonStyleEnabled = false;
 let activeRunButtonWavesEnabled = false;
 let variableMetadataObserver: MutationObserver | null = null;
 let variableMetadataObservedSection: HTMLElement | null = null;
-let variableMetadataScheduled = false;
+let taskbotMetadataScheduled = false;
 let variableMetadataCurrentFileId: string | null = null;
 let variableMetadataMissingSignature: string | null = null;
 let variableMetadataExhaustedSignature: string | null = null;
 let variableMetadataMissingRetryCount = 0;
 let variableMetadataRetryTimer: ReturnType<typeof setTimeout> | undefined;
-const variableMetadataCache = new Map<
+let betterCommentsIndicatorActive = DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED;
+let betterCommentsIndicatorObserver: MutationObserver | null = null;
+let betterCommentsIndicatorObservedCanvas: HTMLElement | null = null;
+let taskbotMetadataCurrentFileId: string | null = null;
+const taskbotMetadataCache = new Map<
 	string,
-	Promise<VariableMetadataLookup | null>
+	Promise<TaskbotMetadataAnalysis | null>
 >();
 
 function applyBundledAssetVariables(): void {
@@ -175,7 +197,8 @@ function applyRouteClasses(): void {
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
 	if (isTopFrame()) setGlobalClipboardWatcherEnabled(isTaskEditorUrl(href));
-	scheduleVariableMetadataSync();
+	syncTaskbotMetadataRoute();
+	scheduleTaskbotMetadataSync();
 	refreshUi();
 }
 
@@ -285,10 +308,12 @@ async function applyStyleClasses(): Promise<void> {
 	const effectiveEnabled =
 		enabled &&
 		(compatibility.supported || compatibility.state === 'unknown' || forceUnsupported);
+	const editableTaskbot =
+		parseAutomationAnywherePageContext(location.href).mode !== 'view';
 	const customPaletteButtonsEnabled =
 		effectiveEnabled &&
 		styleFeatures.customPaletteButtons &&
-		parseAutomationAnywherePageContext(location.href).mode !== 'view';
+		editableTaskbot;
 	document.documentElement.dataset.betterAaControlRoomState = compatibility.state;
 	document.documentElement.dataset.betterAaSupportedControlRoom =
 		formatControlRoomTarget(compatibility.target);
@@ -296,8 +321,8 @@ async function applyStyleClasses(): Promise<void> {
 	for (const feature of STYLE_FEATURES) {
 		document.documentElement.classList.toggle(
 			feature.className,
-			feature.key === 'customPaletteButtons'
-				? customPaletteButtonsEnabled
+			feature.key === 'customPaletteButtons' || feature.key === 'moveDraggableCursor'
+				? effectiveEnabled && editableTaskbot && styleFeatures[feature.key]
 				: styleFeatures[feature.key]
 		);
 	}
@@ -308,7 +333,7 @@ async function applyStyleClasses(): Promise<void> {
 	setPathFinderSlimSidebarEnabled(effectiveEnabled && styleFeatures.pathFinder);
 	syncScrollableFoldersAutoScroll();
 	syncBotExecutionModal();
-	scheduleVariableMetadataSync();
+	scheduleTaskbotMetadataSync();
 }
 
 function getLabelTextElement(label: HTMLElement): HTMLElement {
@@ -367,27 +392,28 @@ function getVariableMetadataContext(): {
 	return { baseUrl: context.baseUrl, fileId: context.fileId, section };
 }
 
-function scheduleVariableMetadataSync(): void {
-	if (variableMetadataScheduled) return;
-	variableMetadataScheduled = true;
+function scheduleTaskbotMetadataSync(): void {
+	if (taskbotMetadataScheduled) return;
+	taskbotMetadataScheduled = true;
 	requestAnimationFrame(() => {
-		variableMetadataScheduled = false;
+		taskbotMetadataScheduled = false;
 		void syncVariableMetadataLabels();
+		void syncBetterCommentsIndicators();
 	});
 }
 
-async function loadVariableMetadata(
+async function loadTaskbotMetadata(
 	fileId: string,
 	baseUrl: string
-): Promise<VariableMetadataLookup | null> {
-	const existing = variableMetadataCache.get(fileId);
+): Promise<TaskbotMetadataAnalysis | null> {
+	const existing = taskbotMetadataCache.get(fileId);
 	if (existing) return existing;
 
 	const authToken = readAutomationAnywhereAuthTokenFromLocalStorage();
 	if (!authToken) {
 		void debugWarn(
-			'variable-metadata',
-			'Automation Anywhere auth token not found.',
+			'taskbot-metadata',
+			'TaskBot metadata auth token not found.',
 			{ fileId },
 			{ feedback: true, keepDetails: true }
 		);
@@ -397,28 +423,49 @@ async function loadVariableMetadata(
 	const promise = new AutomationAnywhereApi(baseUrl, authToken)
 		.getBotContent(fileId)
 		.then((content) => {
-			const lookup = extractVariableMetadataLookup(content, t('(unused)'));
+			const analysis = {
+				variableMetadata: extractVariableMetadataLookup(content, t('(unused)')),
+				betterCommentsHtmlByUid: extractBetterCommentsHtmlByUid(content),
+			};
 			void debugInfo(
-				'variable-metadata',
-				'Variable metadata loaded.',
-				{ fileId, variableCount: lookup.size },
+				'taskbot-metadata',
+				'TaskBot metadata loaded.',
+				{
+					fileId,
+					variableCount: analysis.variableMetadata.size,
+					betterCommentsCount: analysis.betterCommentsHtmlByUid.size,
+				},
 				{ feedback: true, keepDetails: true, debugOnly: true }
 			);
-			return lookup;
+			return analysis;
 		})
 		.catch((error) => {
 			void debugWarn(
-				'variable-metadata',
-				'Variable metadata load failed.',
+				'taskbot-metadata',
+				'TaskBot metadata load failed.',
 				{ fileId, error },
 				{ feedback: true, keepDetails: true }
 			);
 			return null;
 		})
-		.finally(scheduleVariableMetadataSync);
+		.finally(scheduleTaskbotMetadataSync);
 
-	variableMetadataCache.set(fileId, promise);
+	taskbotMetadataCache.set(fileId, promise);
 	return promise;
+}
+
+function syncTaskbotMetadataRoute(): void {
+	const context = parseAutomationAnywherePageContext(location.href);
+	const fileId =
+		context.pageType === 'private-taskbot' || context.pageType === 'public-taskbot'
+			? context.fileId ?? null
+			: null;
+	if (fileId === taskbotMetadataCurrentFileId) return;
+	if (taskbotMetadataCurrentFileId) {
+		taskbotMetadataCache.delete(taskbotMetadataCurrentFileId);
+	}
+	taskbotMetadataCurrentFileId = fileId;
+	removeBetterCommentsIndicators();
 }
 
 function clearVariableMetadataMissingRefresh(): void {
@@ -459,8 +506,8 @@ function refreshMissingVariableMetadata(
 
 	const refresh = (): void => {
 		variableMetadataRetryTimer = undefined;
-		variableMetadataCache.delete(fileId);
-		scheduleVariableMetadataSync();
+		taskbotMetadataCache.delete(fileId);
+		scheduleTaskbotMetadataSync();
 	};
 	const retryCount = variableMetadataMissingRetryCount++;
 	void debugInfo(
@@ -559,23 +606,24 @@ async function syncVariableMetadataLabels(): Promise<void> {
 	if (context.fileId !== variableMetadataCurrentFileId) {
 		clearVariableMetadataMissingRefresh();
 		restoreVariableMetadataLabels();
-		if (variableMetadataCurrentFileId) {
-			variableMetadataCache.delete(variableMetadataCurrentFileId);
-		}
 		variableMetadataCurrentFileId = context.fileId;
 	}
 
-	const lookup = await loadVariableMetadata(context.fileId, context.baseUrl);
+	const analysis = await loadTaskbotMetadata(context.fileId, context.baseUrl);
 	const latestContext = getVariableMetadataContext();
 	if (
-		!lookup ||
+		!analysis ||
 		!latestContext ||
 		latestContext.fileId !== context.fileId ||
 		latestContext.section !== context.section
 	) {
 		return;
 	}
-	applyVariableMetadataLabels(context.section, lookup, context.fileId);
+	applyVariableMetadataLabels(
+		context.section,
+		analysis.variableMetadata,
+		context.fileId
+	);
 }
 
 function setVariableMetadataObserverSection(section: HTMLElement | null): void {
@@ -584,16 +632,115 @@ function setVariableMetadataObserverSection(section: HTMLElement | null): void {
 	variableMetadataObserver = null;
 	variableMetadataObservedSection = section;
 	if (!section) return;
-	variableMetadataObserver = new MutationObserver(scheduleVariableMetadataSync);
+	variableMetadataObserver = new MutationObserver(scheduleTaskbotMetadataSync);
 	variableMetadataObserver.observe(section, {
 		childList: true,
 		subtree: true,
 	});
 }
 
-function installVariableMetadataObserver(): void {
-	document.addEventListener('click', scheduleVariableMetadataSync, true);
-	scheduleVariableMetadataSync();
+function getBetterCommentsIndicatorContext(): {
+	baseUrl: string;
+	fileId: string;
+	canvas: HTMLElement;
+} | null {
+	if (!isTopFrame() || !betterCommentsIndicatorActive) return null;
+	if (!document.documentElement.classList.contains(STYLE_CLASS)) return null;
+	const context = parseAutomationAnywherePageContext(location.href);
+	if (
+		(context.pageType !== 'private-taskbot' &&
+			context.pageType !== 'public-taskbot') ||
+		!context.baseUrl ||
+		!context.fileId ||
+		!document.querySelector(TASKBOT_ACTIVE_LIST_TAB_SELECTOR)
+	) {
+		return null;
+	}
+	const canvas = document.querySelector<HTMLElement>(TASKBOT_CANVAS_LIST_SELECTOR);
+	return canvas ? { baseUrl: context.baseUrl, fileId: context.fileId, canvas } : null;
+}
+
+function removeBetterCommentsIndicators(root: ParentNode = document): void {
+	root
+		.querySelectorAll<HTMLElement>(`.${BETTER_COMMENTS_INDICATOR_CLASS}`)
+		.forEach((indicator) => indicator.remove());
+}
+
+function applyBetterCommentsIndicators(
+	canvas: HTMLElement,
+	htmlByUid: BetterCommentsHtmlByUid
+): void {
+	canvas.querySelectorAll<HTMLElement>(TASKBOT_RENDERED_NODE_SELECTOR).forEach((node) => {
+		const uid = node.dataset.nodeUid;
+		const status = node.querySelector<HTMLElement>(TASKBOT_NODE_STATUS_SELECTOR);
+		const existing = status?.querySelector<HTMLElement>(
+			`.${BETTER_COMMENTS_INDICATOR_CLASS}`
+		);
+		const html = uid ? htmlByUid.get(uid) : undefined;
+		if (!status || html === undefined) {
+			existing?.remove();
+			return;
+		}
+
+		const preview = getBetterCommentsHtmlPreview(html);
+		const label = preview
+			? t('Better Comments: {preview}', { preview })
+			: t('Better Comments documentation');
+		if (existing) {
+			existing.title = label;
+			existing.setAttribute('aria-label', label);
+			return;
+		}
+
+		const indicator = document.createElement('span');
+		indicator.className = BETTER_COMMENTS_INDICATOR_CLASS;
+		indicator.setAttribute('role', 'img');
+		indicator.setAttribute('aria-label', label);
+		indicator.title = label;
+		setContentIcon(indicator, 'message-square');
+		status.append(indicator);
+	});
+}
+
+async function syncBetterCommentsIndicators(): Promise<void> {
+	const context = getBetterCommentsIndicatorContext();
+	setBetterCommentsIndicatorObserverCanvas(context?.canvas ?? null);
+	if (!context) {
+		removeBetterCommentsIndicators();
+		return;
+	}
+
+	const analysis = await loadTaskbotMetadata(context.fileId, context.baseUrl);
+	const latestContext = getBetterCommentsIndicatorContext();
+	if (
+		!analysis ||
+		!latestContext ||
+		latestContext.fileId !== context.fileId ||
+		latestContext.canvas !== context.canvas
+	) {
+		return;
+	}
+	applyBetterCommentsIndicators(context.canvas, analysis.betterCommentsHtmlByUid);
+}
+
+function setBetterCommentsIndicatorObserverCanvas(canvas: HTMLElement | null): void {
+	if (canvas === betterCommentsIndicatorObservedCanvas) return;
+	betterCommentsIndicatorObserver?.disconnect();
+	betterCommentsIndicatorObserver = null;
+	betterCommentsIndicatorObservedCanvas = canvas;
+	if (!canvas) return;
+	betterCommentsIndicatorObserver = new MutationObserver(scheduleTaskbotMetadataSync);
+	betterCommentsIndicatorObserver.observe(canvas, {
+		attributes: true,
+		attributeFilter: ['data-node-uid'],
+		childList: true,
+		subtree: true,
+	});
+}
+
+function installTaskbotMetadataObservers(): void {
+	document.addEventListener('click', scheduleTaskbotMetadataSync, true);
+	scheduleTaskbotMetadataSync();
 }
 
 const packageUpdateToastFileIds = new Set<string>();
@@ -718,8 +865,8 @@ async function checkSavedTaskbotForNonClosingMessageBoxes(
 }
 
 function handleSuccessfulNativeSave(fileId: string, baseUrl: string): void {
-	variableMetadataCache.delete(fileId);
-	if (variableMetadataCurrentFileId === fileId) scheduleVariableMetadataSync();
+	taskbotMetadataCache.delete(fileId);
+	if (taskbotMetadataCurrentFileId === fileId) scheduleTaskbotMetadataSync();
 	if (nonClosingMessageBoxWarningActive) {
 		void checkSavedTaskbotForNonClosingMessageBoxes(fileId, baseUrl);
 	}
@@ -730,7 +877,9 @@ function installNativeSaveListener(): void {
 		'click',
 		(event) => {
 			if (
-				(!nonClosingMessageBoxWarningActive && !variableMetadataActive) ||
+				(!nonClosingMessageBoxWarningActive &&
+					!variableMetadataActive &&
+					!betterCommentsIndicatorActive) ||
 				!document.body
 			) return;
 			const button =
@@ -817,12 +966,13 @@ async function applyInitialSettings(): Promise<void> {
 		setSuggestionsEnabled(await getShowSuggestions());
 		setActiveCommandPaletteEnabled(await getCommandPaletteEnabled());
 		setActiveBlockTaskbotNodeLabelClicks(await getBlockTaskbotNodeLabelClicks());
-	packageUpdateToastActive = await getPackageUpdateToastEnabled();
-	void checkPackageUpdateToast();
-	nonClosingMessageBoxWarningActive =
-		await getNonClosingMessageBoxWarningEnabled();
-	variableMetadataActive = await getVariableMetadataEnabled();
-	scheduleVariableMetadataSync();
+		packageUpdateToastActive = await getPackageUpdateToastEnabled();
+		void checkPackageUpdateToast();
+		nonClosingMessageBoxWarningActive =
+			await getNonClosingMessageBoxWarningEnabled();
+		variableMetadataActive = await getVariableMetadataEnabled();
+		betterCommentsIndicatorActive = await getBetterCommentsIndicatorEnabled();
+		scheduleTaskbotMetadataSync();
 		setForceEnglishLocaleEnabled(await getForceEnglishLocale());
 		setKeepAliveEnabled(await getKeepAliveEnabled());
 		setActiveCommandPaletteShortcut(await getCommandPaletteShortcut());
@@ -842,7 +992,7 @@ async function applyInitialSettings(): Promise<void> {
 function updateOpenSidebarButtonLabel(): void {
 	const button = document.getElementById(OPEN_SIDEBAR_BUTTON_ID);
 	if (!(button instanceof HTMLButtonElement)) return;
-	setContentIconButton(button, 'panel-right-open', t('Better AA'));
+	setContentIcon(button, 'panel-right-open', t('Better AA'));
 	button.title = t('Open Better AA sidebar');
 	button.setAttribute('aria-label', t('Open Better AA sidebar'));
 }
@@ -894,7 +1044,7 @@ function insertOpenSidebarButton(): void {
 	const button = document.createElement('button');
 	button.id = OPEN_SIDEBAR_BUTTON_ID;
 	button.type = 'button';
-	setContentIconButton(button, 'panel-right-open', t('Better AA'));
+	setContentIcon(button, 'panel-right-open', t('Better AA'));
 	button.title = t('Open Better AA sidebar');
 	button.setAttribute('aria-label', t('Open Better AA sidebar'));
 	button.addEventListener('click', () => {
@@ -1152,16 +1302,36 @@ export default defineContentScript({
 		nonClosingMessageBoxWarningEnabled.watch((value) => {
 			nonClosingMessageBoxWarningActive =
 				value ?? DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED;
-			if (!nonClosingMessageBoxWarningActive && !variableMetadataActive) {
+			if (
+				!nonClosingMessageBoxWarningActive &&
+				!variableMetadataActive &&
+				!betterCommentsIndicatorActive
+			) {
 				clearNativeSaveWait();
 			}
 		});
 		variableMetadataEnabled.watch((value) => {
 			variableMetadataActive = value ?? DEFAULT_VARIABLE_METADATA_ENABLED;
-			if (!variableMetadataActive && !nonClosingMessageBoxWarningActive) {
+			if (
+				!variableMetadataActive &&
+				!nonClosingMessageBoxWarningActive &&
+				!betterCommentsIndicatorActive
+			) {
 				clearNativeSaveWait();
 			}
-			scheduleVariableMetadataSync();
+			scheduleTaskbotMetadataSync();
+		});
+		betterCommentsIndicatorEnabled.watch((value) => {
+			betterCommentsIndicatorActive =
+				value ?? DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED;
+			if (
+				!betterCommentsIndicatorActive &&
+				!variableMetadataActive &&
+				!nonClosingMessageBoxWarningActive
+			) {
+				clearNativeSaveWait();
+			}
+			scheduleTaskbotMetadataSync();
 		});
 		blockTaskbotNodeLabelClicks.watch((value) => {
 			setActiveBlockTaskbotNodeLabelClicks(
@@ -1203,7 +1373,7 @@ export default defineContentScript({
 
 		runOnReady(() => {
 			insertOpenSidebarButton();
-			installVariableMetadataObserver();
+			installTaskbotMetadataObservers();
 			initializeUi();
 		});
 	},

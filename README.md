@@ -4,7 +4,7 @@ Browser extension that adds developer-focused controls, UI improvements, and pro
 
 | Extension version | Automation Anywhere Control Room | Browser support | Status    |
 | ----------------- | -------------------------------- | --------------- | --------- |
-| 1.38.8           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
+| 1.40.0           | A360 v.40+                       | Chrome / Edge / Firefox | Supported |
 
 [Installation](#installation) · [Features](#features) · [Commands](#command-palette) · [Known limitations](#known-limitations) · [Report issue](https://github.com/Jamir-boop/better-automationanywhere/issues)
 
@@ -95,6 +95,18 @@ https://github.com/user-attachments/assets/c7a60ccb-d023-4dcb-b865-4d9fcc569933
 Improves action, variable, and trigger picker buttons for faster visual scanning.
 
 https://github.com/user-attachments/assets/271a4a95-26d5-491f-ad3c-bc281b00d0f4
+
+------
+
+### Better Comments indicators
+
+TaskBot List view shows a passive comment icon for saved `betterComments` actions whose HTML field is not empty. Hover the icon to preview the first 160 characters of visible comment text. The feature is enabled by default under Appearance and works on private, public, and cloned TaskBots.
+
+------
+
+### Draggable item cursor
+
+Editable TaskBots use the native move cursor for every draggable element. The Appearance setting is enabled by default and still respects the master UI Improvements switch; read-only TaskBots retain their native cursor.
 
 ------
 

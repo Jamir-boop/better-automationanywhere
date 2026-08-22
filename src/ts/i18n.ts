@@ -125,6 +125,10 @@ const ES: Record<string, string> = {
 	'Variable metadata labels': 'Etiquetas de metadatos de variables',
 	'Shows IO arrows, defaults, and unused badges in the Variables palette.':
 		'Muestra flechas de entrada/salida, valores por defecto e indicadores de sin uso en la paleta de Variables.',
+	'Better Comments indicators': 'Indicadores de Better Comments',
+	'Shows an icon on List view lines that contain Better Comments HTML.':
+		'Muestra un icono en las lineas de la vista Lista que contienen HTML de Better Comments.',
+	'Better Comments documentation': 'Documentacion de Better Comments',
 	'Shows a toast when an open taskbot has package updates available.':
 		'Muestra un aviso cuando un taskbot abierto tiene actualizaciones de paquetes disponibles.',
 	'Checks saved TaskBots for message boxes without a definite positive timeout.':
@@ -241,6 +245,10 @@ const ES: Record<string, string> = {
 	'Palette buttons': 'Botones de paleta',
 	'Use compact Actions, Variables, and Triggers palette layout.':
 		'Usa un diseno compacto para Acciones, Variables y Disparadores.',
+	'Move cursor for draggable items':
+		'Cursor de movimiento para elementos arrastrables',
+	'Use the move cursor for draggable items in editable TaskBots.':
+		'Usa el cursor de movimiento para elementos arrastrables en TaskBots editables.',
 	'Run button style': 'Estilo del boton Ejecutar',
 	'Animate and emphasize Run.': 'Anima y resalta Ejecutar.',
 	'Wave rings': 'Anillos de onda',

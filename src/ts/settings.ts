@@ -51,11 +51,17 @@ export const packageUpdateToastEnabled = storage.defineItem<boolean>(
 export const nonClosingMessageBoxWarningEnabled = storage.defineItem<boolean>(
 	'local:nonClosingMessageBoxWarningEnabled'
 );
+const defaultOnSettingsMigration140Applied = storage.defineItem<boolean>(
+	'local:defaultOnSettingsMigration140Applied'
+);
 export const browserContextMenuEnabled = storage.defineItem<boolean>(
 	'local:browserContextMenuEnabled'
 );
 export const variableMetadataEnabled = storage.defineItem<boolean>(
 	'local:variableMetadataEnabled'
+);
+export const betterCommentsIndicatorEnabled = storage.defineItem<boolean>(
+	'local:betterCommentsIndicatorEnabled'
 );
 export const chunkedClipboardPasteEnabled = storage.defineItem<boolean>(
 	'local:chunkedClipboardPasteEnabled'
@@ -100,10 +106,11 @@ export const DEFAULT_DEBUG_ENABLED = false;
 export const DEFAULT_COMMAND_PALETTE_ENABLED = false;
 export const DEFAULT_KEEP_ALIVE_ENABLED = false;
 export const DEFAULT_BLOCK_TASKBOT_NODE_LABEL_CLICKS = false;
-export const DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = false;
-export const DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED = false;
+export const DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = true;
+export const DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED = true;
 export const DEFAULT_BROWSER_CONTEXT_MENU_ENABLED = false;
 export const DEFAULT_VARIABLE_METADATA_ENABLED = true;
+export const DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED = true;
 export const DEFAULT_CHUNKED_CLIPBOARD_PASTE_ENABLED = true;
 export const DEFAULT_FORCE_ENGLISH_LOCALE = false;
 export const DEFAULT_FORCE_UNSUPPORTED_CONTROL_ROOM_STYLES = false;
@@ -167,6 +174,13 @@ export const STYLE_FEATURES = [
 		defaultValue: true,
 	},
 	{
+		key: 'moveDraggableCursor',
+		label: 'Move cursor for draggable items',
+		description: 'Use the move cursor for draggable items in editable TaskBots.',
+		className: 'better-aa-move-draggable-cursor',
+		defaultValue: true,
+	},
+	{
 		key: 'runButton',
 		label: 'Run button style',
 		description: 'Animate and emphasize Run.',
@@ -193,7 +207,7 @@ export const STYLE_FEATURES = [
 		description:
 			'Makes folder sidebar sticky and scrollable. On folder pages, centers active folder automatically.',
 		className: 'better-aa-make-sidebar-scrollable',
-		defaultValue: false,
+		defaultValue: true,
 	},
 	{
 		key: 'adjustFolderColumnsWidth',
@@ -221,7 +235,7 @@ export const STYLE_FEATURES = [
 		label: 'Loading animation',
 		description: 'Replace loading animation image.',
 		className: 'better-aa-loading-cat',
-		defaultValue: false,
+		defaultValue: true,
 	},
 ] as const;
 
@@ -239,6 +253,17 @@ export const styleFeatureItems = STYLE_FEATURES.reduce(
 	},
 	{} as Record<StyleFeatureKey, StyleFeatureStorageItem>
 );
+
+export async function applyDefaultOnSettingsMigration(): Promise<void> {
+	if (await defaultOnSettingsMigration140Applied.getValue()) return;
+	await Promise.all([
+		packageUpdateToastEnabled.setValue(true),
+		nonClosingMessageBoxWarningEnabled.setValue(true),
+		styleFeatureItems.makeSidebarScrollable.setValue(true),
+		styleFeatureItems.loadingCat.setValue(true),
+	]);
+	await defaultOnSettingsMigration140Applied.setValue(true);
+}
 
 export const STYLE_VALUE_FIELDS = [
 	{
@@ -345,6 +370,13 @@ export async function getBrowserContextMenuEnabled(): Promise<boolean> {
 export async function getVariableMetadataEnabled(): Promise<boolean> {
 	return (
 		(await variableMetadataEnabled.getValue()) ?? DEFAULT_VARIABLE_METADATA_ENABLED
+	);
+}
+
+export async function getBetterCommentsIndicatorEnabled(): Promise<boolean> {
+	return (
+		(await betterCommentsIndicatorEnabled.getValue()) ??
+		DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED
 	);
 }
 

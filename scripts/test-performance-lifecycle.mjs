@@ -21,7 +21,23 @@ for (let index = 0; ; index += 1) {
 assert.equal(attempts, 8);
 
 const readSource = (...parts) => readFile(join(root, ...parts), 'utf8');
-const [recorder, content, clipboard, initialize, sounds, sidepanel, ui, slimSidebarStyle, debug, botExecutionModal] = await Promise.all([
+const [
+	recorder,
+	content,
+	clipboard,
+	initialize,
+	sounds,
+	sidepanel,
+	ui,
+	slimSidebarStyle,
+	debug,
+	botExecutionModal,
+	background,
+	settings,
+	taskbotStyle,
+	indexStyle,
+	selectors,
+] = await Promise.all([
 	readSource('src', 'ts', 'recorder', 'ws-client.ts'),
 	readSource('entrypoints', 'content.ts'),
 	readSource('src', 'ts', 'clipboard.ts'),
@@ -32,12 +48,17 @@ const [recorder, content, clipboard, initialize, sounds, sidepanel, ui, slimSide
 	readSource('src', 'styl', 'rootSidebarAutoHide.styl'),
 	readSource('src', 'ts', 'debug.ts'),
 	readSource('src', 'ts', 'bot-execution-modal.ts'),
+	readSource('entrypoints', 'background.ts'),
+	readSource('src', 'ts', 'settings.ts'),
+	readSource('src', 'styl', 'taskbot.styl'),
+	readSource('src', 'styl', 'index.styl'),
+	readSource('src', 'ts', 'automation-anywhere-selectors.ts'),
 ]);
 
 assert.ok(recorder.includes('RECORDER_RECONNECT_DELAYS_MS'));
 assert.ok(recorder.split('reconnectAttempt = 0').length - 1 >= 3);
 assert.ok(!content.includes('VARIABLE_METADATA_TTL_MS'));
-assert.ok(content.includes('variableMetadataCache.delete(fileId)'));
+assert.ok(content.includes('taskbotMetadataCache.delete(fileId)'));
 assert.ok(content.includes('variableMetadataObserver.observe(section'));
 assert.ok(content.includes('installNativeSaveListener'));
 assert.ok(clipboard.includes('export function setGlobalClipboardWatcherEnabled'));
@@ -71,6 +92,21 @@ assert.match(
 );
 assert.ok(!botExecutionModal.includes('hasBotExecutionTitle'));
 assert.ok(!botExecutionModal.includes('BOT_MODAL_RUNNING_INDICATOR_SELECTOR'));
+assert.ok(settings.includes('DEFAULT_PACKAGE_UPDATE_TOAST_ENABLED = true'));
+assert.ok(settings.includes('DEFAULT_NON_CLOSING_MESSAGE_BOX_WARNING_ENABLED = true'));
+assert.match(settings, /key: 'makeSidebarScrollable'[\s\S]*?defaultValue: true/);
+assert.match(settings, /key: 'loadingCat'[\s\S]*?defaultValue: true/);
+assert.match(settings, /key: 'moveDraggableCursor'[\s\S]*?defaultValue: true/);
+assert.ok(settings.includes("'local:defaultOnSettingsMigration140Applied'"));
+assert.ok(settings.includes('styleFeatureItems.makeSidebarScrollable.setValue(true)'));
+assert.ok(settings.includes('styleFeatureItems.loadingCat.setValue(true)'));
+assert.ok(background.includes('applyDefaultOnSettingsMigration()'));
+assert.ok(content.includes("feature.key === 'moveDraggableCursor'"));
+assert.ok(indexStyle.includes('[draggable="true"]'));
+assert.ok(indexStyle.includes('cursor: move !important'));
+assert.ok(!taskbotStyle.includes('data:image/png;base64'));
+assert.ok(!taskbotStyle.includes('cursor: grab'));
+assert.ok(selectors.includes("EDITOR_DRAGGABLE_SELECTOR = '[draggable=\"true\"]'"));
 const debugLogSource = debug.slice(
 	debug.indexOf('export async function debugLog'),
 	debug.indexOf('export function debugInfo')

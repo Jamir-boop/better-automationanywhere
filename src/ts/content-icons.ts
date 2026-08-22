@@ -1,5 +1,6 @@
 import {
 	Maximize2,
+	MessageSquare,
 	Minimize2,
 	PanelRightOpen,
 	Variable,
@@ -11,6 +12,7 @@ import { setIconContent, type BetterAaIconName } from './icons';
 
 const CONTENT_ICONS = {
 	Maximize2,
+	MessageSquare,
 	Minimize2,
 	PanelRightOpen,
 	Variable,
@@ -19,10 +21,10 @@ const CONTENT_ICONS = {
 	Zap,
 };
 
-export function setContentIconButton(
-	button: HTMLButtonElement,
+export function setContentIcon(
+	element: HTMLElement,
 	name: BetterAaIconName,
 	label = ''
 ): void {
-	setIconContent(CONTENT_ICONS, button, name, label);
+	setIconContent(CONTENT_ICONS, element, name, label);
 }

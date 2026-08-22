@@ -33,6 +33,8 @@ export interface NonClosingMessageBoxFinding {
 	reason: 'auto-close-disabled' | 'timeout-missing' | 'timeout-not-positive';
 }
 
+export type BetterCommentsHtmlByUid = Map<string, string>;
+
 export interface AutomationAnywhereRepositoryReference {
 	value: string;
 	count: number;
@@ -113,6 +115,46 @@ function findAttribute(node: JsonRecord, name: string): JsonRecord | undefined {
 
 function readAttributeValue(attribute: JsonRecord | undefined): JsonRecord | undefined {
 	return attribute && isRecord(attribute.value) ? attribute.value : undefined;
+}
+
+export function extractBetterCommentsHtmlByUid(
+	content: unknown
+): BetterCommentsHtmlByUid {
+	const htmlByUid = new Map<string, string>();
+	if (!isRecord(content) || !Array.isArray(content.nodes)) return htmlByUid;
+
+	for (const node of flattenNodes(content.nodes)) {
+		if (
+			String(node.packageName).toLowerCase() !== 'bettercomments' ||
+			String(node.commandName).toLowerCase() !== 'bettercomments' ||
+			typeof node.uid !== 'string'
+		) {
+			continue;
+		}
+
+		const description = readAttributeValue(findAttribute(node, 'aboutDescription'));
+		if (!Array.isArray(description?.dictionary)) continue;
+		const htmlEntry = description.dictionary.find(
+			(entry): entry is JsonRecord =>
+				isRecord(entry) && String(entry.key).toLowerCase() === 'html'
+		);
+		const htmlValue = htmlEntry && isRecord(htmlEntry.value) ? htmlEntry.value : undefined;
+		if (typeof htmlValue?.string === 'string' && htmlValue.string.length > 0) {
+			htmlByUid.set(node.uid, htmlValue.string);
+		}
+	}
+
+	return htmlByUid;
+}
+
+export function getBetterCommentsHtmlPreview(html: string): string {
+	const document = new DOMParser().parseFromString(html, 'text/html');
+	document.querySelectorAll('script, style, template').forEach((element) => element.remove());
+	const text = (document.documentElement?.textContent ?? '')
+		.replace(/\s+/g, ' ')
+		.trim();
+	if (text.length <= 160) return text;
+	return `${text.slice(0, 160).trimEnd()}\u2026`;
 }
 
 export function findNonClosingMessageBoxes(content: unknown): NonClosingMessageBoxFinding[] {

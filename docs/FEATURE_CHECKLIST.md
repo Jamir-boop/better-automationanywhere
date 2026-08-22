@@ -44,6 +44,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: message type removed from all callers.
 
+- [ ] Version 1.40 default-on settings migration
+  - Source: `src/ts/settings.ts`, `entrypoints/background.ts`
+  - Setting/id: internal `local:defaultOnSettingsMigration140Applied` marker
+  - Selectors: none
+  - Validate: upgrade a profile where Loading animation, Notify outdated packages, Warn about non-closing message boxes, and Scrollable folders are off; then turn them off again and restart the browser.
+  - Expected: the upgrade enables all four settings once, records the marker only after all writes succeed, and respects later user changes. New profiles use the same default-on values. UI Improvements remains the master control for visual features.
+  - Status: active
+  - Delete condition: supported upgrade paths can no longer originate before 1.40.
+
 - [ ] Chrome side panel open
   - Source: `entrypoints/background.ts`, `src/ts/sidepanel-state.ts`
   - Setting/id: `OPEN_SIDEBAR`
@@ -156,6 +165,15 @@ Selector source of truth:
   - Status: active
   - Delete condition: Automation Anywhere palette redesign makes buttons redundant.
 
+- [ ] Move cursor for draggable items
+  - Source: `src/ts/settings.ts`, `entrypoints/content.ts`, `src/styl/index.styl`
+  - Setting/id: `moveDraggableCursor` (default on; also requires master styles)
+  - Selectors: `EDITOR_DRAGGABLE_SELECTOR` (`[draggable="true"]`, Doctor-checked)
+  - Validate: enable and disable the setting on editable private and cloned TaskBots; hover and actively drag palette and canvas elements; repeat on `/view` and with UI Improvements disabled.
+  - Expected: every draggable element uses the native `move` cursor in editable TaskBots, including while dragging. Read-only TaskBots and disabled master/feature states retain native Control Room cursors.
+  - Status: active
+  - Delete condition: Control Room provides the same move cursor consistently.
+
 - [ ] Run button style
   - Source: `src/ts/run-button-animation.ts`
   - Setting/id: `runButton`
@@ -195,7 +213,7 @@ Selector source of truth:
 
 - [ ] Loading animation replacement
   - Source: `src/styl/customLoadingIcon.styl`, `entrypoints/sidepanel/main.ts`
-  - Setting/id: `loadingCat`, `userBg`, `userBgSize`
+  - Setting/id: `loadingCat` (default on), `userBg`, `userBgSize`; existing off values are enabled once by the 1.40 migration.
   - Selectors: `loading-indicator`
   - Validate: upload png/jpg/webp/gif, change sizing, restore default.
   - Expected: loading spinner area uses selected image without storage errors.
@@ -222,7 +240,7 @@ Selector source of truth:
 
 - [ ] Scrollable folders
   - Source: `src/ts/folders.ts`, `src/styl/foldersScrollable.styl`
-  - Setting/id: `makeSidebarScrollable`
+  - Setting/id: `makeSidebarScrollable` (default on); existing off values are enabled once by the 1.40 migration.
   - Selectors: `folder-list`, `folder-list-item`, `active-folder`
   - Validate: open deep folder list.
   - Expected: active folder scrolls into view and sidebar remains usable.
@@ -407,6 +425,17 @@ Selector source of truth:
   - Status: active
   - Delete condition: Automation Anywhere provides a portable cross-Control-Room action clipboard or removes these metadata fields/endpoints.
 
+## Better Comments Indicators
+
+- [ ] Saved Better Comments marker
+  - Source: `entrypoints/content.ts`, `src/ts/automation-anywhere-json.ts`, `src/ts/content-icons.ts`, `src/styl/taskbot.styl`
+  - Setting/id: `local:betterCommentsIndicatorEnabled` (default on; also requires master styles)
+  - Selectors: `TASKBOT_ACTIVE_LIST_TAB_SELECTOR`, `TASKBOT_CANVAS_LIST_SELECTOR`, `TASKBOT_RENDERED_NODE_SELECTOR`, `TASKBOT_NODE_STATUS_SELECTOR` (all Doctor-checked)
+  - Validate: open private, public, and cloned TaskBots containing `betterComments` actions in List, Flow, and Dual views; include native comment status icons, nested actions, an empty HTML string, whitespace-only HTML, and formatting-only HTML; then complete a successful native save.
+  - Expected: only List view shows one passive Lucide MessageSquare icon per matching saved action. Native status icons remain. Any `aboutDescription.html` string with length greater than zero qualifies, independent of package version. Hover shows `Better Comments: ` plus at most 160 normalized visible characters, or the generic documentation label when the HTML has no visible text. Bot content is shared with Variable metadata, loaded once per file, invalidated after successful save or file-id route change, and observed only inside the active List canvas without polling.
+  - Status: active
+  - Delete condition: Automation Anywhere exposes equivalent unlocked Better Comments markers or the package schema changes.
+
 ## Variable Metadata
 
 - [ ] Variable metadata fetch
@@ -494,7 +523,7 @@ Selector source of truth:
 
 - [ ] Package update toast
   - Source: `entrypoints/content.ts`, `src/ts/ui.ts`, `src/ts/settings.ts`
-  - Setting/id: `local:packageUpdateToastEnabled` (default off)
+  - Setting/id: `local:packageUpdateToastEnabled` (default on); existing off values are enabled once by the 1.40 migration.
   - Selectors: none; API/content based
   - Validate: enable in Settings; open taskbot with outdated packages on `/edit` and `/view`; re-open same bot in session; force an auth/API failure and retry; reload; open up-to-date bot; disable toggle.
   - Expected: one toast per successfully checked bot per page load with the total in its title and a vertical list of up to 3 `name current → target` rows plus `+N more`; failed checks remain retryable; up-to-date bot silent; toggle off silent.
@@ -503,7 +532,7 @@ Selector source of truth:
 
 - [ ] Non-closing message-box save warning
   - Source: `entrypoints/content.ts`, `entrypoints/sidepanel/tools.ts`, `src/ts/automation-anywhere-json.ts`, `src/ts/settings.ts`
-  - Setting/id: `local:nonClosingMessageBoxWarningEnabled` (default off)
+  - Setting/id: `local:nonClosingMessageBoxWarningEnabled` (default on); existing off values are enabled once by the 1.40 migration.
   - Selectors: `TASKBOT_SAVE_BUTTON_SELECTOR`, `NATIVE_TOAST_SELECTOR`
   - Validate: enable the setting; save the supplied unsafe and corrected TaskBots through native Save and TaskBot JSON Save; test nested actions, a dynamic timeout, an unrelated toast, save failure, a build without a visible Save-button busy transition, and setting off.
   - Expected: native Save requires the same button to enter and leave `disabled`/`aria-busy` state plus a new native toast; ambiguous, unrelated, safe, failed, and disabled checks stay silent. A successful unsafe save warns with the affected action count and up to 3 action names; missing/false auto-close and missing/non-positive literal timeouts warn; enabled auto-close with a dynamic timeout does not. Native Save is never delayed or blocked.

@@ -56,6 +56,11 @@ export const LOADING_INDICATOR_SELECTOR =
 	'.devicechannelmodal .icon-image-container, .rio-spinner--variant_LOADING, .rio-spinner--variant_WORKING';
 export const TASKBOT_EDITOR_LAYOUT_SELECTOR = '.editor-layout__palette';
 export const TASKBOT_CANVAS_NODE_SELECTOR = '.taskbot-canvas-list-node';
+export const TASKBOT_ACTIVE_LIST_TAB_SELECTOR =
+	'[data-path="EditorTabs.tab"][data-tab-name="list"][aria-selected="true"]';
+export const TASKBOT_CANVAS_LIST_SELECTOR = '.taskbot-canvas-list';
+export const TASKBOT_NODE_STATUS_SELECTOR =
+	'.taskbot-canvas-list-node__title-cell--status .taskbot-node-status';
 export const TASKBOT_RENDERED_NODE_SELECTOR =
 	'[data-path="TaskbotCanvasListNode"][data-node-uid], [data-path="TaskbotCanvasFlowPoint"][data-node-uid]';
 export const TASKBOT_ACTIVE_CURSOR_SELECTOR =
@@ -100,7 +105,7 @@ export const DELETE_UNUSED_VARIABLES_MENU_BUTTON_SELECTOR =
 	'button.action-bar__item--is_menu:nth-child(5)';
 export const DELETE_UNUSED_VARIABLES_OPTION_SELECTOR =
 	'.dropdown-options.g-scroller button.rio-focus--inset_4px:nth-child(2)';
-export const EDITOR_DRAGGABLE_CHILD_SELECTOR = '.editor-palette-item__child--is_draggable';
+export const EDITOR_DRAGGABLE_SELECTOR = '[draggable="true"]';
 export const EDITOR_TABS_SELECTOR =
 	'.taskbot-editor__toolbar__tabs > .editortabs[role="tablist"][data-path="EditorTabs"]';
 export const RUN_BUTTON_SELECTOR =
@@ -236,6 +241,42 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		source: 'src/styl/editorMain.styl',
 		severity: 'required',
 		status: 'active',
+	},
+	{
+		id: 'taskbot-active-list-tab',
+		view: 'taskbot-editor',
+		group: 'taskbot-editor',
+		label: 'Active List editor tab',
+		feature: 'Better Comments indicators',
+		selector: TASKBOT_ACTIVE_LIST_TAB_SELECTOR,
+		source: 'entrypoints/content.ts',
+		severity: 'optional',
+		status: 'active',
+		triggerHint: 'Select List in the Flow/List/Dual editor tabs.',
+	},
+	{
+		id: 'taskbot-canvas-list',
+		view: 'taskbot-editor',
+		group: 'taskbot-editor',
+		label: 'Taskbot List canvas',
+		feature: 'Better Comments indicators',
+		selector: TASKBOT_CANVAS_LIST_SELECTOR,
+		source: 'entrypoints/content.ts',
+		severity: 'optional',
+		status: 'active',
+		triggerHint: 'Select List in the Flow/List/Dual editor tabs.',
+	},
+	{
+		id: 'taskbot-node-status',
+		view: 'taskbot-editor',
+		group: 'taskbot-editor',
+		label: 'Taskbot List node status host',
+		feature: 'Better Comments indicators',
+		selector: TASKBOT_NODE_STATUS_SELECTOR,
+		source: 'entrypoints/content.ts',
+		severity: 'optional',
+		status: 'active',
+		triggerHint: 'Select List in the Flow/List/Dual editor tabs.',
 	},
 	{
 		id: 'taskbot-rendered-node',
@@ -444,13 +485,13 @@ export const AUTOMATION_ANYWHERE_SELECTOR_CHECKS: AutomationAnywhereSelectorChec
 		notes: 'Transient control exists only while palette search is active.',
 	},
 	{
-		id: 'editor-draggable-child',
+		id: 'editor-draggable-element',
 		view: 'taskbot-editor',
 		group: 'taskbot-editor',
-		label: 'Draggable palette item',
-		feature: 'Taskbot editor UI',
-		selector: EDITOR_DRAGGABLE_CHILD_SELECTOR,
-		source: 'src/styl/taskbot.styl',
+		label: 'Draggable TaskBot element',
+		feature: 'Move draggable cursor',
+		selector: EDITOR_DRAGGABLE_SELECTOR,
+		source: 'src/styl/index.styl',
 		severity: 'optional',
 		status: 'active',
 	},

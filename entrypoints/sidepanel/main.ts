@@ -134,6 +134,9 @@ import {
 	variableMetadataEnabled,
 	getVariableMetadataEnabled,
 	DEFAULT_VARIABLE_METADATA_ENABLED,
+	betterCommentsIndicatorEnabled,
+	getBetterCommentsIndicatorEnabled,
+	DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED,
 	DEFAULT_RECORDER_BRIDGE_ENABLED,
 	DEFAULT_RECORDER_BRIDGE_PORT,
 	recorderBridgeEnabled,
@@ -211,6 +214,7 @@ const STYLE_FEATURE_GROUPS = [
 		title: 'Taskbot Editor',
 		keys: [
 			'customPaletteButtons',
+			'moveDraggableCursor',
 			'runButton',
 			'editorTabsButtons',
 			'minimizeBotModal',
@@ -452,6 +456,18 @@ function renderVariableMetadataControl(): string {
 	`;
 }
 
+function renderBetterCommentsIndicatorControl(): string {
+	return `
+		<label class="setting-row userstyle-dependent">
+			<span>
+				<strong>${t('Better Comments indicators')}</strong>
+				<small>${t('Shows an icon on List view lines that contain Better Comments HTML.')}</small>
+			</span>
+			<input id="betterCommentsIndicatorEnabled" type="checkbox">
+		</label>
+	`;
+}
+
 function renderStyleFeatureControls(): string {
 	return STYLE_FEATURE_GROUPS.map((group) => {
 		const groupId = group.title === 'Taskbot Editor'
@@ -461,7 +477,7 @@ function renderStyleFeatureControls(): string {
 				: 'appearance-background-loading';
 		const extraControls =
 			group.title === 'Taskbot Editor'
-				? renderVariableMetadataControl()
+				? `${renderVariableMetadataControl()}${renderBetterCommentsIndicatorControl()}`
 				: '';
 		const controls = group.keys
 			.map((key) => STYLE_FEATURES.find((feature) => feature.key === key))
@@ -786,6 +802,8 @@ const chunkedClipboardPasteEnabledInput = document.querySelector<HTMLInputElemen
 const variableMetadataEnabledInput = document.querySelector<HTMLInputElement>(
 	'#variableMetadataEnabled'
 )!;
+const betterCommentsIndicatorEnabledInput =
+	document.querySelector<HTMLInputElement>('#betterCommentsIndicatorEnabled')!;
 const showSuggestionsInput =
 	document.querySelector<HTMLInputElement>('#showSuggestions')!;
 const keepAliveEnabledInput =
@@ -1932,6 +1950,8 @@ async function loadState(): Promise<void> {
 	browserContextMenuEnabledInput.checked = await getBrowserContextMenuEnabled();
 	chunkedClipboardPasteEnabledInput.checked = await getChunkedClipboardPasteEnabled();
 	variableMetadataEnabledInput.checked = await getVariableMetadataEnabled();
+	betterCommentsIndicatorEnabledInput.checked =
+		await getBetterCommentsIndicatorEnabled();
 	recorderBridgeEnabledInput.checked = recorderEnabled;
 	updateRecorderBridgeDependentState();
 	recorderBridgePortInput.value = String(recorderPort);
@@ -2135,6 +2155,12 @@ browser.permissions.onRemoved.addListener((permissions) => {
 
 variableMetadataEnabledInput.addEventListener('change', () => {
 	void variableMetadataEnabled.setValue(variableMetadataEnabledInput.checked);
+});
+
+betterCommentsIndicatorEnabledInput.addEventListener('change', () => {
+	void betterCommentsIndicatorEnabled.setValue(
+		betterCommentsIndicatorEnabledInput.checked
+	);
 });
 
 showSuggestionsInput.addEventListener('change', () => {
@@ -2791,6 +2817,10 @@ packageUpdateToastEnabled.watch((value) => {
 });
 variableMetadataEnabled.watch((value) => {
 	variableMetadataEnabledInput.checked = value ?? DEFAULT_VARIABLE_METADATA_ENABLED;
+});
+betterCommentsIndicatorEnabled.watch((value) => {
+	betterCommentsIndicatorEnabledInput.checked =
+		value ?? DEFAULT_BETTER_COMMENTS_INDICATOR_ENABLED;
 });
 showSuggestions.watch((value) => {
 	showSuggestionsInput.checked = value ?? DEFAULT_SHOW_SUGGESTIONS;

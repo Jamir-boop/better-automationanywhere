@@ -1,6 +1,6 @@
 import { isTaskEditorUrl } from './automation-anywhere';
 import { t } from './i18n';
-import { setContentIconButton } from './content-icons';
+import { setContentIcon } from './content-icons';
 import {
 	findBackdropNear,
 	findBotExecutionModalControlHost,
@@ -88,7 +88,7 @@ function createControl(action: BotModalControl, label: string): HTMLElement {
 	button.setAttribute('aria-label', label);
 	button.title = label;
 
-	setContentIconButton(button, action === 'minimize' ? 'minimize-2' : 'maximize-2');
+	setContentIcon(button, action === 'minimize' ? 'minimize-2' : 'maximize-2');
 	wrapper.append(button);
 	wireControl(wrapper);
 	return wrapper;

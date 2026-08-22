@@ -30,6 +30,7 @@ import {
 	type ControlRoomVersionDetails,
 } from '../src/ts/control-room-version';
 import {
+	applyDefaultOnSettingsMigration,
 	botExecutionModalPosition,
 	backgroundJobNotificationsEnabled,
 	blockTaskbotNodeLabelClicks,
@@ -1019,6 +1020,14 @@ async function handleApiRequest(
 }
 
 export default defineBackground(() => {
+	void applyDefaultOnSettingsMigration().catch((error) => {
+		void debugError(
+			'settings',
+			'Default-on settings migration failed.',
+			{ error },
+			{ feedback: true, keepDetails: true }
+		);
+	});
 	browser.commands.onCommand.addListener((command) => {
 		if (command === 'open-sidebar') {
 			if (import.meta.env.CHROME) {
